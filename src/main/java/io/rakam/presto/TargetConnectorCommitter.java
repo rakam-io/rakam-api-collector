@@ -33,7 +33,7 @@ public class TargetConnectorCommitter
         this.databaseHandler = databaseHandler;
     }
 
-    public synchronized void process(Iterable<Table<String, String, MessageEventTransformer.TableData>> batches)
+    public void process(Iterable<Table<String, String, MessageEventTransformer.TableData>> batches)
     {
         StreamSupport.stream(batches.spliterator(), false).flatMap(t -> t.cellSet().stream()
                 .map(b -> new SchemaTableName(b.getRowKey(), b.getColumnKey()))).distinct().forEach(table -> {
@@ -46,7 +46,7 @@ public class TargetConnectorCommitter
                                 new Duration(1, TimeUnit.MINUTES),
                                 new Duration(1, TimeUnit.MILLISECONDS), 2.0)
                         .onRetry(() -> log.warn("Retrying to save data"))
-                        .run("middlewareConnector", () -> commit(batches, table));
+                        .run("middlewareConnector", () -> commit(batches, table).join());
             }
             catch (Exception e) {
                 log.error(e, "Unable to commit table %s.", table);

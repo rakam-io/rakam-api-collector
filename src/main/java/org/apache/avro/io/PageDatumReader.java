@@ -34,6 +34,11 @@ public class PageDatumReader
     private ResolvingDecoder creatorResolver = null;
     private final Thread creator = Thread.currentThread();
 
+    public PageDatumReader(PageBuilder pageBuilder, Schema schema)
+    {
+        this(pageBuilder, schema, schema);
+    }
+
     public PageDatumReader(PageBuilder pageBuilder, Schema actualSchema, Schema expectedSchema)
     {
         this.builder = pageBuilder;

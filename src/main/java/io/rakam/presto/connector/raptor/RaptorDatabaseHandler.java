@@ -75,13 +75,14 @@ public class RaptorDatabaseHandler
                 ImmutableMap.of("s3", (Module) binder -> {
                 }));
 
-        ImmutableMap<String, String> properties = ImmutableMap.of(
-                "metadata.db.type", "mysql",
-                "metadata.db.url", config.getMetadataUrl(),
-                "storage.data-directory", config.getDataDirectory().getAbsolutePath(),
-                "metadata.db.connections.max", "200",
-                "backup.timeout", "20m"
-        );
+        ImmutableMap<String, String> properties = ImmutableMap.<String, String>builder()
+                .put("metadata.db.type", "mysql")
+                .put("metadata.db.url", config.getMetadataUrl())
+                .put("storage.data-directory", config.getDataDirectory().getAbsolutePath())
+                .put("metadata.db.connections.max", "200")
+                .put("storage.compaction-enabled", "false")
+                .put("storage.organization-enabled", "false")
+                .put("backup.timeout", "20m").build();
 
         NodeManager nodeManager = new SingleNodeManager(config.getNodeIdentifier());
 
