@@ -413,7 +413,8 @@
                         <configuration>
                             <skip>${skip.deploy.s3}</skip>
                             <serverId>aws-release</serverId>
-                            <url>s3://rakam-prod-static/rakam-presto-builds/${presto.version}/${project.artifactId}-${project.version}-bundle.tar.gz</url>
+                            <toFile>${project.artifactId}-${project.version}-bundle.tar.gz</toFile>
+                            <url>s3://rakam-prod-static/rakam-presto-builds/${presto.version}</url>
                             <fromFile>${project.build.directory}/${project.artifactId}-${project.version}-bundle.tar.gz</fromFile>
                         </configuration>
                     </execution>
@@ -426,7 +427,8 @@
                         <configuration>
                             <skip>${skip.deploy.s3}</skip>
                             <serverId>aws-release</serverId>
-                            <url>s3://rakam-prod-static/rakam-presto-builds/${presto.version}/latest.tar.gz</url>
+                            <toFile>latest.tar.gz</toFile>
+                            <url>s3://rakam-prod-static/rakam-presto-builds/${presto.version}</url>
                             <fromFile>${project.build.directory}/${project.artifactId}-${project.version}-bundle.tar.gz</fromFile>
                         </configuration>
                     </execution>
