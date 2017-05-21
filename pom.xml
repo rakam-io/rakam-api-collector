@@ -420,6 +420,22 @@
                             </includes>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>deploy-release-latest</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>upload</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skip.deploy.s3}</skip>
+                            <serverId>aws-release</serverId>
+                            <url>s3://rakam-prod-static/rakam-presto-builds/${presto.version}/</url>
+                            <fromDir>${project.build.directory}</fromDir>
+                            <includes>
+                                latest.tar.gz
+                            </includes>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
         </plugins>
