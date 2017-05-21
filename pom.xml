@@ -10,7 +10,7 @@
 
     <groupId>io.rakam.presto</groupId>
     <artifactId>collector</artifactId>
-    <version>0.173.5-SNAPSHOT</version>
+    <version>0.173.4-SNAPSHOT</version>
 
     <properties>
         <presto.version>0.173</presto.version>
