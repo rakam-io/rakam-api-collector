@@ -408,32 +408,26 @@
                         <id>deploy-release</id>
                         <phase>deploy</phase>
                         <goals>
-                            <goal>upload</goal>
+                            <goal>upload-single</goal>
                         </goals>
                         <configuration>
                             <skip>${skip.deploy.s3}</skip>
                             <serverId>aws-release</serverId>
-                            <url>s3://rakam-prod-static/rakam-presto-builds/${presto.version}/</url>
-                            <fromDir>${project.build.directory}</fromDir>
-                            <includes>
-                                ${project.artifactId}-${project.version}-bundle.tar.gz
-                            </includes>
+                            <url>s3://rakam-prod-static/rakam-presto-builds/${presto.version}/${project.artifactId}-${project.version}-bundle.tar.gz</url>
+                            <fromFile>${project.build.directory}/${project.artifactId}-${project.version}-bundle.tar.gz</fromFile>
                         </configuration>
                     </execution>
                     <execution>
                         <id>deploy-release-latest</id>
                         <phase>deploy</phase>
                         <goals>
-                            <goal>upload</goal>
+                            <goal>upload-single</goal>
                         </goals>
                         <configuration>
                             <skip>${skip.deploy.s3}</skip>
                             <serverId>aws-release</serverId>
-                            <url>s3://rakam-prod-static/rakam-presto-builds/${presto.version}/</url>
-                            <fromDir>${project.build.directory}</fromDir>
-                            <includes>
-                                latest.tar.gz
-                            </includes>
+                            <url>s3://rakam-prod-static/rakam-presto-builds/${presto.version}/latest.tar.gz</url>
+                            <fromFile>${project.build.directory}/${project.artifactId}-${project.version}-bundle.tar.gz</fromFile>
                         </configuration>
                     </execution>
                 </executions>
