@@ -415,7 +415,6 @@
                             <serverId>aws-release</serverId>
                             <url>s3://rakam-prod-static/rakam-presto-builds/${presto.version}/</url>
                             <fromDir>${project.build.directory}</fromDir>
-                            <toDir>${project.version}</toDir>
                             <includes>
                                 ${project.artifactId}-${project.version}-bundle.tar.gz
                             </includes>
