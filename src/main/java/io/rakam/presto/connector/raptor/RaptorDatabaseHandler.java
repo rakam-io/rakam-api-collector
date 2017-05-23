@@ -11,6 +11,7 @@ import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.metadata.PrestoNode;
 import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.operator.PagesIndex;
+import com.facebook.presto.rakam.*;
 import com.facebook.presto.raptor.RaptorConnectorFactory;
 import com.facebook.presto.raptor.metadata.DatabaseMetadataModule;
 import com.facebook.presto.spi.ColumnMetadata;
@@ -67,22 +68,38 @@ public class RaptorDatabaseHandler
     private final ConnectorPageSinkProvider pageSinkProvider;
 
     @Inject
-    public RaptorDatabaseHandler(RaptorConfig config)
+    public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig)
     {
         RaptorConnectorFactory raptorConnectorFactory = new RaptorConnectorFactory(
                 RAKAM_RAPTOR_CONNECTOR,
                 new DatabaseMetadataModule(),
-                ImmutableMap.of("s3", (Module) binder -> {
-                }));
+                ImmutableMap.of("s3", new S3BackupStoreModule()));
 
-        ImmutableMap<String, String> properties = ImmutableMap.<String, String>builder()
+        ImmutableMap.Builder<String, String> props = ImmutableMap.<String, String>builder()
                 .put("metadata.db.type", "mysql")
+                .put("backup.provider", "s3")
+                .put("aws.s3-bucket", s3BackupConfig.getS3Bucket())
+                .put("aws.region", s3BackupConfig.getAWSRegion().getName())
                 .put("metadata.db.url", config.getMetadataUrl())
                 .put("storage.data-directory", config.getDataDirectory().getAbsolutePath())
                 .put("metadata.db.connections.max", "200")
                 .put("storage.compaction-enabled", "false")
                 .put("storage.organization-enabled", "false")
-                .put("backup.timeout", "20m").build();
+                .put("backup.timeout", "20m");
+
+        if(s3BackupConfig.getAccessKey() != null) {
+           props.put("raptor.aws.access-key", s3BackupConfig.getAccessKey());
+        }
+
+        if(s3BackupConfig.getSecretAccessKey() != null) {
+           props.put("raptor.aws.secret-access-key", s3BackupConfig.getSecretAccessKey());
+        }
+
+        if(s3BackupConfig.getEndpoint() != null) {
+           props.put("raptor.aws.s3-endpoint", s3BackupConfig.getEndpoint());
+        }
+
+        ImmutableMap<String, String> properties = props.build();
 
         NodeManager nodeManager = new SingleNodeManager(config.getNodeIdentifier());
 
@@ -115,7 +132,7 @@ public class RaptorDatabaseHandler
         Map<SchemaTableName, List<ColumnMetadata>> schemaTableNameListMap =
                 metadata.listTableColumns(session, new SchemaTablePrefix(schema, table));
         List<ColumnMetadata> columnMetadatas = schemaTableNameListMap.get(new SchemaTableName(schema, table));
-        if(columnMetadatas == null) {
+        if (columnMetadatas == null) {
             throw new IllegalArgumentException("Table doesn't exist");
         }
 
@@ -130,7 +147,8 @@ public class RaptorDatabaseHandler
 
         ConnectorPageSink pageSink = pageSinkProvider.createPageSink(connectorTransactionHandle, session, insertTableHandle);
 
-        return new Inserter() {
+        return new Inserter()
+        {
 
             @Override
             public void addPage(Page page)

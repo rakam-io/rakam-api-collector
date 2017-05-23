@@ -16,6 +16,7 @@ public class RaptorModule
     protected void setup(Binder binder)
     {
         ConfigBinder.configBinder(binder).bindConfig(RaptorConfig.class);
+        ConfigBinder.configBinder(binder).bindConfig(S3BackupConfig.class);
         binder.bind(DatabaseHandler.class).to(RaptorDatabaseHandler.class);
     }
 }

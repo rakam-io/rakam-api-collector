@@ -134,6 +134,12 @@
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-rakam-raptor</artifactId>
+            <version>0.173.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
             <artifactId>presto-raptor</artifactId>
             <version>${presto.version}</version>
         </dependency>
@@ -443,4 +449,15 @@
         <url>https://github.com/rakam-io/rakam</url>
         <tag>HEAD</tag>
     </scm>
+
+    <repositories>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-buremba-maven</id>
+            <name>bintray</name>
+            <url>http://dl.bintray.com/buremba/maven</url>
+        </repository>
+    </repositories>
 </project>
