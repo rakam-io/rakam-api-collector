@@ -13,6 +13,8 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DatumReader;
+import org.apache.avro.io.Decoder;
+import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.ResolvingDecoder;
 import org.apache.avro.util.WeakIdentityHashMap;
 
@@ -69,6 +71,7 @@ public class PageDatumReader
             cache = new WeakIdentityHashMap<>();
             RESOLVER_CACHE.get().put(actual, cache);
         }
+
         resolver = cache.get(expected);
         if (resolver == null) {
             resolver = DecoderFactory.get().resolvingDecoder(Schema.applyAliases(actual, expected), expected, null);
@@ -213,16 +216,5 @@ public class PageDatumReader
             }
             while ((l = in.arrayNext()) > 0);
         }
-    }
-
-    /**
-     * Called to create new array instances.  Subclasses may override to use a
-     * different array implementation.  By default, this returns a {@link
-     * GenericData.Array}.
-     */
-    @SuppressWarnings("unchecked")
-    protected Object newArray(int size, Schema schema)
-    {
-        return new GenericData.Array(size, schema);
     }
 }

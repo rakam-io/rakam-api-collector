@@ -11,9 +11,9 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.InterleavedBlockBuilder;
 import com.facebook.presto.spi.type.AbstractType;
+import com.facebook.presto.spi.type.ArrayType;
+import com.facebook.presto.spi.type.MapType;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.type.ArrayType;
-import com.facebook.presto.type.MapType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.apache.avro.Schema;
@@ -274,7 +274,7 @@ public class TestPageDatumReader
     public void testMapReader()
             throws Exception
     {
-        MapType mapType = new MapType(VARCHAR, VARCHAR);
+        MapType mapType = new MapType(false, VARCHAR, VARCHAR, null, null, null);
         PageBuilder page = new PageBuilder(of(mapType));
 
         Schema elementType = Schema.create(Schema.Type.STRING);

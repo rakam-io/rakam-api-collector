@@ -40,7 +40,6 @@ import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.split.PageSinkManager;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
-import com.facebook.presto.testing.TestingMetadata.InMemoryTableHandle;
 import com.facebook.presto.testing.TestingSession;
 import com.facebook.presto.testing.TestingTransactionHandle;
 import com.facebook.presto.transaction.TransactionManager;
@@ -67,7 +66,7 @@ import static org.testng.AssertJUnit.fail;
 
 public class TestTargetConnectorCommitter
 {
-    //@Test
+    @Test
     public void testCommitter()
             throws Exception
     {
@@ -185,7 +184,7 @@ public class TestTargetConnectorCommitter
         @Override
         public ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
         {
-            return new TestingConnectorInsertTableHandle((InMemoryTableHandle) tableHandle);
+            return new TestingConnectorInsertTableHandle(tableHandle);
         }
 
         @Override
@@ -200,9 +199,9 @@ public class TestTargetConnectorCommitter
             implements ConnectorInsertTableHandle
     {
 
-        private final InMemoryTableHandle tableHandle;
+        private final ConnectorTableHandle tableHandle;
 
-        public TestingConnectorInsertTableHandle(InMemoryTableHandle inMemoryTableHandle)
+        public TestingConnectorInsertTableHandle(ConnectorTableHandle inMemoryTableHandle)
         {
             this.tableHandle = inMemoryTableHandle;
         }

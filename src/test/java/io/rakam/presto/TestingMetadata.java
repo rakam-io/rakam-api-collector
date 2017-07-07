@@ -21,7 +21,6 @@ import com.facebook.presto.spi.ViewNotFoundException;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.testing.TestingHandle;
-import com.facebook.presto.testing.TestingMetadata.InMemoryTableHandle;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
@@ -200,9 +199,7 @@ public class TestingMetadata
     private static SchemaTableName getTableName(ConnectorTableHandle tableHandle)
     {
         requireNonNull(tableHandle, "tableHandle is null");
-        checkArgument(tableHandle instanceof InMemoryTableHandle, "tableHandle is not an instance of InMemoryTableHandle");
-        InMemoryTableHandle inMemoryTableHandle = (InMemoryTableHandle) tableHandle;
-        return inMemoryTableHandle.getTableName();
+        return ((InMemoryTableHandle) tableHandle).getTableName();
     }
 
     public static class InMemoryColumnHandle

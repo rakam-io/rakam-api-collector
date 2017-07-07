@@ -10,12 +10,12 @@
 
     <groupId>io.rakam.presto</groupId>
     <artifactId>collector</artifactId>
-    <version>0.173.6-SNAPSHOT</version>
+    <version>0.180.0-SNAPSHOT</version>
 
     <properties>
-        <presto.version>0.173</presto.version>
+        <presto.version>0.180</presto.version>
         <aws-java-sdk.version>1.11.115</aws-java-sdk.version>
-        <dep.airlift.version>0.145</dep.airlift.version>
+        <dep.airlift.version>0.148</dep.airlift.version>
         <dep.slice.version>0.29</dep.slice.version>
         <skip.deploy.s3>true</skip.deploy.s3>
         <air.check.skip-findbugs>true</air.check.skip-findbugs>
@@ -135,7 +135,7 @@
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-rakam-raptor</artifactId>
-            <version>0.173.0</version>
+            <version>0.180.0</version>
         </dependency>
 
         <dependency>
@@ -164,12 +164,31 @@
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-main</artifactId>
             <version>${presto.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-main</artifactId>
+            <version>${presto.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>joda-time</groupId>
+            <artifactId>joda-time</artifactId>
+            <version>2.9.9</version>
         </dependency>
 
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-client</artifactId>
             <version>${presto.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>joda-time</groupId>
+                    <artifactId>joda-time</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -392,6 +411,7 @@
                             <ignoredUnusedDeclaredDependencies>
                                 <ignoredUnusedDeclaredDependency>com.fasterxml.jackson.dataformat:jackson-dataformat-cbor</ignoredUnusedDeclaredDependency>
                                 <ignoredUnusedDeclaredDependency>com.google.protobuf:protobuf-java</ignoredUnusedDeclaredDependency>
+                                <ignoredUnusedDeclaredDependency>joda-time:joda-time</ignoredUnusedDeclaredDependency>
                             </ignoredUnusedDeclaredDependencies>
                         </configuration>
                     </execution>

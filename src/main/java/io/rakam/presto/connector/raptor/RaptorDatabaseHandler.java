@@ -149,7 +149,6 @@ public class RaptorDatabaseHandler
 
         return new Inserter()
         {
-
             @Override
             public void addPage(Page page)
             {
