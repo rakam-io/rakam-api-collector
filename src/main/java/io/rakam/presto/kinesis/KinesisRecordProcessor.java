@@ -36,6 +36,7 @@ public class KinesisRecordProcessor
     private final BasicMemoryBuffer streamBuffer;
     private final MiddlewareBuffer middlewareBuffer;
     private final StreamWorkerContext context;
+    private String shardId;
 
     public KinesisRecordProcessor(StreamWorkerContext context,
             MiddlewareConfig middlewareConfig,
@@ -50,6 +51,7 @@ public class KinesisRecordProcessor
     @Override
     public void initialize(String shardId)
     {
+        this.shardId = shardId;
         log.info("Kinesis consumer shard %s initialized", shardId);
     }
 
@@ -108,6 +110,7 @@ public class KinesisRecordProcessor
     public void shutdown(IRecordProcessorCheckpointer iRecordProcessorCheckpointer, ShutdownReason shutdownReason)
     {
         streamBuffer.clear();
+        log.error("Shutdown %s, the reason is %s", shardId, shutdownReason.name());
     }
 
     private Table<String, String, MessageEventTransformer.TableData> flushStream()

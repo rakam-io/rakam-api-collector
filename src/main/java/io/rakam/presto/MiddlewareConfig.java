@@ -12,7 +12,7 @@ public class MiddlewareConfig
 {
     private Duration maxFlushDuration = Duration.valueOf("60s");
     private int maxFlushRecords = 150_000;
-    private DataSize maxSize = DataSize.succinctDataSize(50, DataSize.Unit.MEGABYTE);
+    private DataSize maxSize = DataSize.succinctDataSize(350, DataSize.Unit.MEGABYTE);
 
     @Config("middleware.max-flush-duration")
     public void setMaxFlushDuration(Duration maxFlushDuration)
