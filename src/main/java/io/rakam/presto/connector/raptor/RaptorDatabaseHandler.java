@@ -6,8 +6,10 @@ package io.rakam.presto.connector.raptor;
 
 import com.facebook.presto.PagesIndexPageSorter;
 import com.facebook.presto.Session;
+import com.facebook.presto.block.BlockEncodingManager;
 import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.connector.ConnectorId;
+import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.PrestoNode;
 import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.operator.PagesIndex;
@@ -34,6 +36,7 @@ import com.facebook.presto.spi.connector.ConnectorPageSinkProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.type.TypeManager;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.gen.JoinCompiler;
 import com.facebook.presto.sql.gen.OrderingCompiler;
 import com.facebook.presto.type.TypeRegistry;
@@ -108,8 +111,12 @@ public class RaptorDatabaseHandler
         PagesIndexPageSorter pageSorter = new PagesIndexPageSorter(
                 new PagesIndex.DefaultFactory(new OrderingCompiler(), new JoinCompiler()));
 
+        TypeRegistry typeRegistry = new TypeRegistry();
+        BlockEncodingManager blockEncodingManager = new BlockEncodingManager(typeRegistry);
+        new FunctionRegistry(typeRegistry, blockEncodingManager, new FeaturesConfig());
+
         Connector connector = raptorConnectorFactory.create(RAKAM_RAPTOR_CONNECTOR, properties,
-                new ProxyConnectorContext(nodeManager, new TypeRegistry(), pageSorter));
+                new ProxyConnectorContext(nodeManager, typeRegistry, pageSorter));
 
         connectorTransactionHandle = connector.beginTransaction(READ_COMMITTED, false);
 
