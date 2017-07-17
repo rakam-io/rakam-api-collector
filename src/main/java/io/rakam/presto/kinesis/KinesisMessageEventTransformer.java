@@ -5,6 +5,8 @@
 package io.rakam.presto.kinesis;
 
 import com.amazonaws.services.kinesis.model.Record;
+import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.SchemaTableName;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.MessageEventTransformer;
@@ -20,12 +22,23 @@ import java.nio.ByteBuffer;
 public class KinesisMessageEventTransformer
         extends MessageEventTransformer<Record>
 {
+    private final AmazonS3Client s3Client;
+    private final S3MiddlewareConfig bulkConfig;
+
     @Inject
-    public KinesisMessageEventTransformer(DatabaseHandler databaseHandler, S3MiddlewareConfig config)
+    public KinesisMessageEventTransformer(DatabaseHandler databaseHandler, S3MiddlewareConfig bulkConfig)
     {
-        super(databaseHandler, config);
+        super(databaseHandler);
+
+        this.bulkConfig = bulkConfig;
+        s3Client = new AmazonS3Client(bulkConfig.getCredentials());
+        s3Client.setRegion(bulkConfig.getAWSRegion());
+        if (bulkConfig.getEndpoint() != null) {
+            s3Client.setEndpoint(bulkConfig.getEndpoint());
+        }
     }
 
+    @SuppressWarnings("Duplicates")
     @Override
     public SchemaTableName extractCollection(Record message, BinaryDecoder decoder)
             throws IOException
@@ -56,5 +69,11 @@ public class KinesisMessageEventTransformer
     {
         ByteBuffer data = record.getData();
         return data.array();
+    }
+
+    @Override
+    protected S3Object getBulkObject(String bulkKey)
+    {
+        return s3Client.getObject(bulkConfig.getS3Bucket(), bulkKey);
     }
 }

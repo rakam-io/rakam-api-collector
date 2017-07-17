@@ -5,13 +5,19 @@
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.HostAddress;
-import com.google.common.base.Throwables;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Table;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.rakam.presto.BasicMemoryBuffer;
+import io.rakam.presto.BatchRecords;
+import io.rakam.presto.MessageEventTransformer;
+import io.rakam.presto.MiddlewareBuffer;
+import io.rakam.presto.MiddlewareConfig;
 import io.rakam.presto.StreamWorkerContext;
-import kafka.consumer.ConsumerConfig;
-import kafka.consumer.KafkaStream;
-import kafka.javaapi.consumer.ConsumerConnector;
-import kafka.message.MessageAndMetadata;
+import io.rakam.presto.TargetConnectorCommitter;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -30,24 +36,28 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+@SuppressWarnings("ALL")
 public class KafkaWorkerManager
         implements Watcher
 {
-    private final StreamWorkerContext<MessageAndMetadata> context;
-    private KafkaCommitter committer;
-    private ConsumerConnector consumer;
+    private final StreamWorkerContext<ConsumerRecord> context;
+    private final TargetConnectorCommitter committer;
+    private final MiddlewareBuffer middlewareBuffer;
+    private final BasicMemoryBuffer buffer;
+    private KafkaConsumer<byte[], byte[]> consumer;
     private KafkaConfig config;
     private ExecutorService executor;
     private ZooKeeper zk;
-    private KafkaMemoryBuffer buffer;
 
     @Inject
-    public KafkaWorkerManager(KafkaConfig config, StreamWorkerContext<MessageAndMetadata> context)
+    public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
     {
         this.config = config;
         this.context = context;
+        this.committer = committer;
+        this.middlewareBuffer = new MiddlewareBuffer(middlewareConfig);
+        buffer = context.createBuffer();
         this.executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("kafka-topic-consumer").build());
-        this.buffer = new KafkaMemoryBuffer();
     }
 
     public ExecutorService getExecutor()
@@ -60,7 +70,7 @@ public class KafkaWorkerManager
     {
         context.shutdown();
         if (consumer != null) {
-            consumer.shutdown();
+            consumer.close();
         }
         if (executor != null) {
             executor.shutdown();
@@ -86,33 +96,60 @@ public class KafkaWorkerManager
             children = zk.getChildren("/brokers/topics", this);
         }
         catch (IOException | KeeperException | InterruptedException e) {
-            throw Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
 
-        this.consumer = kafka.consumer.Consumer.createJavaConsumerConnector(createConsumerConfig(zkNodes));
-        this.committer = new KafkaCommitter(consumer, buffer, context);
+        consumer = new KafkaConsumer(createConsumerConfig(zkNodes));
+        consumer.subscribe(children);
 
-        Map<String, Integer> collect = children.stream().collect(Collectors.toMap(c -> c, c -> 1));
+        try {
 
-        Map<String, List<KafkaStream<byte[], byte[]>>> consumers = consumer.createMessageStreams(collect);
+            while (true) {
+                ConsumerRecords<byte[], byte[]> records = consumer.poll(1000);
+                for (ConsumerRecord<byte[], byte[]> record : records) {
+                    buffer.consumeRecord(record.value(), record.value().length);
+                }
+                if (buffer.shouldFlush()) {
+                    Map.Entry<List, List> records1 = buffer.getRecords();
+                    try {
+                        middlewareBuffer.add(new BatchRecords(context.convert(records1.getKey(), records1.getValue()), new BatchRecords.Checkpointer() {
+                            @Override
+                            public void checkpoint()
+                                    throws BatchRecords.CheckpointException
+                            {
+                                // checkpoint for kafka topic
+                            }
+                        }));
 
-        for (Map.Entry<String, List<KafkaStream<byte[], byte[]>>> entry : consumers.entrySet()) {
-            String[] split = entry.getKey().split("_", 2);
-//            executor.execute(new KafkaStreamConsumer(split[0], split[1], ImmutableSet.of(), entry.getValue().get(0), buffer, committer));
+                        if(middlewareBuffer.shouldFlush()) {
+                            List<BatchRecords> list = middlewareBuffer.flush();
+
+                            if (!list.isEmpty()) {
+                                committer.process(Iterables.transform(list, BatchRecords::getTable));
+
+                                list.forEach(l -> {
+                                    try {
+                                        l.checkpoint();
+                                    }
+                                    catch (BatchRecords.CheckpointException e) {
+                                        throw new RuntimeException("Error while checkpointing records", e);
+                                    }
+                                });
+                            }
+                        }
+
+                    }
+                    catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+        } finally {
+            consumer.close();
         }
-//        Map<String, List<KafkaStream<byte[], byte[]>>> consumers = consumer.createMessageStreams(streamMap.build());
-//
-//        executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2,
-//                new ThreadFactoryBuilder().setNameFormat("kafka-stream-worker").build());
-//
-//        for (Map.Entry<String, List<KafkaStream<byte[], byte[]>>> entry : consumers.entrySet()) {
-//            for (KafkaStream<byte[], byte[]> stream : entry.getValue()) {
-//                executor.execute(new KafkaStreamConsumer(entry.getKey(), consumer, stream, context));
-//            }
-//        }
     }
 
-    private static ConsumerConfig createConsumerConfig(String zkNodes)
+    private static Properties createConsumerConfig(String zkNodes)
     {
         Properties props = new Properties();
         props.put("zookeeper.connect", zkNodes);
@@ -124,7 +161,7 @@ public class KafkaWorkerManager
         props.put("offsets.storage", "kafka");
         props.put("consumer.timeout.ms", "10");
 
-        return new ConsumerConfig(props);
+        return props;
     }
 
     @Override

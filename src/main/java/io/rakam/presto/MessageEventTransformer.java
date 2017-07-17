@@ -4,7 +4,6 @@
 
 package io.rakam.presto;
 
-import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.Page;
@@ -35,20 +34,11 @@ public abstract class MessageEventTransformer<T>
     static final Logger LOGGER = Logger.get(MessageEventTransformer.class);
 
     private final DatabaseHandler database;
-    private final AmazonS3Client s3Client;
-    private final S3MiddlewareConfig bulkConfig;
     private BinaryDecoder decoder;
 
-    public MessageEventTransformer(DatabaseHandler database, S3MiddlewareConfig bulkConfig)
+    public MessageEventTransformer(DatabaseHandler database)
     {
         this.database = database;
-
-        s3Client = new AmazonS3Client(bulkConfig.getCredentials());
-        s3Client.setRegion(bulkConfig.getAWSRegion());
-        if (bulkConfig.getEndpoint() != null) {
-            s3Client.setEndpoint(bulkConfig.getEndpoint());
-        }
-        this.bulkConfig = bulkConfig;
     }
 
     public abstract SchemaTableName extractCollection(T message, @Nullable BinaryDecoder decoder)
@@ -82,12 +72,12 @@ public abstract class MessageEventTransformer<T>
         }
 
         for (T record : bulkRecords) {
-            String s3Key = null;
+            String bulkKey = null;
             S3Object object = null;
             try {
                 byte[] data = getData(record);
-                s3Key = new String(data, 9, data.length - 9, UTF_8);
-                object = s3Client.getObject(bulkConfig.getS3Bucket(), s3Key);
+                bulkKey = new String(data, 9, data.length - 9, UTF_8);
+                object = getBulkObject(bulkKey);
                 InputStreamSliceInput input = new InputStreamSliceInput(object.getObjectContent());
 
                 SchemaTableName table = extractCollection(record, null);
@@ -127,7 +117,7 @@ public abstract class MessageEventTransformer<T>
                 }
             }
             catch (Exception e) {
-                LOGGER.error(e, "Error while reading batch data: %s", s3Key == null ? "" : s3Key);
+                LOGGER.error(e, "Error while reading batch data: %s", bulkKey);
             } finally {
                 if(object != null) {
                     object.close();
@@ -137,6 +127,8 @@ public abstract class MessageEventTransformer<T>
 
         return buildTable(builderMap);
     }
+
+    protected abstract S3Object getBulkObject(String bulkKey);
 
     private AvroPageReader getReader(Map<SchemaTableName, AvroPageReader> builderMap, SchemaTableName table)
     {
