@@ -1,8 +1,11 @@
+/*
+ * Licensed under the Rakam Incorporation
+ */
+
 package io.rakam.presto;
 
-import com.facebook.presto.hadoop.$internal.com.google.common.primitives.Ints;
+import com.google.common.primitives.Ints;
 import io.airlift.units.DataSize;
-import org.jboss.netty.util.CharsetUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
@@ -15,6 +18,8 @@ import org.rocksdb.WriteBatch;
 import org.rocksdb.WriteOptions;
 
 import java.io.File;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,9 +32,9 @@ public class Deduplicator
 {
     private final static byte[] EMPTY_ARRAY = new byte[0];
     private final static int DELETE_BATCH_SIZE = 100000;
-    private final static byte[] SEEK_HINT = "seek_hint".getBytes(CharsetUtil.UTF_8);
-    private final static byte[] INDEX_NAME = "index".getBytes(CharsetUtil.UTF_8);
-    private final static byte[] SEQUENCE_NUMBER = "sequence_number".getBytes(CharsetUtil.UTF_8);
+    private final static byte[] SEEK_HINT = "seek_hint".getBytes(StandardCharsets.UTF_8);
+    private final static byte[] INDEX_NAME = "index".getBytes(StandardCharsets.UTF_8);
+    private final static byte[] SEQUENCE_NUMBER = "sequence_number".getBytes(StandardCharsets.UTF_8);
 
     private final RocksDB db;
     private final File file;
