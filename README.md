@@ -7,8 +7,8 @@
 5. Calculate the indexes for Raptor, and write the file to local disk and update metadata.
 6. Create backup S3 file.
 
-```
 ## Sample Config
+```
 #aws.access-key=
 #aws.secret-access-key=
 
