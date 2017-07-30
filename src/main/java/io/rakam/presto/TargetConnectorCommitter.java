@@ -13,6 +13,7 @@ import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.google.common.collect.Table;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
+import io.rakam.presto.deserialization.TableData;
 
 import javax.inject.Inject;
 
@@ -33,7 +34,7 @@ public class TargetConnectorCommitter
         this.databaseHandler = databaseHandler;
     }
 
-    public void process(Iterable<Table<String, String, MessageEventTransformer.TableData>> batches)
+    public void process(Iterable<Table<String, String, TableData>> batches)
     {
         StreamSupport.stream(batches.spliterator(), false).flatMap(t -> t.cellSet().stream()
                 .map(b -> new SchemaTableName(b.getRowKey(), b.getColumnKey()))).distinct().forEach(table -> {
@@ -54,14 +55,14 @@ public class TargetConnectorCommitter
         });
     }
 
-    private CompletableFuture<Void> commit(Iterable<Table<String, String, MessageEventTransformer.TableData>> batches, SchemaTableName table)
+    private CompletableFuture<Void> commit(Iterable<Table<String, String, TableData>> batches, SchemaTableName table)
     {
         List<ColumnMetadata> columns = databaseHandler.getColumns(table.getSchemaName(), table.getTableName());
 
         DatabaseHandler.Inserter insert = databaseHandler.insert(table.getSchemaName(), table.getTableName());
 
-        for (Table<String, String, MessageEventTransformer.TableData> batch : batches) {
-            MessageEventTransformer.TableData tableData = batch.get(table.getSchemaName(), table.getTableName());
+        for (Table<String, String, TableData> batch : batches) {
+            TableData tableData = batch.get(table.getSchemaName(), table.getTableName());
             if (tableData != null) {
                 Page page = tableData.page;
                 if (columns.size() != page.getChannelCount()) {

@@ -16,11 +16,11 @@ import com.google.common.collect.Table;
 import io.airlift.log.Logger;
 import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.BatchRecords;
-import io.rakam.presto.MessageEventTransformer;
 import io.rakam.presto.MiddlewareBuffer;
 import io.rakam.presto.MiddlewareConfig;
 import io.rakam.presto.StreamWorkerContext;
 import io.rakam.presto.TargetConnectorCommitter;
+import io.rakam.presto.deserialization.TableData;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -77,7 +77,7 @@ public class KinesisRecordProcessor
         }
 
         if (streamBuffer.shouldFlush()) {
-            Table<String, String, MessageEventTransformer.TableData> pages = flushStream();
+            Table<String, String, TableData> pages = flushStream();
 
             middlewareBuffer.add(new BatchRecords(pages, () -> {
                 try {
@@ -113,9 +113,9 @@ public class KinesisRecordProcessor
         log.error("Shutdown %s, the reason is %s", shardId, shutdownReason.name());
     }
 
-    private Table<String, String, MessageEventTransformer.TableData> flushStream()
+    private Table<String, String, TableData> flushStream()
     {
-        Table<String, String, MessageEventTransformer.TableData> pages;
+        Table<String, String, TableData> pages;
         try {
             Map.Entry<List, List> list = streamBuffer.getRecords();
             pages = context.convert(list.getKey(), list.getValue());

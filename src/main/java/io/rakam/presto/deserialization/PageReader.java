@@ -2,54 +2,59 @@
  * Licensed under the Rakam Incorporation
  */
 
-package io.rakam.presto;
+package io.rakam.presto.deserialization;
 
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.Page;
-import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.RunLengthEncodedBlock;
 import com.facebook.presto.spi.type.Type;
-import org.apache.avro.io.BinaryDecoder;
-import org.apache.avro.io.PageDatumReader;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
-import static io.rakam.presto.AvroUtil.convertAvroSchema;
 
-public class AvroPageReader
+public abstract class PageReader<T>
 {
-    private final PageDatumReader datumReader;
-    private final List<ColumnMetadata> expectedSchema;
+    private final PageReaderDeserializer<T> datumReader;
+    private final String checkpointColumn;
+    private List<ColumnMetadata> expectedSchema;
+    private List<ColumnMetadata> actualSchema;
     private PageBuilder pageBuilder;
 
-    public AvroPageReader(List<ColumnMetadata> rakamSchema)
-    {
-        this(rakamSchema, rakamSchema);
-    }
-
-    public AvroPageReader(List<ColumnMetadata> actualSchema, List<ColumnMetadata> expectedSchema)
+    public PageReader(String checkpointColumn, List<ColumnMetadata> actualSchema, List<ColumnMetadata> expectedSchema)
     {
         List<Type> prestoSchema = expectedSchema.stream()
-                .filter(a -> !a.getName().startsWith("$") && !a.getName().equals("_shard_time"))
+                .filter(a -> !a.getName().startsWith("$") && !a.getName().equals(checkpointColumn))
                 .map(field -> field.getType())
                 .collect(Collectors.toList());
 
+        this.checkpointColumn = checkpointColumn;
         this.expectedSchema = expectedSchema;
+        this.actualSchema = actualSchema;
         this.pageBuilder = new PageBuilder(prestoSchema);
-        this.datumReader = new PageDatumReader(pageBuilder,
-                convertAvroSchema(actualSchema),
-                convertAvroSchema(expectedSchema));
+        this.datumReader = createReader();
     }
+
+    public PageBuilder getPageBuilder()
+    {
+        return pageBuilder;
+    }
+
+    public void setPageBuilder(PageBuilder pageBuilder)
+    {
+        this.pageBuilder = pageBuilder;
+    }
+
+    public abstract PageReaderDeserializer<T> createReader();
 
     public Page getPage()
     {
         int shardTimeIdx = -1;
         for (int i = 0; i < expectedSchema.size(); i++) {
-            if (expectedSchema.get(i).getName().equals("_shard_time")) {
+            if (expectedSchema.get(i).getName().equals(checkpointColumn)) {
                 shardTimeIdx = i;
                 break;
             }
@@ -73,10 +78,15 @@ public class AvroPageReader
         return build;
     }
 
-    public void read(BinaryDecoder decoder)
+    public List<ColumnMetadata> getActualSchema()
+    {
+        return actualSchema;
+    }
+
+    public void read(T decoder)
             throws IOException
     {
-        datumReader.read(null, decoder);
+        datumReader.read(decoder);
     }
 
     public List<ColumnMetadata> getExpectedSchema()
@@ -86,6 +96,7 @@ public class AvroPageReader
 
     public void setActualSchema(List<ColumnMetadata> actualSchema)
     {
-        datumReader.setSchema(convertAvroSchema(actualSchema));
+        this.actualSchema = actualSchema;
+        this.expectedSchema = actualSchema;
     }
 }

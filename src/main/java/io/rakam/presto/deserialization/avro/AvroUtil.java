@@ -2,7 +2,7 @@
  * Licensed under the Rakam Incorporation
  */
 
-package io.rakam.presto;
+package io.rakam.presto.deserialization.avro;
 
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.type.StandardTypes;
@@ -50,10 +50,10 @@ public class AvroUtil
         }
     }
 
-    public static Schema convertAvroSchema(Collection<ColumnMetadata> fields)
+    public static Schema convertAvroSchema(Collection<ColumnMetadata> fields, String checkpointColumn)
     {
         List<Schema.Field> avroFields = fields.stream()
-                .filter(a -> !a.getName().startsWith("$") && !a.getName().equals("_shard_time"))
+                .filter(a -> !a.getName().startsWith("$") && !a.getName().equals(checkpointColumn))
                 .map(AvroUtil::generateAvroSchema).collect(Collectors.toList());
 
         Schema schema = Schema.createRecord("collection", null, null, false);
@@ -76,13 +76,15 @@ public class AvroUtil
             case StandardTypes.VARCHAR:
                 return Schema.create(Schema.Type.STRING);
             case StandardTypes.BIGINT:
+            case StandardTypes.TIME:
                 return Schema.create(Schema.Type.LONG);
+            case StandardTypes.VARBINARY:
+                return Schema.create(Schema.Type.BYTES);
             case StandardTypes.DOUBLE:
                 return Schema.create(Schema.Type.DOUBLE);
             case StandardTypes.BOOLEAN:
                 return Schema.create(Schema.Type.BOOLEAN);
             case StandardTypes.DATE:
-            case StandardTypes.TIME:
             case StandardTypes.INTEGER:
                 return Schema.create(Schema.Type.INT);
             case StandardTypes.TIMESTAMP:

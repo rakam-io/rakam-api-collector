@@ -47,7 +47,7 @@ import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import io.airlift.slice.Slice;
-import io.rakam.presto.MessageEventTransformer.TableData;
+import io.rakam.presto.deserialization.TableData;
 import org.testng.annotations.Test;
 
 import java.util.Collection;
@@ -87,7 +87,7 @@ public class TestTargetConnectorCommitter
         PageSinkManager pageSinkManager = new PageSinkManager();
         pageSinkManager.addConnectorPageSinkProvider(new ConnectorId("testconnector"), new TestingConnectorPageSinkProvider(latch));
 
-        TargetConnectorCommitter committer = new TargetConnectorCommitter(new TestDatabaseHandler());
+        TargetConnectorCommitter committer = new TargetConnectorCommitter(new TestDatabaseHandler("test", "test", ImmutableList.of()));
 
         committer.process(ImmutableList.of(of("test", "test", new TableData(new Page(1), ImmutableList.of()))));
 
@@ -120,7 +120,7 @@ public class TestTargetConnectorCommitter
         PageSinkManager pageSinkManager = new PageSinkManager();
         pageSinkManager.addConnectorPageSinkProvider(new ConnectorId("testconnector"), new TestingConnectorPageSinkProvider(latch));
 
-        TargetConnectorCommitter committer = new TargetConnectorCommitter(new TestDatabaseHandler());
+        TargetConnectorCommitter committer = new TargetConnectorCommitter(new TestDatabaseHandler("test", "test", ImmutableList.of()));
 
         List<Table<String, String, TableData>> batches = ImmutableList.of(
                 of("test", "test", new TableData(new Page(createStringsBlock("test")), ImmutableList.of(new ColumnMetadata("test1", VarcharType.VARCHAR)))),
@@ -266,41 +266,5 @@ public class TestTargetConnectorCommitter
                 new SchemaPropertyManager(),
                 new TablePropertyManager(),
                 transactionManager);
-    }
-
-    public static class TestDatabaseHandler implements DatabaseHandler {
-
-        @Override
-        public List<ColumnMetadata> getColumns(String schema, String table)
-        {
-            if(schema.equals("test") && table.equals("test")) {
-                return ImmutableList.of();
-            }
-
-            throw new IllegalStateException();
-        }
-
-        @Override
-        public Inserter insert(String schema, String table)
-        {
-            boolean[] isDone = new boolean[1];
-
-            return new Inserter() {
-                @Override
-                public void addPage(Page page)
-                {
-                    isDone[0] = true;
-                }
-
-                @Override
-                public CompletableFuture<Void> commit()
-                {
-                    if(!isDone[0]) {
-                        throw new IllegalStateException();
-                    }
-                    return CompletableFuture.completedFuture(null);
-                }
-            };
-        }
     }
 }

@@ -36,19 +36,33 @@ import com.facebook.presto.spi.connector.ConnectorPageSinkProvider;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.type.TypeManager;
+import com.facebook.presto.spi.type.TypeSignature;
+import com.facebook.presto.spi.type.TypeSignatureParameter;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.gen.JoinCompiler;
 import com.facebook.presto.sql.gen.OrderingCompiler;
 import com.facebook.presto.type.TypeRegistry;
+import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.eventbus.EventBus;
 import com.google.inject.Module;
 import io.airlift.slice.Slice;
 import io.rakam.presto.DatabaseHandler;
+import org.rakam.analysis.JDBCPoolDataSource;
+import org.rakam.collection.FieldType;
+import org.rakam.collection.SchemaField;
+import org.rakam.config.JDBCConfig;
+import org.rakam.config.ProjectConfig;
+import org.rakam.presto.analysis.PrestoConfig;
+import org.rakam.presto.analysis.PrestoRakamRaptorMetastore;
+import org.skife.jdbi.v2.DBI;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.List;
@@ -56,10 +70,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.facebook.presto.spi.transaction.IsolationLevel.READ_COMMITTED;
+import static com.facebook.presto.spi.type.ParameterKind.TYPE;
 import static com.facebook.presto.spi.type.TimeZoneKey.UTC_KEY;
 import static java.util.Locale.ENGLISH;
+import static org.rakam.presto.analysis.PrestoQueryExecution.fromPrestoType;
+import static org.rakam.presto.analysis.PrestoRakamRaptorMetastore.toType;
 
 public class RaptorDatabaseHandler
         implements DatabaseHandler
@@ -69,6 +88,7 @@ public class RaptorDatabaseHandler
     private final ConnectorSession session;
     private final ConnectorTransactionHandle connectorTransactionHandle;
     private final ConnectorPageSinkProvider pageSinkProvider;
+    private final PrestoRakamRaptorMetastore metastore;
 
     @Inject
     public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig)
@@ -133,6 +153,15 @@ public class RaptorDatabaseHandler
 
         metadata = connector.getMetadata(connectorTransactionHandle);
         pageSinkProvider = connector.getPageSinkProvider();
+        JDBCConfig jdbcConfig = new JDBCConfig();
+        try {
+            jdbcConfig.setUrl(config.getMetadataUrl());
+        }
+        catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
+        metastore = new PrestoRakamRaptorMetastore(JDBCPoolDataSource.getOrCreateDataSource(jdbcConfig),
+                new EventBus(), new ProjectConfig(), new PrestoConfig());
     }
 
     @Override
@@ -146,6 +175,21 @@ public class RaptorDatabaseHandler
         }
 
         return columnMetadatas;
+    }
+
+    @Override
+    public List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns)
+    {
+        List<SchemaField> fields = metastore.getOrCreateCollectionFields(schema, table, columns.stream().map(e -> {
+            TypeSignature typeSignature = e.getType().getTypeSignature();
+            FieldType type = fromPrestoType(typeSignature.getBase(),
+                    typeSignature.getParameters().stream()
+                            .filter(input -> input.getKind() == TYPE)
+                            .map(typeSignatureParameter -> typeSignatureParameter.getTypeSignature().getBase()).iterator());
+            return new SchemaField(e.getName(), type);
+        }).collect(Collectors.toSet()));
+
+        return fields.stream().map(e -> new ColumnMetadata(e.getName(), toType(e.getType()))).collect(Collectors.toList());
     }
 
     @Override

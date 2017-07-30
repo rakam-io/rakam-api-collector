@@ -8,6 +8,7 @@ import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.ArrayType;
+import com.facebook.presto.spi.type.IntegerType;
 import com.facebook.presto.spi.type.Type;
 
 import java.util.ArrayList;
@@ -19,6 +20,7 @@ import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
@@ -149,13 +151,23 @@ public final class BlockAssertions
         return BIGINT.createFixedSizeBlockBuilder(0).build();
     }
 
-    // This method makes it easy to create blocks without having to add an L to every value
     public static Block createLongsBlock(int... values)
     {
         BlockBuilder builder = BIGINT.createBlockBuilder(new BlockBuilderStatus(), 100);
 
         for (int value : values) {
             BIGINT.writeLong(builder, (long) value);
+        }
+
+        return builder.build();
+    }
+
+    public static Block createIntsBlock(int... values)
+    {
+        BlockBuilder builder = INTEGER.createBlockBuilder(new BlockBuilderStatus(), 100);
+
+        for (int value : values) {
+            INTEGER.writeLong(builder, value);
         }
 
         return builder.build();

@@ -82,6 +82,7 @@ public final class ServiceStarter
         protected void setup(Binder binder)
         {
             configBinder(binder).bindConfig(StreamConfig.class);
+            configBinder(binder).bindConfig(FieldNameConfig.class);
             configBinder(binder).bindConfig(S3MiddlewareConfig.class);
             configBinder(binder).bindConfig(MiddlewareConfig.class);
             binder.bind(StreamWorkerContext.class).in(Scopes.SINGLETON);

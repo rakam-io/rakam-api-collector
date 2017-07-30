@@ -7,7 +7,7 @@ package io.rakam.presto.kafka;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
-import io.rakam.presto.MessageEventTransformer;
+import io.rakam.presto.deserialization.MessageEventTransformer;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
 
@@ -19,6 +19,6 @@ public class KafkaStreamSourceModule
     {
         configBinder(binder).bindConfig(KafkaConfig.class);
         binder.bind(KafkaWorkerManager.class).in(Scopes.SINGLETON);
-        binder.bind(MessageEventTransformer.class).to(KafkaMessageTransformer.class).in(Scopes.SINGLETON);
+        binder.bind(MessageEventTransformer.class).to(KafkaJsonMessageTransformer.class).in(Scopes.SINGLETON);
     }
 }

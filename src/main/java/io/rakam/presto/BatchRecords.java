@@ -5,19 +5,20 @@
 package io.rakam.presto;
 
 import com.google.common.collect.Table;
+import io.rakam.presto.deserialization.TableData;
 
 public class BatchRecords
 {
-    private final Table<String, String, MessageEventTransformer.TableData> table;
+    private final Table<String, String, TableData> table;
     private final Checkpointer checkpointer;
 
-    public BatchRecords(Table<String, String, MessageEventTransformer.TableData> table, Checkpointer checkpointer)
+    public BatchRecords(Table<String, String, TableData> table, Checkpointer checkpointer)
     {
         this.table = table;
         this.checkpointer = checkpointer;
     }
 
-    public Table<String, String, MessageEventTransformer.TableData> getTable()
+    public Table<String, String, TableData> getTable()
     {
         return table;
     }

@@ -4,18 +4,13 @@
 
 package org.apache.avro.io;
 
-import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.block.BlockBuilder;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
+import io.rakam.presto.deserialization.PageBuilder;
+import io.rakam.presto.deserialization.PageReaderDeserializer;
 import org.apache.avro.AvroRuntimeException;
 import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.io.BinaryDecoder;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.Decoder;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.avro.io.ResolvingDecoder;
 import org.apache.avro.util.WeakIdentityHashMap;
 
 import java.io.IOException;
@@ -26,8 +21,8 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.doubleToLongBits;
 import static java.lang.Float.floatToIntBits;
 
-public class PageDatumReader
-        implements DatumReader<Void>
+public class AvroPageDatumReader
+        implements DatumReader<Void>, PageReaderDeserializer<BinaryDecoder>
 {
     private final PageBuilder builder;
     private Schema actualSchema;
@@ -36,12 +31,12 @@ public class PageDatumReader
     private ResolvingDecoder creatorResolver = null;
     private final Thread creator = Thread.currentThread();
 
-    public PageDatumReader(PageBuilder pageBuilder, Schema schema)
+    public AvroPageDatumReader(PageBuilder pageBuilder, Schema schema)
     {
         this(pageBuilder, schema, schema);
     }
 
-    public PageDatumReader(PageBuilder pageBuilder, Schema actualSchema, Schema expectedSchema)
+    public AvroPageDatumReader(PageBuilder pageBuilder, Schema actualSchema, Schema expectedSchema)
     {
         this.builder = pageBuilder;
         this.actualSchema = actualSchema;
@@ -216,5 +211,11 @@ public class PageDatumReader
             }
             while ((l = in.arrayNext()) > 0);
         }
+    }
+
+    @Override
+    public void read(BinaryDecoder in) throws IOException
+    {
+        read(null, in);
     }
 }

@@ -7,7 +7,8 @@ package io.rakam.presto.kafka;
 import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.SchemaTableName;
 import io.rakam.presto.DatabaseHandler;
-import io.rakam.presto.MessageEventTransformer;
+import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.deserialization.avro.AvroMessageEventTransformer;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -16,13 +17,13 @@ import javax.inject.Inject;
 
 import java.io.IOException;
 
-public class KafkaMessageTransformer
-        extends MessageEventTransformer<ConsumerRecord<byte[], byte[]>>
+public class KafkaAvroMessageTransformer
+        extends AvroMessageEventTransformer<ConsumerRecord<byte[], byte[]>>
 {
     @Inject
-    public KafkaMessageTransformer(DatabaseHandler databaseHandler)
+    public KafkaAvroMessageTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler databaseHandler)
     {
-        super(databaseHandler);
+        super(fieldNameConfig, databaseHandler);
     }
 
     @SuppressWarnings("Duplicates")

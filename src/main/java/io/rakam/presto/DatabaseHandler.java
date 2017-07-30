@@ -14,6 +14,8 @@ public interface DatabaseHandler
 {
     List<ColumnMetadata> getColumns(String schema, String table);
 
+    List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns);
+
     Inserter insert(String schema, String table);
 
     interface Inserter {

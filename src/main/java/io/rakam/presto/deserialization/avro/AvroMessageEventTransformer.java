@@ -2,11 +2,10 @@
  * Licensed under the Rakam Incorporation
  */
 
-package io.rakam.presto;
+package io.rakam.presto.deserialization.avro;
 
 import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.ColumnMetadata;
-import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.HashBasedTable;
@@ -14,42 +13,43 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
+import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.deserialization.MessageEventTransformer;
+import io.rakam.presto.deserialization.PageReader;
+import io.rakam.presto.deserialization.TableData;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DecoderFactory;
-
-import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
-import static com.facebook.presto.spi.StandardErrorCode.NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public abstract class MessageEventTransformer<T>
+public abstract class AvroMessageEventTransformer<T>
+        extends MessageEventTransformer<T, BinaryDecoder>
 {
-    static final Logger LOGGER = Logger.get(MessageEventTransformer.class);
+    private final static Logger LOGGER = Logger.get(AvroMessageEventTransformer.class);
+    private final String checkpointColumn;
 
-    private final DatabaseHandler database;
     private BinaryDecoder decoder;
 
-    public MessageEventTransformer(DatabaseHandler database)
+    public AvroMessageEventTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler database)
     {
-        this.database = database;
+        super(fieldNameConfig, database);
+        this.checkpointColumn = fieldNameConfig.getCheckpointField();
     }
 
-    public abstract SchemaTableName extractCollection(T message, @Nullable BinaryDecoder decoder)
-            throws IOException;
-
-    public abstract byte[] getData(T record);
-
+    @Override
     public synchronized Table<String, String, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
             throws IOException
     {
-        Map<SchemaTableName, AvroPageReader> builderMap = new HashMap<>();
+        Map<SchemaTableName, PageReader> builderMap = new HashMap<>();
 
         for (T record : records) {
             decoder = DecoderFactory.get().binaryDecoder(getData(record), decoder);
@@ -57,7 +57,7 @@ public abstract class MessageEventTransformer<T>
 
             SchemaTableName collection = extractCollection(record, decoder);
 
-            AvroPageReader pageBuilder = getReader(builderMap, collection);
+            PageReader pageBuilder = getReader(builderMap, collection);
             if (pageBuilder == null) {
                 continue;
             }
@@ -82,7 +82,7 @@ public abstract class MessageEventTransformer<T>
 
                 SchemaTableName table = extractCollection(record, null);
 
-                AvroPageReader pageBuilder = getReader(builderMap, table);
+                PageReader pageBuilder = getReader(builderMap, table);
                 if (pageBuilder == null) {
                     continue;
                 }
@@ -95,7 +95,13 @@ public abstract class MessageEventTransformer<T>
                 for (int i = 0; i < countOfColumns; i++) {
                     String columnName = decoder.readString();
                     Optional<ColumnMetadata> column = pageBuilder.getExpectedSchema().stream()
-                            .filter(c -> c.getName().equals(columnName))
+                            .filter(new Predicate<ColumnMetadata>() {
+                                @Override
+                                public boolean test(ColumnMetadata o)
+                                {
+                                    return o.getName().equals(columnName);
+                                }
+                            })
                             .findAny();
                     if (!column.isPresent()) {
                         throw new PrestoException(GENERIC_INTERNAL_ERROR, "Unknown column: " + columnName);
@@ -128,62 +134,11 @@ public abstract class MessageEventTransformer<T>
         return buildTable(builderMap);
     }
 
+    @Override
+    public PageReader<BinaryDecoder> createPageReader(List<ColumnMetadata> metadata)
+    {
+        return new AvroPageReader(checkpointColumn, metadata);
+    }
+
     protected abstract S3Object getBulkObject(String bulkKey);
-
-    private AvroPageReader getReader(Map<SchemaTableName, AvroPageReader> builderMap, SchemaTableName table)
-    {
-        AvroPageReader pageBuilder = builderMap.get(table);
-        if (pageBuilder == null) {
-            try {
-                pageBuilder = generatePageBuilder(table.getSchemaName(), table.getTableName());
-            }
-            catch (PrestoException e) {
-                if (e.getErrorCode() == NOT_FOUND.toErrorCode()) {
-                    LOGGER.warn(e, "Unable to find table '%s' for record.", table);
-                    return null;
-                } else {
-                    throw e;
-                }
-            }
-            builderMap.put(table, pageBuilder);
-        }
-
-        return pageBuilder;
-    }
-
-    private Table<String, String, TableData> buildTable(Map<SchemaTableName, AvroPageReader> builderMap)
-    {
-        Table<String, String, TableData> table = HashBasedTable.create();
-        for (Map.Entry<SchemaTableName, AvroPageReader> entry : builderMap.entrySet()) {
-            SchemaTableName key = entry.getKey();
-            table.put(key.getSchemaName(), key.getTableName(),
-                    new TableData(entry.getValue().getPage(), entry.getValue().getExpectedSchema()));
-        }
-
-        return table;
-    }
-
-    private AvroPageReader generatePageBuilder(String project, String collection)
-    {
-        List<ColumnMetadata> rakamSchema = database.getColumns(project, collection);
-
-        if (rakamSchema == null) {
-            throw new PrestoException(NOT_FOUND,
-                    String.format("Source table '%s.%s' not found", project, collection));
-        }
-
-        return new AvroPageReader(rakamSchema);
-    }
-
-    public static class TableData
-    {
-        public final Page page;
-        public final List<ColumnMetadata> metadata;
-
-        public TableData(Page page, List<ColumnMetadata> metadata)
-        {
-            this.page = page;
-            this.metadata = metadata;
-        }
-    }
 }

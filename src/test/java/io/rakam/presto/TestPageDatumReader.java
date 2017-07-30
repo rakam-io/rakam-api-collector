@@ -5,7 +5,6 @@
 package io.rakam.presto;
 
 import com.facebook.presto.spi.Page;
-import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
@@ -16,6 +15,7 @@ import com.facebook.presto.spi.type.MapType;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.rakam.presto.deserialization.PageBuilder;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.generic.GenericData;
@@ -24,7 +24,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.EncoderFactory;
-import org.apache.avro.io.PageDatumReader;
+import org.apache.avro.io.AvroPageDatumReader;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -49,7 +49,7 @@ public class TestPageDatumReader
 {
     private static final int ITERATION = 1000;
 
-    ////@Test
+    @Test
     public void testComplexTypeReader()
             throws Exception
     {
@@ -63,7 +63,7 @@ public class TestPageDatumReader
                         new Field("test4", createUnion(of(Schema.create(Schema.Type.BOOLEAN))), null, null)
                 ));
 
-        PageDatumReader reader = new PageDatumReader(page, schema);
+        AvroPageDatumReader reader = new AvroPageDatumReader(page, schema);
 
         for (int i = 0; i < ITERATION; i++) {
             GenericData.Record record = new GenericData.Record(schema);
@@ -81,7 +81,7 @@ public class TestPageDatumReader
                 BlockAssertions.createBooleanSequenceBlock(0, ITERATION)));
     }
 
-    ////@Test
+    @Test
     public void testSchemaChange()
             throws Exception
     {
@@ -108,7 +108,7 @@ public class TestPageDatumReader
         }
 
         PageBuilder page = new PageBuilder(of(VARCHAR, DOUBLE));
-        PageDatumReader reader = new PageDatumReader(page, schema);
+        AvroPageDatumReader reader = new AvroPageDatumReader(page, schema);
 
         for (byte[] bytes : out) {
             reader.read(null, DecoderFactory.get().binaryDecoder(bytes, null));
@@ -126,7 +126,7 @@ public class TestPageDatumReader
         PageAssertions.assertPageEquals(of(VARCHAR, DOUBLE), page.build(), new Page(stringSequenceBlock, blockBuilder.build()));
     }
 
-    //@Test
+    @Test
     public void testStringReader()
             throws Exception
     {
@@ -134,19 +134,14 @@ public class TestPageDatumReader
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.STRING))), null, null)));
 
-        PageDatumReader reader = new PageDatumReader(page, schema);
+        AvroPageDatumReader reader = new AvroPageDatumReader(page, schema);
 
-        for (int i = 0; i < ITERATION; i++) {
-            GenericData.Record record = new GenericData.Record(schema);
-            record.put("test", String.valueOf(i));
-            byte[] bytes = get(record);
-            reader.read(null, DecoderFactory.get().binaryDecoder(bytes, null));
-        }
+        readData(schema, reader);
 
         PageAssertions.assertPageEquals(of(VARCHAR), page.build(), new Page(BlockAssertions.createStringSequenceBlock(0, ITERATION)));
     }
 
-    //@Test(expectedExceptions = UnsupportedOperationException.class)
+    @Test(expectedExceptions = UnsupportedOperationException.class)
     public void testInvalidSchemaReader()
             throws Exception
     {
@@ -154,8 +149,14 @@ public class TestPageDatumReader
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.STRING))), null, null)));
 
-        PageDatumReader reader = new PageDatumReader(page, schema);
+        AvroPageDatumReader reader = new AvroPageDatumReader(page, schema);
 
+        readData(schema, reader);
+    }
+
+    private void readData(Schema schema, AvroPageDatumReader reader)
+            throws IOException
+    {
         for (int i = 0; i < ITERATION; i++) {
             GenericData.Record record = new GenericData.Record(schema);
             record.put("test", String.valueOf(i));
@@ -164,7 +165,7 @@ public class TestPageDatumReader
         }
     }
 
-    //@Test
+    @Test
     public void testBigintReader()
             throws Exception
     {
@@ -172,7 +173,7 @@ public class TestPageDatumReader
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.LONG))), null, null)));
 
-        PageDatumReader reader = new PageDatumReader(page, schema);
+        AvroPageDatumReader reader = new AvroPageDatumReader(page, schema);
 
         for (long i = 0; i < ITERATION; i++) {
             GenericData.Record record = new GenericData.Record(schema);
@@ -184,7 +185,7 @@ public class TestPageDatumReader
         PageAssertions.assertPageEquals(of(BIGINT), page.build(), new Page(BlockAssertions.createLongSequenceBlock(0, ITERATION)));
     }
 
-    //@Test
+    @Test
     public void testBooleanReader()
             throws Exception
     {
@@ -192,7 +193,7 @@ public class TestPageDatumReader
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.BOOLEAN))), null, null)));
 
-        PageDatumReader reader = new PageDatumReader(page, schema);
+        AvroPageDatumReader reader = new AvroPageDatumReader(page, schema);
 
         for (int i = 0; i < ITERATION; i++) {
             GenericData.Record record = new GenericData.Record(schema);
@@ -204,7 +205,7 @@ public class TestPageDatumReader
         PageAssertions.assertPageEquals(of(BOOLEAN), page.build(), new Page(BlockAssertions.createBooleanSequenceBlock(0, ITERATION)));
     }
 
-    //@Test
+    @Test
     public void testDoubleReader()
             throws Exception
     {
@@ -212,7 +213,7 @@ public class TestPageDatumReader
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.DOUBLE))), null, null)));
 
-        PageDatumReader reader = new PageDatumReader(page, schema);
+        AvroPageDatumReader reader = new AvroPageDatumReader(page, schema);
 
         for (double i = 0; i < ITERATION; i++) {
             GenericData.Record record = new GenericData.Record(schema);
@@ -224,7 +225,7 @@ public class TestPageDatumReader
         PageAssertions.assertPageEquals(of(DOUBLE), page.build(), new Page(BlockAssertions.createDoubleSequenceBlock(0, ITERATION)));
     }
 
-    //@Test
+    @Test
     public void testDateReader()
             throws Exception
     {
@@ -232,7 +233,7 @@ public class TestPageDatumReader
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.INT))), null, null)));
 
-        PageDatumReader reader = new PageDatumReader(page, schema);
+        AvroPageDatumReader reader = new AvroPageDatumReader(page, schema);
 
         for (int i = 0; i < ITERATION; i++) {
             GenericData.Record record = new GenericData.Record(schema);
@@ -244,7 +245,7 @@ public class TestPageDatumReader
         PageAssertions.assertPageEquals(of(DATE), page.build(), new Page(BlockAssertions.createDateSequenceBlock(0, ITERATION)));
     }
 
-    //@Test
+    @Test
     public void testArrayReader()
             throws Exception
     {
@@ -253,7 +254,7 @@ public class TestPageDatumReader
         Schema array = Schema.createArray(Schema.create(Schema.Type.STRING));
         Schema schema = createRecord(of(new Field("test", createUnion(of(array)), null, null)));
 
-        PageDatumReader reader = new PageDatumReader(page, schema);
+        AvroPageDatumReader reader = new AvroPageDatumReader(page, schema);
 
         for (int i = 0; i < ITERATION; i++) {
             GenericData.Record record = new GenericData.Record(schema);
@@ -270,7 +271,7 @@ public class TestPageDatumReader
                 new Page(BlockAssertions.createStringArraysBlock(values)));
     }
 
-    //@Test
+    @Test
     public void testMapReader()
             throws Exception
     {
@@ -280,7 +281,7 @@ public class TestPageDatumReader
         Schema elementType = Schema.create(Schema.Type.STRING);
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.createMap(elementType))), null, null)));
 
-        PageDatumReader reader = new PageDatumReader(page, schema);
+        AvroPageDatumReader reader = new AvroPageDatumReader(page, schema);
 
         for (int i = 0; i < ITERATION; i++) {
             GenericData.Record record = new GenericData.Record(schema);

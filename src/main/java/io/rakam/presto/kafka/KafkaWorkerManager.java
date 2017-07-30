@@ -5,12 +5,11 @@
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.HostAddress;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Table;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.BatchRecords;
-import io.rakam.presto.MessageEventTransformer;
 import io.rakam.presto.MiddlewareBuffer;
 import io.rakam.presto.MiddlewareConfig;
 import io.rakam.presto.StreamWorkerContext;
@@ -99,15 +98,15 @@ public class KafkaWorkerManager
             throw new RuntimeException(e);
         }
 
-        consumer = new KafkaConsumer(createConsumerConfig(zkNodes));
-        consumer.subscribe(children);
+        consumer = new KafkaConsumer(createConsumerConfig(zkNodes, "127.0.0.1:9092"));
+        consumer.subscribe(ImmutableList.of("presto.tweet"));
 
         try {
 
             while (true) {
                 ConsumerRecords<byte[], byte[]> records = consumer.poll(1000);
                 for (ConsumerRecord<byte[], byte[]> record : records) {
-                    buffer.consumeRecord(record.value(), record.value().length);
+                    buffer.consumeRecord(record, record.value().length);
                 }
                 if (buffer.shouldFlush()) {
                     Map.Entry<List, List> records1 = buffer.getRecords();
@@ -149,16 +148,19 @@ public class KafkaWorkerManager
         }
     }
 
-    private static Properties createConsumerConfig(String zkNodes)
+    private static Properties createConsumerConfig(String zkNodes, String kafkaNodes)
     {
         Properties props = new Properties();
         props.put("zookeeper.connect", zkNodes);
+        props.put("bootstrap.servers", kafkaNodes);
         props.put("group.id", "presto_streaming");
         props.put("zookeeper.session.timeout.ms", "400");
         props.put("zookeeper.sync.time.ms", "200");
         props.put("auto.commit.enable", "false");
-        props.put("auto.offset.reset", "smallest");
+        props.put("auto.offset.reset", "earliest");
         props.put("offsets.storage", "kafka");
+        props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+        props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("consumer.timeout.ms", "10");
 
         return props;
