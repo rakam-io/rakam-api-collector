@@ -49,6 +49,7 @@ import com.google.common.eventbus.EventBus;
 import com.google.inject.Module;
 import io.airlift.slice.Slice;
 import io.rakam.presto.DatabaseHandler;
+import org.apache.http.client.utils.URLEncodedUtils;
 import org.rakam.analysis.JDBCPoolDataSource;
 import org.rakam.collection.FieldType;
 import org.rakam.collection.SchemaField;
@@ -61,8 +62,10 @@ import org.skife.jdbi.v2.DBI;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLDecoder;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.List;
@@ -112,16 +115,16 @@ public class RaptorDatabaseHandler
                 .put("storage.organization-enabled", "false")
                 .put("backup.timeout", "20m");
 
-        if(s3BackupConfig.getAccessKey() != null) {
-           props.put("raptor.aws.access-key", s3BackupConfig.getAccessKey());
+        if (s3BackupConfig.getAccessKey() != null) {
+            props.put("raptor.aws.access-key", s3BackupConfig.getAccessKey());
         }
 
-        if(s3BackupConfig.getSecretAccessKey() != null) {
-           props.put("raptor.aws.secret-access-key", s3BackupConfig.getSecretAccessKey());
+        if (s3BackupConfig.getSecretAccessKey() != null) {
+            props.put("raptor.aws.secret-access-key", s3BackupConfig.getSecretAccessKey());
         }
 
-        if(s3BackupConfig.getEndpoint() != null) {
-           props.put("raptor.aws.s3-endpoint", s3BackupConfig.getEndpoint());
+        if (s3BackupConfig.getEndpoint() != null) {
+            props.put("raptor.aws.s3-endpoint", s3BackupConfig.getEndpoint());
         }
 
         ImmutableMap<String, String> properties = props.build();
@@ -155,13 +158,31 @@ public class RaptorDatabaseHandler
         pageSinkProvider = connector.getPageSinkProvider();
         JDBCConfig jdbcConfig = new JDBCConfig();
         try {
+            String uri = new URI(config.getMetadataUrl().substring(5)).getQuery();
+            for (String elem : uri.split("&")) {
+                String[] split = elem.split("=", 2);
+                if (split[0].equals("user")) {
+                    jdbcConfig.setUsername(URLDecoder.decode(split[1], "UTF-8"));
+                }
+                else if (split[0].equals("password")) {
+                    jdbcConfig.setPassword(URLDecoder.decode(split[1], "UTF-8"));
+                }
+            }
             jdbcConfig.setUrl(config.getMetadataUrl());
         }
-        catch (URISyntaxException e) {
+        catch (URISyntaxException|UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
-        metastore = new PrestoRakamRaptorMetastore(JDBCPoolDataSource.getOrCreateDataSource(jdbcConfig),
-                new EventBus(), new ProjectConfig(), new PrestoConfig());
+
+        if(config.getPrestoURL() != null) {
+            JDBCPoolDataSource orCreateDataSource = JDBCPoolDataSource.getOrCreateDataSource(jdbcConfig);
+            PrestoConfig prestoConfig = new PrestoConfig();
+            prestoConfig.setAddress(config.getPrestoURL());
+            metastore = new PrestoRakamRaptorMetastore(orCreateDataSource,
+                    new EventBus(), new ProjectConfig(), prestoConfig);
+        } else {
+            metastore = null;
+        }
     }
 
     @Override
@@ -180,6 +201,9 @@ public class RaptorDatabaseHandler
     @Override
     public List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns)
     {
+        if(metastore == null) {
+            throw new IllegalStateException();
+        }
         List<SchemaField> fields = metastore.getOrCreateCollectionFields(schema, table, columns.stream().map(e -> {
             TypeSignature typeSignature = e.getType().getTypeSignature();
             FieldType type = fromPrestoType(typeSignature.getBase(),

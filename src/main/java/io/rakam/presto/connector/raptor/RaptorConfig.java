@@ -7,12 +7,15 @@ package io.rakam.presto.connector.raptor;
 import io.airlift.configuration.Config;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URL;
 
 public class RaptorConfig
 {
     private String metadataUrl;
     private String nodeIdentifier;
     private File dataDirectory;
+    private URI prestoURL;
 
     public String getMetadataUrl()
     {
@@ -47,6 +50,18 @@ public class RaptorConfig
     public RaptorConfig setDataDirectory(File dataDirectory)
     {
         this.dataDirectory = dataDirectory;
+        return this;
+    }
+
+    public URI getPrestoURL()
+    {
+        return prestoURL;
+    }
+
+    @Config("raptor.presto-url")
+    public RaptorConfig setPrestoURL(URI prestoURL)
+    {
+        this.prestoURL = prestoURL;
         return this;
     }
 }
