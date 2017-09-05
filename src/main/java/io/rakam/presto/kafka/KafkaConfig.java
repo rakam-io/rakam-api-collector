@@ -22,6 +22,19 @@ public class KafkaConfig
 
     private Set<HostAddress> nodes;
     private Set<HostAddress> zkNodes;
+    private String topic;
+
+    public String getTopic()
+    {
+        return topic;
+    }
+
+    @Config("kafka.topic")
+    public KafkaConfig setTopic(String topic)
+    {
+        this.topic = topic;
+        return this;
+    }
 
     @Size(min = 1)
     public Set<HostAddress> getNodes()

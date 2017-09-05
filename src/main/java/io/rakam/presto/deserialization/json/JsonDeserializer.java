@@ -10,6 +10,7 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.DateType;
 import com.facebook.presto.spi.type.DoubleType;
+import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -30,7 +31,9 @@ import java.io.IOException;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
@@ -56,6 +59,7 @@ public class JsonDeserializer
     private static final JsonFactory READER = new ObjectMapper().getFactory();
     private final DatabaseHandler databaseHandler;
 
+    private Map<Type, FieldType> typeCache = new ConcurrentHashMap<>();
     private String project;
     private String collection;
     private JsonParser jp;
@@ -97,7 +101,7 @@ public class JsonDeserializer
             t = jp.nextToken();
         }
         else {
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("Invalid json");
         }
 
         for (; t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
@@ -107,10 +111,14 @@ public class JsonDeserializer
 
             switch (fieldName) {
                 case "project":
-                    project = checkCollectionValid(jp.getValueAsString().toLowerCase());
+                    project = jp.getValueAsString();
+                    if (project == null || project.isEmpty()) {
+                        throw new RuntimeException("Project can't be null");
+                    }
+                    project = project.toLowerCase();
                     break;
                 case "collection":
-                    collection = checkCollectionValid(jp.getValueAsString().toLowerCase());
+                    collection = checkCollectionValid(jp.getValueAsString());
                     break;
                 case "properties":
                     if (t != START_OBJECT) {
@@ -123,7 +131,8 @@ public class JsonDeserializer
                     else {
                         if (pageReader != null) {
                             parseProperties(pageReader);
-                        } else {
+                        }
+                        else {
                             return;
                         }
                     }
@@ -180,7 +189,6 @@ public class JsonDeserializer
                             .addAll(columns)
                             .add(newField)
                             .build();
-                    pageReader.setActualSchema(columns);
 
                     newFields.add(newField);
                     idx = columns.size() - 1;
@@ -200,17 +208,22 @@ public class JsonDeserializer
                 }
             }
             else {
-                TypeSignature typeSignature = columns.get(idx).getType().getTypeSignature();
-                FieldType fieldType = PrestoQueryExecution.fromPrestoType(typeSignature.getBase(), typeSignature.getParameters().stream().map(e -> e.toString()).iterator());
+                Type type = columns.get(idx).getType();
+                FieldType fieldType = typeCache.get(type);
+                if (fieldType == null) {
+                    TypeSignature typeSignature = type.getTypeSignature();
+                    fieldType = PrestoQueryExecution.fromPrestoType(typeSignature.getBase(),
+                            typeSignature.getParameters().stream().map(e -> e.toString()).iterator());
+                    typeCache.put(type, fieldType);
+                }
+
                 ColumnMetadata columnMetadata = columns.get(idx);
-                columnMetadata.getType().getTypeSignature().getParameters().stream()
-                        .filter(param -> param.getKind() == TYPE)
-                        .map(param -> param.getTypeSignature().getBase()).iterator();
 
                 BlockBuilder blockBuilder = pageBuilder.getBlockBuilder(idx);
-                if(currentPosition == blockBuilder.getPositionCount()) {
+                if (currentPosition == blockBuilder.getPositionCount()) {
                     jp.skipChildren();
-                } else  {
+                }
+                else {
                     getValue(blockBuilder, jp, fieldType, columnMetadata, false);
                 }
             }
@@ -224,9 +237,10 @@ public class JsonDeserializer
         }
 
         if (newFields != null) {
-            List<ColumnMetadata> newColumns = databaseHandler.addColumns(project, collection, newFields);
+            pageReader.setActualSchema(databaseHandler.addColumns(project, collection, newFields));
+            List<ColumnMetadata> newColumns = pageReader.getExpectedSchema();
 
-            if (!columns.equals(newColumns)) {
+            if (!newColumns.equals(columns)) {
                 BlockBuilder[] blockBuilders = new BlockBuilder[newColumns.size()];
 
                 for (int i = 0; i < newColumns.size(); i++) {
@@ -254,7 +268,6 @@ public class JsonDeserializer
                         Optional.ofNullable(blockBuilders), pageBuilder.getPositionCount());
 
                 pageReader.setPageBuilder(pageBuilder);
-                pageReader.setActualSchema(newColumns);
             }
         }
 

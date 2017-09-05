@@ -36,7 +36,7 @@ public class AvroPageDatumReader
         this(pageBuilder, schema, schema);
     }
 
-    public AvroPageDatumReader(PageBuilder pageBuilder, Schema actualSchema, Schema expectedSchema)
+    private AvroPageDatumReader(PageBuilder pageBuilder, Schema actualSchema, Schema expectedSchema)
     {
         this.builder = pageBuilder;
         this.actualSchema = actualSchema;

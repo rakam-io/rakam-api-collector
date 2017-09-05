@@ -57,29 +57,12 @@ public class TargetConnectorCommitter
 
     private CompletableFuture<Void> commit(Iterable<Table<String, String, TableData>> batches, SchemaTableName table)
     {
-        List<ColumnMetadata> columns = databaseHandler.getColumns(table.getSchemaName(), table.getTableName());
-
         DatabaseHandler.Inserter insert = databaseHandler.insert(table.getSchemaName(), table.getTableName());
 
         for (Table<String, String, TableData> batch : batches) {
             TableData tableData = batch.get(table.getSchemaName(), table.getTableName());
             if (tableData != null) {
-                Page page = tableData.page;
-                if (columns.size() != page.getChannelCount()) {
-                    Block[] blocks = Arrays.copyOf(page.getBlocks(), columns.size());
-                    for (int i = page.getChannelCount(); i < columns.size(); i++) {
-                        BlockBuilder blockBuilder = columns.get(i).getType().createBlockBuilder(new BlockBuilderStatus(), page.getPositionCount());
-                        for (int i1 = 0; i1 < page.getPositionCount(); i1++) {
-                            blockBuilder.appendNull();
-                        }
-                        blocks[i] = blockBuilder.build();
-                        page = new Page(blocks);
-                    }
-
-                    page = new Page(blocks);
-                }
-
-                insert.addPage(page);
+                insert.addPage(tableData.page);
             }
         }
 

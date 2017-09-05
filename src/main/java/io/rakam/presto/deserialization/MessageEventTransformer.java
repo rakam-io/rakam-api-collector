@@ -16,6 +16,7 @@ import com.google.common.collect.Table;
 import io.airlift.log.Logger;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
+import org.rakam.util.NotExistsException;
 
 import javax.annotation.Nullable;
 
@@ -76,7 +77,7 @@ public abstract class MessageEventTransformer<T, C>
         for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
             SchemaTableName key = entry.getKey();
             table.put(key.getSchemaName(), key.getTableName(),
-                    new TableData(entry.getValue().getPage(), entry.getValue().getExpectedSchema()));
+                    new TableData(entry.getValue().getPage(), entry.getValue().getActualSchema()));
         }
 
         return table;
@@ -97,6 +98,10 @@ public abstract class MessageEventTransformer<T, C>
                 else {
                     throw e;
                 }
+            }
+            catch (NotExistsException e) {
+                LOGGER.warn(e, "Unable to find table '%s' for record.", table);
+                return null;
             }
             builderMap.put(table, pageBuilder);
         }

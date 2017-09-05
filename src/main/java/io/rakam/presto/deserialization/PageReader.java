@@ -11,6 +11,7 @@ import com.facebook.presto.spi.block.RunLengthEncodedBlock;
 import com.facebook.presto.spi.type.Type;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,16 +25,17 @@ public abstract class PageReader<T>
     private List<ColumnMetadata> actualSchema;
     private PageBuilder pageBuilder;
 
-    public PageReader(String checkpointColumn, List<ColumnMetadata> actualSchema, List<ColumnMetadata> expectedSchema)
+    public PageReader(String checkpointColumn, List<ColumnMetadata> schema)
     {
-        List<Type> prestoSchema = expectedSchema.stream()
+        List<ColumnMetadata> expectedSchema = schema.stream()
                 .filter(a -> !a.getName().startsWith("$") && !a.getName().equals(checkpointColumn))
-                .map(field -> field.getType())
                 .collect(Collectors.toList());
+
+        List<Type> prestoSchema = expectedSchema.stream().map(field -> field.getType()).collect(Collectors.toList());
 
         this.checkpointColumn = checkpointColumn;
         this.expectedSchema = expectedSchema;
-        this.actualSchema = actualSchema;
+        this.actualSchema = schema;
         this.pageBuilder = new PageBuilder(prestoSchema);
         this.datumReader = createReader();
     }
@@ -53,8 +55,8 @@ public abstract class PageReader<T>
     public Page getPage()
     {
         int shardTimeIdx = -1;
-        for (int i = 0; i < expectedSchema.size(); i++) {
-            if (expectedSchema.get(i).getName().equals(checkpointColumn)) {
+        for (int i = 0; i < actualSchema.size(); i++) {
+            if (actualSchema.get(i).getName().equals(checkpointColumn)) {
                 shardTimeIdx = i;
                 break;
             }
@@ -70,7 +72,7 @@ public abstract class PageReader<T>
             System.arraycopy(oldBlocks, 0, blocks, 0, shardTimeIdx);
             System.arraycopy(oldBlocks, shardTimeIdx, blocks, shardTimeIdx + 1, build.getChannelCount() - shardTimeIdx);
 
-            blocks[shardTimeIdx] = RunLengthEncodedBlock.create(TIMESTAMP, null, build.getPositionCount());
+            blocks[shardTimeIdx] = RunLengthEncodedBlock.create(TIMESTAMP, Instant.now().toEpochMilli(), build.getPositionCount());
 
             return new Page(blocks);
         }
@@ -97,6 +99,9 @@ public abstract class PageReader<T>
     public void setActualSchema(List<ColumnMetadata> actualSchema)
     {
         this.actualSchema = actualSchema;
-        this.expectedSchema = actualSchema;
+
+        this.expectedSchema = actualSchema.stream()
+                .filter(a -> !a.getName().startsWith("$") && !a.getName().equals(checkpointColumn))
+                .collect(Collectors.toList());
     }
 }

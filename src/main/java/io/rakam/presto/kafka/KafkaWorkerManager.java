@@ -7,26 +7,31 @@ package io.rakam.presto.kafka;
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Table;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.airlift.log.Logger;
 import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.BatchRecords;
 import io.rakam.presto.MiddlewareBuffer;
 import io.rakam.presto.MiddlewareConfig;
 import io.rakam.presto.StreamWorkerContext;
 import io.rakam.presto.TargetConnectorCommitter;
+import io.rakam.presto.deserialization.TableData;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.zookeeper.KeeperException;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.consumer.OffsetCommitCallback;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.ZooKeeper;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -39,14 +44,15 @@ import java.util.stream.Collectors;
 public class KafkaWorkerManager
         implements Watcher
 {
+    private static final Logger log = Logger.get(KafkaWorkerManager.class);
+
     private final StreamWorkerContext<ConsumerRecord> context;
     private final TargetConnectorCommitter committer;
     private final MiddlewareBuffer middlewareBuffer;
-    private final BasicMemoryBuffer buffer;
+    private final BasicMemoryBuffer<ConsumerRecord> buffer;
     private KafkaConsumer<byte[], byte[]> consumer;
     private KafkaConfig config;
     private ExecutorService executor;
-    private ZooKeeper zk;
 
     @Inject
     public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
@@ -76,11 +82,11 @@ public class KafkaWorkerManager
         }
         try {
             if (!executor.awaitTermination(5000, TimeUnit.MILLISECONDS)) {
-                System.out.println("Timed out waiting for consumer threads to shut down, exiting uncleanly");
+                log.warn("Timed out waiting for consumer threads to shut down, exiting uncleanly");
             }
         }
         catch (InterruptedException e) {
-            System.out.println("Interrupted during shutdown, exiting uncleanly");
+            log.warn("Interrupted during shutdown, exiting uncleanly");
         }
     }
 
@@ -88,39 +94,29 @@ public class KafkaWorkerManager
     public void run()
     {
         String zkNodes = config.getZookeeperNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
+        String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
 
-        List<String> children;
-        try {
-            zk = new ZooKeeper(zkNodes, 1000 * 60 * 2, this);
-            children = zk.getChildren("/brokers/topics", this);
-        }
-        catch (IOException | KeeperException | InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
-        consumer = new KafkaConsumer(createConsumerConfig(zkNodes, "127.0.0.1:9092"));
-        consumer.subscribe(ImmutableList.of("presto.tweet"));
+        consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes));
+        consumer.subscribe(ImmutableList.of(config.getTopic()));
 
         try {
-
             while (true) {
-                ConsumerRecords<byte[], byte[]> records = consumer.poll(1000);
-                for (ConsumerRecord<byte[], byte[]> record : records) {
+                ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(1000);
+                for (ConsumerRecord<byte[], byte[]> record : kafkaRecord) {
                     buffer.consumeRecord(record, record.value().length);
                 }
                 if (buffer.shouldFlush()) {
-                    Map.Entry<List, List> records1 = buffer.getRecords();
                     try {
-                        middlewareBuffer.add(new BatchRecords(context.convert(records1.getKey(), records1.getValue()), new BatchRecords.Checkpointer() {
-                            @Override
-                            public void checkpoint()
-                                    throws BatchRecords.CheckpointException
-                            {
-                                // checkpoint for kafka topic
-                            }
-                        }));
+                        Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> records = buffer.getRecords();
 
-                        if(middlewareBuffer.shouldFlush()) {
+                        if (!records.getValue().isEmpty() || !records.getKey().isEmpty()) {
+                            Table<String, String, TableData> convert = context.convert(records.getKey(), records.getValue());
+                            buffer.clear();
+
+                            middlewareBuffer.add(new BatchRecords(convert, createCheckpointer(findLatestRecord(records))));
+                        }
+
+                        if (middlewareBuffer.shouldFlush()) {
                             List<BatchRecords> list = middlewareBuffer.flush();
 
                             if (!list.isEmpty()) {
@@ -136,15 +132,72 @@ public class KafkaWorkerManager
                                 });
                             }
                         }
-
                     }
-                    catch (IOException e) {
-                        throw new RuntimeException(e);
+                    catch (Throwable e) {
+                        log.error(e, "Error processing Kafka records, passing record to latest offset.");
+                        commitAsyncOffset(null);
                     }
                 }
             }
-        } finally {
+        }
+        finally {
             consumer.close();
+        }
+    }
+
+    private Table<String, String, TableData> flushStream()
+    {
+        Table<String, String, TableData> pages;
+        try {
+            Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> list = buffer.getRecords();
+
+            if (list.getValue().isEmpty() && list.getKey().isEmpty()) {
+                return null;
+            }
+
+            pages = context.convert(list.getKey(), list.getValue());
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        buffer.clear();
+        return pages;
+    }
+
+    public BatchRecords.Checkpointer createCheckpointer(ConsumerRecord record)
+    {
+        return new BatchRecords.Checkpointer()
+        {
+            @Override
+            public void checkpoint()
+                    throws BatchRecords.CheckpointException
+            {
+                commitAsyncOffset(record);
+            }
+        };
+    }
+
+    public void commitAsyncOffset(ConsumerRecord record)
+    {
+        OffsetCommitCallback callback = new OffsetCommitCallback()
+        {
+            @Override
+            public void onComplete(Map<TopicPartition, OffsetAndMetadata> offsets, Exception e)
+            {
+                if (e != null) {
+                    log.error(e, "Kafka offset commit fail. %s", offsets.toString());
+                }
+            }
+        };
+
+        if (record == null) {
+            consumer.commitAsync(callback);
+        }
+        else {
+            Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
+            offsets.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1));
+            consumer.commitAsync(offsets, callback);
         }
     }
 
@@ -164,6 +217,22 @@ public class KafkaWorkerManager
         props.put("consumer.timeout.ms", "10");
 
         return props;
+    }
+
+    private ConsumerRecord findLatestRecord(Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> records)
+    {
+        ConsumerRecord lastSingleRecord = records.getKey().isEmpty() ? null : records.getKey().get(records.getKey().size() - 1);
+        ConsumerRecord lastBatchRecord = records.getValue().isEmpty() ? null : records.getValue().get(records.getValue().size() - 1);
+
+        ConsumerRecord lastRecord;
+        if (lastBatchRecord != null && lastSingleRecord != null) {
+            lastRecord = lastBatchRecord.offset() > lastBatchRecord.offset() ? lastBatchRecord : lastSingleRecord;
+        }
+        else {
+            lastRecord = lastBatchRecord != null ? lastBatchRecord : lastSingleRecord;
+        }
+
+        return lastRecord;
     }
 
     @Override

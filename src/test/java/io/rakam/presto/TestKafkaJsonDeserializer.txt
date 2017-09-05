@@ -13,6 +13,7 @@ import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.TableData;
 import io.rakam.presto.kafka.KafkaJsonMessageTransformer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.rakam.collection.FieldType;
 import org.rakam.util.JsonHelper;
 import org.testng.annotations.Test;
 
@@ -88,7 +89,7 @@ public class TestKafkaJsonDeserializer
         assertEquals(testcollection.page.getChannelCount(), columns.size());
         assertEquals(testcollection.page.getPositionCount(), ITERATION_COUNT);
 
-        Block block = testcollection.page.getBlock(24);
+        Block block = testcollection.page.getBlock(25);
         Block expectedBlock = BlockAssertions.createStringsBlock("test", "test", "test");
         BlockAssertions.assertBlockEquals(VARCHAR, block, expectedBlock);
     }
@@ -106,13 +107,13 @@ public class TestKafkaJsonDeserializer
         Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(ImmutableList.of(record), ImmutableList.of());
         Map<String, TableData> testproject = pageTable.row("testproject");
         TableData testcollection = testproject.get("testcollection");
-        assertEquals(testcollection.metadata.size(), 3);
-        assertEquals(testcollection.page.getChannelCount(), 3);
+        assertEquals(testcollection.metadata.size(), 4);
+        assertEquals(testcollection.page.getChannelCount(), 4);
         assertEquals(testcollection.page.getPositionCount(), 1);
 
-        Block block = testcollection.page.getBlock(2);
+        Block block = testcollection.page.getBlock(3);
 
-        BlockAssertions.assertBlockEquals(COLUMNS.get(0).getType(), block,
+        BlockAssertions.assertBlockEquals(COLUMNS.get(1).getType(), block,
                 BlockAssertions.createStringsBlock("1"));
     }
 
@@ -123,16 +124,17 @@ public class TestKafkaJsonDeserializer
         TestDatabaseHandler databaseHandler = new TestDatabaseHandler();
         MessageEventTransformer messageEventTransformer = new KafkaJsonMessageTransformer(new FieldNameConfig(), databaseHandler);
         Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecords("testproject", "testcollection2", Optional.of(new int[] {
-                0})), ImmutableList.of());
+                1})), ImmutableList.of());
         Map<String, TableData> testproject = pageTable.row("testproject");
         TableData testcollection = testproject.get("testcollection2");
-        assertEquals(testcollection.metadata.size(), 3);
-        assertEquals(testcollection.page.getChannelCount(), 3);
+        assertEquals(testcollection.metadata.size(), 4);
+        assertEquals(testcollection.page.getChannelCount(), 4);
         assertEquals(testcollection.page.getPositionCount(), ITERATION_COUNT);
 
-        Block block = testcollection.page.getBlock(2);
+        Block block = testcollection.page.getBlock(3);
 
-        BlockAssertions.assertBlockEquals(COLUMNS.get(0).getType(), block, getBlock(FIELDS.get(0)));
+        // first field
+        BlockAssertions.assertBlockEquals(VARCHAR, block, getBlock(FieldType.STRING));
     }
 
     @Test
@@ -173,11 +175,11 @@ public class TestKafkaJsonDeserializer
         assertEquals(testcollection.page.getChannelCount(), latestColumns.size());
         assertEquals(testcollection.page.getPositionCount(), ITERATION_COUNT);
 
-        Block block = testcollection.page.getBlock(24);
+        Block block = testcollection.page.getBlock(25);
         Block expectedBlock = BlockAssertions.createStringsBlock("test2", "test2", "test2");
         BlockAssertions.assertBlockEquals(VARCHAR, block, expectedBlock);
 
-        block = testcollection.page.getBlock(25);
+        block = testcollection.page.getBlock(26);
         expectedBlock = BlockAssertions.createStringsBlock("test1", "test1", "test1");
         BlockAssertions.assertBlockEquals(VARCHAR, block, expectedBlock);
     }

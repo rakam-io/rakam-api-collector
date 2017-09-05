@@ -6,6 +6,7 @@ package io.rakam.presto;
 
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.Page;
+import com.facebook.presto.spi.type.TimestampType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
@@ -73,6 +74,7 @@ public class TestDatabaseHandler
 
         if(columnList == null) {
             columnList = new ArrayList<>();
+            columnList.add(new ColumnMetadata("_shard_time", TimestampType.TIMESTAMP));
             tables.put(table, columnList);
         }
 

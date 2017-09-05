@@ -27,6 +27,7 @@ import com.facebook.presto.spi.ConnectorTableHandle;
 import com.facebook.presto.spi.ConnectorTableMetadata;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.SchemaTableName;
+import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.connector.Connector;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
@@ -48,8 +49,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import io.airlift.slice.Slice;
 import io.rakam.presto.deserialization.TableData;
+import org.openjdk.jol.info.ClassLayout;
 import org.testng.annotations.Test;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -66,6 +70,38 @@ import static org.testng.AssertJUnit.fail;
 
 public class TestTargetConnectorCommitter
 {
+    @Test
+    public void simple()
+            throws Exception
+    {
+        deepInstanceSize(BlockBuilderStatus.class);
+    }
+
+    private static int deepInstanceSize(Class<?> clazz)
+    {
+        System.out.println(clazz);
+        if (clazz.isArray()) {
+            throw new IllegalArgumentException(String.format("Cannot determine size of %s because it contains an array", clazz.getSimpleName()));
+        }
+        if (clazz.isInterface()) {
+            throw new IllegalArgumentException(String.format("%s is an interface", clazz.getSimpleName()));
+        }
+        if (Modifier.isAbstract(clazz.getModifiers())) {
+            throw new IllegalArgumentException(String.format("%s is abstract", clazz.getSimpleName()));
+        }
+        if (!clazz.getSuperclass().equals(Object.class)) {
+            throw new IllegalArgumentException(String.format("Cannot determine size of a subclass. %s extends from %s", clazz.getSimpleName(), clazz.getSuperclass().getSimpleName()));
+        }
+
+        int size = ClassLayout.parseClass(clazz).instanceSize();
+        for (Field field : clazz.getDeclaredFields()) {
+            if (!field.getType().isPrimitive()) {
+                size += deepInstanceSize(field.getType());
+            }
+        }
+        return size;
+    }
+
     @Test
     public void testCommitter()
             throws Exception

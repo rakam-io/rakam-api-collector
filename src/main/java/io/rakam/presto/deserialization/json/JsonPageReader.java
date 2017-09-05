@@ -16,7 +16,7 @@ public class JsonPageReader
 {
     public JsonPageReader(String checkpointColumn, List<ColumnMetadata> rakamSchema)
     {
-        super(checkpointColumn, rakamSchema, rakamSchema);
+        super(checkpointColumn, rakamSchema);
     }
 
     @Override

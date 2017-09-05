@@ -4,7 +4,6 @@
 
 package io.rakam.presto;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.Table;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.TableData;
@@ -32,15 +31,7 @@ public class StreamWorkerContext<T>
     public Table<String, String, TableData> convert(Iterable<? extends T> records, Iterable<? extends T> bulkRecords)
             throws IOException
     {
-        Table<String, String, TableData> pages;
-        try {
-            pages = transformer.createPageTable(records, bulkRecords);
-        }
-        catch (IOException e) {
-            throw Throwables.propagate(e);
-        }
-
-        return pages;
+        return transformer.createPageTable(records, bulkRecords);
     }
 
     public BasicMemoryBuffer createBuffer()

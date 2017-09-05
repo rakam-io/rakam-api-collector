@@ -152,7 +152,7 @@
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-rakam-raptor</artifactId>
-            <version>0.180.0</version>
+            <version>0.180.1</version>
         </dependency>
 
         <dependency>

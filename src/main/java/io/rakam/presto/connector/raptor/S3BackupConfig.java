@@ -55,7 +55,6 @@ public class S3BackupConfig
         return this;
     }
 
-    @NotNull
     public String getS3Bucket()
     {
         return s3Bucket;

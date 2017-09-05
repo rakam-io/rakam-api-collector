@@ -43,12 +43,16 @@ import com.facebook.presto.sql.gen.JoinCompiler;
 import com.facebook.presto.sql.gen.OrderingCompiler;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.base.Predicate;
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.EventBus;
 import com.google.inject.Module;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.TargetConnectorCommitter;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.rakam.analysis.JDBCPoolDataSource;
 import org.rakam.collection.FieldType;
@@ -86,15 +90,18 @@ import static org.rakam.presto.analysis.PrestoRakamRaptorMetastore.toType;
 public class RaptorDatabaseHandler
         implements DatabaseHandler
 {
+    private static final Logger log = Logger.get(RaptorDatabaseHandler.class);
+
     private static final String RAKAM_RAPTOR_CONNECTOR = "RAKAM_RAPTOR_CONNECTOR";
     private final ConnectorMetadata metadata;
     private final ConnectorSession session;
     private final ConnectorTransactionHandle connectorTransactionHandle;
     private final ConnectorPageSinkProvider pageSinkProvider;
     private final PrestoRakamRaptorMetastore metastore;
+    private final Supplier<ConnectorMetadata> writeMetadata;
 
     @Inject
-    public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig)
+    public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig)
     {
         RaptorConnectorFactory raptorConnectorFactory = new RaptorConnectorFactory(
                 RAKAM_RAPTOR_CONNECTOR,
@@ -103,9 +110,6 @@ public class RaptorDatabaseHandler
 
         ImmutableMap.Builder<String, String> props = ImmutableMap.<String, String>builder()
                 .put("metadata.db.type", "mysql")
-                .put("backup.provider", "s3")
-                .put("aws.s3-bucket", s3BackupConfig.getS3Bucket())
-                .put("aws.region", s3BackupConfig.getAWSRegion().getName())
                 .put("metadata.db.url", config.getMetadataUrl())
                 .put("storage.data-directory", config.getDataDirectory().getAbsolutePath())
                 .put("metadata.db.connections.max", "200")
@@ -115,16 +119,26 @@ public class RaptorDatabaseHandler
                 .put("storage.organization-enabled", "false")
                 .put("backup.timeout", "20m");
 
-        if (s3BackupConfig.getAccessKey() != null) {
-            props.put("raptor.aws.access-key", s3BackupConfig.getAccessKey());
-        }
+        if (s3BackupConfig.getS3Bucket() != null) {
+            props.put("backup.provider", "s3");
+            props.put("aws.s3-bucket", s3BackupConfig.getS3Bucket());
 
-        if (s3BackupConfig.getSecretAccessKey() != null) {
-            props.put("raptor.aws.secret-access-key", s3BackupConfig.getSecretAccessKey());
-        }
+            props.put("aws.s3-bucket", s3BackupConfig.getS3Bucket());
+            props.put("aws.region", s3BackupConfig.getAWSRegion().getName());
 
-        if (s3BackupConfig.getEndpoint() != null) {
-            props.put("raptor.aws.s3-endpoint", s3BackupConfig.getEndpoint());
+            if (s3BackupConfig.getAccessKey() != null) {
+                props.put("aws.access-key", s3BackupConfig.getAccessKey());
+            }
+
+            if (s3BackupConfig.getSecretAccessKey() != null) {
+                props.put("aws.secret-access-key", s3BackupConfig.getSecretAccessKey());
+            }
+
+            if (s3BackupConfig.getEndpoint() != null) {
+                props.put("aws.s3-endpoint", s3BackupConfig.getEndpoint());
+            }
+        } else {
+            log.warn("THE BACKUP IS NOT ENABLED! YOU WILL LOSE DATA IF THIS NODE DIES!!!!!");
         }
 
         ImmutableMap<String, String> properties = props.build();
@@ -155,6 +169,11 @@ public class RaptorDatabaseHandler
                 .setCatalog(RAKAM_RAPTOR_CONNECTOR).build().toConnectorSession(connectorId);
 
         metadata = connector.getMetadata(connectorTransactionHandle);
+        writeMetadata = () -> {
+            ConnectorTransactionHandle connectorTransactionHandle = connector.beginTransaction(READ_COMMITTED, false);
+            return connector.getMetadata(connectorTransactionHandle);
+        };
+
         pageSinkProvider = connector.getPageSinkProvider();
         JDBCConfig jdbcConfig = new JDBCConfig();
         try {
@@ -170,17 +189,22 @@ public class RaptorDatabaseHandler
             }
             jdbcConfig.setUrl(config.getMetadataUrl());
         }
-        catch (URISyntaxException|UnsupportedEncodingException e) {
+        catch (URISyntaxException | UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
 
-        if(config.getPrestoURL() != null) {
+        if (config.getPrestoURL() != null) {
             JDBCPoolDataSource orCreateDataSource = JDBCPoolDataSource.getOrCreateDataSource(jdbcConfig);
             PrestoConfig prestoConfig = new PrestoConfig();
             prestoConfig.setAddress(config.getPrestoURL());
+            prestoConfig.setCheckpointColumn(fieldNameConfig.getCheckpointField());
+
             metastore = new PrestoRakamRaptorMetastore(orCreateDataSource,
-                    new EventBus(), new ProjectConfig(), prestoConfig);
-        } else {
+                    new EventBus(), new ProjectConfig()
+                    .setTimeColumn(fieldNameConfig.getTimeField())
+                    .setUserColumn(fieldNameConfig.getUserFieldName()), prestoConfig);
+        }
+        else {
             metastore = null;
         }
     }
@@ -201,10 +225,10 @@ public class RaptorDatabaseHandler
     @Override
     public List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns)
     {
-        if(metastore == null) {
+        if (metastore == null) {
             throw new IllegalStateException();
         }
-        List<SchemaField> fields = metastore.getOrCreateCollectionFields(schema, table, columns.stream().map(e -> {
+        metastore.getOrCreateCollectionFields(schema, table, columns.stream().map(e -> {
             TypeSignature typeSignature = e.getType().getTypeSignature();
             FieldType type = fromPrestoType(typeSignature.getBase(),
                     typeSignature.getParameters().stream()
@@ -213,14 +237,15 @@ public class RaptorDatabaseHandler
             return new SchemaField(e.getName(), type);
         }).collect(Collectors.toSet()));
 
-        return fields.stream().map(e -> new ColumnMetadata(e.getName(), toType(e.getType()))).collect(Collectors.toList());
+        return getColumns(schema, table);
     }
 
     @Override
     public Inserter insert(String schema, String table)
     {
         ConnectorTableHandle tableHandle = metadata.getTableHandle(session, new SchemaTableName(schema, table));
-        ConnectorInsertTableHandle insertTableHandle = metadata.beginInsert(session, tableHandle);
+        ConnectorMetadata connectorMetadata = writeMetadata.get();
+        ConnectorInsertTableHandle insertTableHandle = connectorMetadata.beginInsert(session, tableHandle);
 
         ConnectorPageSink pageSink = pageSinkProvider.createPageSink(connectorTransactionHandle, session, insertTableHandle);
 
@@ -236,7 +261,7 @@ public class RaptorDatabaseHandler
             public CompletableFuture<Void> commit()
             {
                 CompletableFuture<Collection<Slice>> finish = pageSink.finish();
-                return finish.thenAccept(slices -> metadata.finishInsert(session, insertTableHandle, slices));
+                return finish.thenAccept(slices -> connectorMetadata.finishInsert(session, insertTableHandle, slices));
             }
         };
     }

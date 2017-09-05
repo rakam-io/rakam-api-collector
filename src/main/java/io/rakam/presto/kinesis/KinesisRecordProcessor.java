@@ -121,7 +121,7 @@ public class KinesisRecordProcessor
             pages = context.convert(list.getKey(), list.getValue());
         }
         catch (IOException e) {
-            throw Throwables.propagate(e);
+            throw new RuntimeException(e);
         }
 
         streamBuffer.clear();

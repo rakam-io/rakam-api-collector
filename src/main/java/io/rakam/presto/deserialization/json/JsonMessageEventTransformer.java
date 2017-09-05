@@ -40,20 +40,21 @@ public abstract class JsonMessageEventTransformer<T>
     {
         Map<SchemaTableName, PageReader> builderMap = new HashMap<>();
         for (T record : records) {
-            SchemaTableName collection = extractCollection(record, jsonDecoder);
+            SchemaTableName collection;
+            try {
+                collection = extractCollection(record, jsonDecoder);
+            }
+            catch (Throwable e) {
+                LOGGER.error(e, "Unable to parse collection from message in Kafka topic.");
+                continue;
+            }
 
             PageReader pageBuilder = getReader(builderMap, collection);
             if (pageBuilder == null) {
                 continue;
             }
 
-            try {
-                pageBuilder.read(jsonDecoder);
-            }
-            catch (Exception e) {
-                LOGGER.error(e, "Unable to parse message in broker.");
-                return HashBasedTable.create();
-            }
+            pageBuilder.read(jsonDecoder);
         }
 
         return buildTable(builderMap);

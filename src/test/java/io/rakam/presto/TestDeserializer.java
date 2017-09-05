@@ -8,6 +8,7 @@ import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
+import com.facebook.presto.spi.block.RunLengthEncodedBlock;
 import com.facebook.presto.spi.type.ArrayType;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.BooleanType;
@@ -52,9 +53,15 @@ public abstract class TestDeserializer<T>
             .filter(e -> e != FieldType.BINARY && e != FieldType.ARRAY_BINARY && e != FieldType.MAP_BINARY)
             .collect(toImmutableList());
 
-    protected static final List<ColumnMetadata> COLUMNS = FIELDS.stream()
-            .map(e -> new ColumnMetadata("col" + e.name().toLowerCase(), toType(e)))
-            .collect(toImmutableList());
+    protected static final List<ColumnMetadata> COLUMNS;
+    static {
+        ImmutableList.Builder<ColumnMetadata> builder = ImmutableList.builder();
+        builder.add(new ColumnMetadata("_shard_time", TIMESTAMP));
+        FIELDS.stream()
+                .forEach(e -> builder.add(new ColumnMetadata("col" + e.name().toLowerCase(), toType(e))));
+        COLUMNS = builder.build();
+    }
+
     protected static final int ITERATION_COUNT = 3;
     protected static final List<Map<String, Object>> EVENTS;
 
@@ -130,14 +137,20 @@ public abstract class TestDeserializer<T>
         Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecords("testproject", "testcollection", Optional.empty()), ImmutableList.of());
         Map<String, TableData> testproject = pageTable.row("testproject");
         TableData testcollection = testproject.get("testcollection");
+
         assertEquals(testcollection.metadata, COLUMNS);
         assertEquals(testcollection.page.getChannelCount(), COLUMNS.size());
         assertEquals(testcollection.page.getPositionCount(), ITERATION_COUNT);
 
-        for (int i = 0; i < testcollection.page.getBlocks().length; i++) {
+        long aLong = BigintType.BIGINT.getLong(testcollection.page.getBlock(0), 0);
+        assertTrue(Instant.now().toEpochMilli() - aLong < 10000);
+        Block expectedShardTime = RunLengthEncodedBlock.create(TIMESTAMP, aLong, testcollection.page.getPositionCount());
+        BlockAssertions.assertBlockEquals(TIMESTAMP, testcollection.page.getBlock(0), expectedShardTime);
+
+        for (int i = 1; i < testcollection.page.getBlocks().length; i++) {
             Block block = testcollection.page.getBlock(i);
 
-            FieldType fieldType = FIELDS.get(i);
+            FieldType fieldType = FIELDS.get(i - 1);
             Block expectedBlock = getBlock(fieldType);
 
             BlockAssertions.assertBlockEquals(COLUMNS.get(i).getType(), block, expectedBlock);
@@ -150,7 +163,8 @@ public abstract class TestDeserializer<T>
     {
         MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
 
-        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecords("testproject", "testcollection", Optional.of(new int[]{0})), ImmutableList.of());
+        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecords("testproject", "testcollection", Optional.of(new int[] {
+                1})), ImmutableList.of());
         Map<String, TableData> testproject = pageTable.row("testproject");
         TableData testcollection = testproject.get("testcollection");
 
@@ -158,11 +172,11 @@ public abstract class TestDeserializer<T>
         assertEquals(testcollection.page.getChannelCount(), COLUMNS.size());
         assertEquals(testcollection.page.getPositionCount(), ITERATION_COUNT);
 
-        Block block = testcollection.page.getBlock(0);
+        Block block = testcollection.page.getBlock(1);
         Block expectedBlock = getBlock(FieldType.STRING);
         BlockAssertions.assertBlockEquals(VARCHAR, block, expectedBlock);
 
-        for (int i = 1; i < COLUMNS.size(); i++) {
+        for (int i = 2; i < COLUMNS.size(); i++) {
             Block block1 = testcollection.page.getBlock(i);
             assertEquals(block1.getPositionCount(), ITERATION_COUNT);
 

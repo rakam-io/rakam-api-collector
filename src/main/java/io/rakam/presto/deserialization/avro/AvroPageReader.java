@@ -20,15 +20,13 @@ public class AvroPageReader extends PageReader<BinaryDecoder>
 
     public AvroPageReader(String checkpointColumn, List<ColumnMetadata> rakamSchema)
     {
-        super(checkpointColumn, rakamSchema, rakamSchema);
+        super(checkpointColumn, rakamSchema);
         this.checkpointColumn = checkpointColumn;
     }
 
     @Override
     public PageReaderDeserializer<BinaryDecoder> createReader()
     {
-        return new AvroPageDatumReader(getPageBuilder(),
-                convertAvroSchema(getActualSchema(), checkpointColumn),
-                convertAvroSchema(getExpectedSchema(), checkpointColumn));
+        return new AvroPageDatumReader(getPageBuilder(), convertAvroSchema(getExpectedSchema(), checkpointColumn));
     }
 }
