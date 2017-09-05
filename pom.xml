@@ -85,7 +85,7 @@
         <dependency>
             <groupId>org.openjdk.jol</groupId>
             <artifactId>jol-core</artifactId>
-            <version></version>
+            <version>0.2</version>
         </dependency>
 
         <dependency>
