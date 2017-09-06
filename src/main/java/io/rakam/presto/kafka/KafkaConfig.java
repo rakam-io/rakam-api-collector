@@ -76,7 +76,7 @@ public class KafkaConfig
         return this;
     }
 
-    @Config("data-format")
+    @Config("source.data-format")
     public void setDataFormat(DataFormat dataFormat)
     {
         this.dataFormat = dataFormat;

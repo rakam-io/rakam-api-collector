@@ -16,8 +16,8 @@
 #stream.source=kafka
 #kafka.nodes=127.0.0.1
 #zookeeper.nodes=127.0.0.1
-#topic=events
-#data-format=JSON
+#kafka.topic=events
+#source.data-format=JSON
 
 # ----- For Kinesis
 #stream.source=kinesis
