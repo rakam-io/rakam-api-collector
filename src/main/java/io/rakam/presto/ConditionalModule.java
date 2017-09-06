@@ -6,6 +6,7 @@ package io.rakam.presto;
 
 import com.google.inject.Binder;
 import com.google.inject.Module;
+import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.airlift.configuration.ConfigurationAwareModule;
 import io.airlift.configuration.ConfigurationFactory;
 
@@ -38,6 +39,9 @@ public class ConditionalModule
     {
         this.configurationFactory = Objects.requireNonNull(configurationFactory, "configurationFactory is null");
         configurationFactory.consumeProperty(property);
+        if(module instanceof AbstractConfigurationAwareModule) {
+            ((AbstractConfigurationAwareModule) module).setConfigurationFactory(configurationFactory);
+        }
 
         // consume properties if we are not going to install the module
         if (!shouldInstall()) {

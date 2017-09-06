@@ -8,6 +8,7 @@ import com.facebook.presto.spi.HostAddress;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
+import io.rakam.presto.StreamConfig;
 
 import javax.validation.constraints.Size;
 
@@ -19,6 +20,7 @@ public class KafkaConfig
 {
     private static final int KAFKA_DEFAULT_PORT = 9092;
     private static final int ZOOKEEPER_DEFAULT_PORT = 2181;
+    private DataFormat dataFormat = DataFormat.AVRO;
 
     private Set<HostAddress> nodes;
     private Set<HostAddress> zkNodes;
@@ -74,6 +76,18 @@ public class KafkaConfig
         return this;
     }
 
+    @Config("data-format")
+    public void setDataFormat(DataFormat dataFormat)
+    {
+        this.dataFormat = dataFormat;
+    }
+
+    public DataFormat getDataFormat()
+    {
+        return dataFormat;
+    }
+
+
     private static HostAddress toKafkaHostAddress(String value)
     {
         return HostAddress.fromString(value).withDefaultPort(KAFKA_DEFAULT_PORT);
@@ -82,5 +96,9 @@ public class KafkaConfig
     private static HostAddress toZookeeperHostAddress(String value)
     {
         return HostAddress.fromString(value).withDefaultPort(ZOOKEEPER_DEFAULT_PORT);
+    }
+
+    public enum DataFormat {
+        JSON, dataFormat, AVRO
     }
 }

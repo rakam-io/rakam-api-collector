@@ -21,6 +21,7 @@
         <skip.deploy.s3>true</skip.deploy.s3>
         <air.check.skip-findbugs>true</air.check.skip-findbugs>
         <air.check.skip-duplicate-finder>true</air.check.skip-duplicate-finder>
+        <air.check.skip-jacoco>true</air.check.skip-jacoco>
     </properties>
 
     <dependencies>

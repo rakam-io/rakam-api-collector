@@ -70,7 +70,7 @@ public final class ServiceStarter
                 new RaptorModule());
 
         app.requireExplicitBindings(false);
-        Injector injector = app.strictConfig().initialize();
+        app.strictConfig().initialize();
 
         LOGGER.info("======== SERVER STARTED ========");
     }
