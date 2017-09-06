@@ -8,7 +8,6 @@ import com.facebook.presto.spi.HostAddress;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
-import io.rakam.presto.StreamConfig;
 
 import javax.validation.constraints.Size;
 
@@ -77,9 +76,10 @@ public class KafkaConfig
     }
 
     @Config("source.data-format")
-    public void setDataFormat(DataFormat dataFormat)
+    public KafkaConfig setDataFormat(DataFormat dataFormat)
     {
         this.dataFormat = dataFormat;
+        return this;
     }
 
     public DataFormat getDataFormat()
@@ -99,6 +99,6 @@ public class KafkaConfig
     }
 
     public enum DataFormat {
-        JSON, dataFormat, AVRO
+        JSON, AVRO
     }
 }

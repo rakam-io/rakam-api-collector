@@ -50,8 +50,8 @@ public class KafkaWorkerManager
     private final TargetConnectorCommitter committer;
     private final MiddlewareBuffer middlewareBuffer;
     private final BasicMemoryBuffer<ConsumerRecord> buffer;
-    private KafkaConsumer<byte[], byte[]> consumer;
-    private KafkaConfig config;
+    protected KafkaConsumer<byte[], byte[]> consumer;
+    protected KafkaConfig config;
     private ExecutorService executor;
 
     @Inject
@@ -90,14 +90,18 @@ public class KafkaWorkerManager
         }
     }
 
-    @PostConstruct
-    public void run()
-    {
+    public void subscribe() {
         String zkNodes = config.getZookeeperNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
         String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
 
         consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes));
         consumer.subscribe(ImmutableList.of(config.getTopic()));
+    }
+
+    @PostConstruct
+    public void run()
+    {
+        subscribe();
 
         try {
             while (true) {
@@ -165,7 +169,7 @@ public class KafkaWorkerManager
         return pages;
     }
 
-    public BatchRecords.Checkpointer createCheckpointer(ConsumerRecord record)
+    private BatchRecords.Checkpointer createCheckpointer(ConsumerRecord record)
     {
         return new BatchRecords.Checkpointer()
         {
@@ -201,7 +205,7 @@ public class KafkaWorkerManager
         }
     }
 
-    private static Properties createConsumerConfig(String zkNodes, String kafkaNodes)
+    protected static Properties createConsumerConfig(String zkNodes, String kafkaNodes)
     {
         Properties props = new Properties();
         props.put("zookeeper.connect", zkNodes);
