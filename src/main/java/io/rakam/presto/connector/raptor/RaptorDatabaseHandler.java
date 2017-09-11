@@ -122,8 +122,6 @@ public class RaptorDatabaseHandler
         if (s3BackupConfig.getS3Bucket() != null) {
             props.put("backup.provider", "s3");
             props.put("aws.s3-bucket", s3BackupConfig.getS3Bucket());
-
-            props.put("aws.s3-bucket", s3BackupConfig.getS3Bucket());
             props.put("aws.region", s3BackupConfig.getAWSRegion().getName());
 
             if (s3BackupConfig.getAccessKey() != null) {
@@ -137,8 +135,11 @@ public class RaptorDatabaseHandler
             if (s3BackupConfig.getEndpoint() != null) {
                 props.put("aws.s3-endpoint", s3BackupConfig.getEndpoint());
             }
-        } else {
+        }
+        else {
+            log.warn("------------");
             log.warn("THE BACKUP IS NOT ENABLED! YOU WILL LOSE DATA IF THIS NODE DIES!!!!!");
+            log.warn("------------");
         }
 
         ImmutableMap<String, String> properties = props.build();

@@ -14,7 +14,7 @@
 
     <properties>
         <presto.version>0.180</presto.version>
-        <rakam.version>0.9</rakam.version>
+        <rakam.version>0.10</rakam.version>
         <aws-java-sdk.version>1.11.115</aws-java-sdk.version>
         <dep.airlift.version>0.148</dep.airlift.version>
         <dep.slice.version>0.29</dep.slice.version>
