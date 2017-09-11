@@ -18,7 +18,7 @@
         <aws-java-sdk.version>1.11.115</aws-java-sdk.version>
         <dep.airlift.version>0.148</dep.airlift.version>
         <dep.slice.version>0.29</dep.slice.version>
-        <skip.deploy.s3>true</skip.deploy.s3>
+        <skip.deploy.s3>false</skip.deploy.s3>
         <air.check.skip-findbugs>true</air.check.skip-findbugs>
         <air.check.skip-duplicate-finder>true</air.check.skip-duplicate-finder>
         <air.check.skip-jacoco>true</air.check.skip-jacoco>
