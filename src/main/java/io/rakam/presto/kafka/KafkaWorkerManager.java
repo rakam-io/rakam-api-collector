@@ -105,7 +105,7 @@ public class KafkaWorkerManager
 
         try {
             while (true) {
-                ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(1000);
+                ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
                 for (ConsumerRecord<byte[], byte[]> record : kafkaRecord) {
                     buffer.consumeRecord(record, record.value().length);
                 }
