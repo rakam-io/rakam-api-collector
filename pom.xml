@@ -10,7 +10,7 @@
 
     <groupId>io.rakam.presto</groupId>
     <artifactId>collector</artifactId>
-    <version>0.180.5-SNAPSHOT</version>
+    <version>0.180.5</version>
 
     <properties>
         <presto.version>0.180</presto.version>
@@ -515,7 +515,7 @@
         <connection>scm:git:https://github.com/rakam-io/rakam-presto-collector.git</connection>
         <developerConnection>scm:git:git@github.com:rakam-io/rakam-presto-collector.git</developerConnection>
         <url>https://github.com/rakam-io/rakam</url>
-        <tag>HEAD</tag>
+        <tag>0.180.5</tag>
     </scm>
 
     <repositories>
