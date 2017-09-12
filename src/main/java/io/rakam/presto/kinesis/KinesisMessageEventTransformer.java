@@ -52,13 +52,17 @@ public class KinesisMessageEventTransformer
         String collection;
 
         byte dataFormatType = array[0];
+        if (dataFormatType == 0 || dataFormatType == 1) {
+            collection = partitionKey.substring(splitterIndex + 1);
+        } else
         if (dataFormatType == 2) {
             if (decoder == null) {
                 decoder = DecoderFactory.get().binaryDecoder(array, decoder);
             }
             collection = decoder.readString();
-        } else {
-            throw new IllegalArgumentException();
+        }
+        else {
+            throw new IllegalArgumentException("Unknown data format type: " + dataFormatType);
         }
 
         return new SchemaTableName(project, collection);
