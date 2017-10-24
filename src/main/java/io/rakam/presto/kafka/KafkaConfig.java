@@ -23,17 +23,32 @@ public class KafkaConfig
 
     private Set<HostAddress> nodes;
     private Set<HostAddress> zkNodes;
-    private String topic;
+    private String[] topic;
+    private String offset = "latest";
+    private String groupId = "presto_streaming";
 
-    public String getTopic()
+    public String[] getTopic()
     {
         return topic;
+    }
+
+    public String getOffset()
+    {
+        return offset;
+    }
+
+    public String getGroupId()
+    {
+        return groupId;
     }
 
     @Config("kafka.topic")
     public KafkaConfig setTopic(String topic)
     {
-        this.topic = topic;
+        if (topic != null) {
+            topic = topic.replaceAll("\\s+", "");
+            this.topic = topic.split(",");
+        }
         return this;
     }
 
@@ -52,6 +67,24 @@ public class KafkaConfig
         }
         else {
             this.nodes = null;
+        }
+        return this;
+    }
+
+    @Config("kafka.offset")
+    public KafkaConfig setOffset(String offset)
+    {
+        if (offset != null) {
+            this.offset = offset;
+        }
+        return this;
+    }
+
+    @Config("kafka.group.id")
+    public KafkaConfig setGroupId(String groupId)
+    {
+        if (groupId != null) {
+            this.groupId = groupId;
         }
         return this;
     }
@@ -87,7 +120,6 @@ public class KafkaConfig
         return dataFormat;
     }
 
-
     private static HostAddress toKafkaHostAddress(String value)
     {
         return HostAddress.fromString(value).withDefaultPort(KAFKA_DEFAULT_PORT);
@@ -98,7 +130,8 @@ public class KafkaConfig
         return HostAddress.fromString(value).withDefaultPort(ZOOKEEPER_DEFAULT_PORT);
     }
 
-    public enum DataFormat {
+    public enum DataFormat
+    {
         JSON, AVRO
     }
 }
