@@ -30,7 +30,7 @@ public abstract class JsonMessageEventTransformer<T>
     public JsonMessageEventTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler database)
     {
         super(fieldNameConfig, database);
-        jsonDecoder = new JsonDeserializer(database);
+        jsonDecoder = new JsonDeserializer(database,fieldNameConfig);
         this.checkpointColumn = fieldNameConfig.getCheckpointField();
     }
 
