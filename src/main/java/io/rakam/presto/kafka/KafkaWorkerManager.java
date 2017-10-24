@@ -5,7 +5,6 @@
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.HostAddress;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Table;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -31,6 +30,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,12 +90,14 @@ public class KafkaWorkerManager
         }
     }
 
-    public void subscribe() {
+    public void subscribe()
+    {
         String zkNodes = config.getZookeeperNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
         String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
-
-        consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes));
-        consumer.subscribe(ImmutableList.of(config.getTopic()));
+        String offset = config.getOffset();
+        String groupId = config.getGroupId();
+        consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes, offset, groupId));
+        consumer.subscribe(Arrays.asList(config.getTopic()));
     }
 
     @PostConstruct
@@ -190,6 +192,7 @@ public class KafkaWorkerManager
             public void onComplete(Map<TopicPartition, OffsetAndMetadata> offsets, Exception e)
             {
                 if (e != null) {
+                    e.printStackTrace();
                     log.error(e, "Kafka offset commit fail. %s", offsets.toString());
                 }
             }
@@ -205,16 +208,18 @@ public class KafkaWorkerManager
         }
     }
 
-    protected static Properties createConsumerConfig(String zkNodes, String kafkaNodes)
+    protected static Properties createConsumerConfig(String zkNodes, String kafkaNodes, String offset, String groupId)
     {
         Properties props = new Properties();
         props.put("zookeeper.connect", zkNodes);
         props.put("bootstrap.servers", kafkaNodes);
-        props.put("group.id", "presto_streaming");
+        props.put("group.id", groupId);
         props.put("zookeeper.session.timeout.ms", "400");
         props.put("zookeeper.sync.time.ms", "200");
         props.put("auto.commit.enable", "false");
-        props.put("auto.offset.reset", "earliest");
+        props.put("enable.auto.commit", "false");
+
+        props.put("auto.offset.reset", offset);
         props.put("offsets.storage", "kafka");
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
