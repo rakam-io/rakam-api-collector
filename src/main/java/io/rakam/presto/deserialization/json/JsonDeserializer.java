@@ -1,5 +1,7 @@
 package io.rakam.presto.deserialization.json;
-
+/*
+ * Licensed under the Rakam Incorporation
+ */
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.block.BlockBuilder;

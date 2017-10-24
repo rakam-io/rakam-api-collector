@@ -1,8 +1,7 @@
 package io.rakam.presto;
 /*
- * Licensed under the Apache 2.0
+ * Licensed under the Rakam Incorporation
  */
-
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -36,7 +35,7 @@ public class KafkaProducerTest
                 "\t\t\"sender\": null\n" +
                 "\t},\n" +
                 "\t\"data\": {\n" +
-                "\t\t\"_collection\": \"new_screen_events_rakam2\",\n" +
+                "\t\t\"_collection\": \"new_screen_events_rakam3\",\n" +
                 "\t\t\"schema\": \"screen_events_rakam\",\n" +
                 "\t\t\"_actor\": \"121222792\",\n" +
                 "\t\t\"_project\": \"dapi\",\n" +
@@ -59,7 +58,7 @@ public class KafkaProducerTest
                 "}";
 
         //Assign topicName to string variable
-        String topicName = "presto_test_2";
+        String topicName = "presto_test_1";
 
         // create instance for properties to access producer configs
         Properties props = new Properties();
@@ -90,7 +89,7 @@ public class KafkaProducerTest
 
         Producer<String, String> producer = new KafkaProducer<String, String>(props);
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i >=0; i++) {
             producer.send(new ProducerRecord<String, String>(topicName,
                     Integer.toString(i), fabricEvent));
         }

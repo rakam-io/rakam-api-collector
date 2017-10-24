@@ -96,7 +96,9 @@ public class KafkaWorkerManager
         String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
         String offset = config.getOffset();
         String groupId = config.getGroupId();
-        consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes, offset, groupId));
+        String sessionTimeOut = config.getSessionTimeOut();
+        String requestTimeOut = config.getRequestTimeOut();
+        consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes, offset, groupId,sessionTimeOut,requestTimeOut));
         consumer.subscribe(Arrays.asList(config.getTopic()));
     }
 
@@ -106,20 +108,26 @@ public class KafkaWorkerManager
         subscribe();
 
         try {
+            int recordCount = 0;
             while (true) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
+                recordCount += kafkaRecord.count();
                 for (ConsumerRecord<byte[], byte[]> record : kafkaRecord) {
                     buffer.consumeRecord(record, record.value().length);
                 }
                 if (buffer.shouldFlush()) {
                     try {
+                        long conversionStartTime = System.currentTimeMillis();
                         Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> records = buffer.getRecords();
-
                         if (!records.getValue().isEmpty() || !records.getKey().isEmpty()) {
                             Table<String, String, TableData> convert = context.convert(records.getKey(), records.getValue());
+                            long conversionEndTime = System.currentTimeMillis();
                             buffer.clear();
 
+
                             middlewareBuffer.add(new BatchRecords(convert, createCheckpointer(findLatestRecord(records))));
+                            log.info("----Conversion execution time: "+ (conversionEndTime - conversionStartTime) +" for records: "+ recordCount);
+                            recordCount = 0;
                         }
 
                         if (middlewareBuffer.shouldFlush()) {
@@ -208,22 +216,24 @@ public class KafkaWorkerManager
         }
     }
 
-    protected static Properties createConsumerConfig(String zkNodes, String kafkaNodes, String offset, String groupId)
+    protected static Properties createConsumerConfig(String zkNodes, String kafkaNodes, String offset, String groupId,String sessionTimeOut,String requestTimeOut)
     {
         Properties props = new Properties();
-        props.put("zookeeper.connect", zkNodes);
+        //props.put("zookeeper.connect", zkNodes);
         props.put("bootstrap.servers", kafkaNodes);
         props.put("group.id", groupId);
-        props.put("zookeeper.session.timeout.ms", "400");
-        props.put("zookeeper.sync.time.ms", "200");
-        props.put("auto.commit.enable", "false");
+        //props.put("zookeeper.session.timeout.ms", "400");
+        //props.put("zookeeper.sync.time.ms", "200");
         props.put("enable.auto.commit", "false");
-
         props.put("auto.offset.reset", offset);
-        props.put("offsets.storage", "kafka");
+        //props.put("offsets.storage", "kafka");
+        props.put("session.timeout.ms", sessionTimeOut);
+        props.put("heartbeat.interval.ms", "1000");
+        props.put("request.timeout.ms", requestTimeOut);
+
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
-        props.put("consumer.timeout.ms", "10");
+        //props.put("consumer.timeout.ms", "10");
 
         return props;
     }

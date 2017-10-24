@@ -1,0 +1,37 @@
+#aws.access-key=
+#aws.secret-access-key=
+#aws.s3-bulk-bucket=
+#aws.region=us-east-1
+
+# ----- For Kafka
+stream.source=kafka
+kafka.nodes=127.0.0.1
+kafka.topic=presto_test_1
+# 'earliest' or 'latest'
+kafka.offset=latest
+#kafka.group.id=
+zookeeper.nodes=127.0.0.1
+
+request.timeout.ms=120000
+session.timeout.ms=100000
+
+#possible values: 10ns, 10s, 10m, 10h, 10d
+stream.max-flush-duration=10s
+stream.max-flush-records=100000
+stream.max-flush-datasize=700MB
+
+
+middleware.max-flush-duration=20s
+#middleware.max-flush-records=800MB
+middleware.max-size=500MB
+database.checkpoint-field=_shard_time
+database.user-excluded-columns=_shard_time,_project,_collection
+
+raptor.aws.region=us-east-1
+#raptor.aws.s3-bucket=
+raptor.metadata.url=jdbc:mysql://localhost/raptor1?user=satsahu&password=satsahu@1234
+raptor.node.id=ffffffff-ffff-ffff-ffff-ffffffffffff
+raptor.storage.data-directory=/var/presto/data
+raptor.presto-url=http://localhost:8080/
+stream.source=kafka
+log-active=false
