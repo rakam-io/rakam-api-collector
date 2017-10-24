@@ -1,0 +1,6 @@
+config.properties
+var/*
+target/*
+.idea/*
+*.iml
+release.properties

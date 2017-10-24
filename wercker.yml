@@ -1,0 +1,17 @@
+box: maven:3-jdk-8
+build:
+  steps:
+    - script:
+        name: Show base information
+        code: |
+          echo $JAVA_HOME
+          java -version
+          javac -version
+    - script:
+        name: Run maven
+        code: |
+          mvn clean install
+    - script:
+        name: Upload S3 artifacts if commit contains release
+        code: |
+          [[ $(mvn org.apache.maven.plugins:maven-help-plugin:2.1.1:evaluate -Dexpression=project.version) =~ "SNAPSHOT" ]] || mvn deploy -Dskip.deploy.s3=false
