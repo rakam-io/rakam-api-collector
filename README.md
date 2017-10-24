@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-test
 =======
 # rakam-presto-collector
 
@@ -35,4 +33,3 @@ test
 #raptor.node.id=PRESTO_NODEID
 #raptor.storage.data-directory=
 ```
->>>>>>> 0711ea022b5a6a803aff9ab215edbff66780b6e6
