@@ -26,6 +26,8 @@ public class KafkaConfig
     private String[] topic;
     private String offset = "latest";
     private String groupId = "presto_streaming";
+    private String sessionTimeOut = "12000";
+    private String requestTimeOut = "15000";
 
     public String[] getTopic()
     {
@@ -42,6 +44,16 @@ public class KafkaConfig
         return groupId;
     }
 
+    public String getSessionTimeOut()
+    {
+        return sessionTimeOut;
+    }
+
+    public String getRequestTimeOut()
+    {
+        return requestTimeOut;
+    }
+
     @Config("kafka.topic")
     public KafkaConfig setTopic(String topic)
     {
@@ -56,6 +68,24 @@ public class KafkaConfig
     public Set<HostAddress> getNodes()
     {
         return nodes;
+    }
+
+    @Config("session.timeout.ms")
+    public KafkaConfig setSessionTimeOut(String sessionTimeOut)
+    {
+        if (sessionTimeOut != null) {
+            this.sessionTimeOut = sessionTimeOut;
+        }
+        return this;
+    }
+
+    @Config("request.timeout.ms")
+    public KafkaConfig setRequestTimeOut(String requestTimeOut)
+    {
+        if (requestTimeOut != null) {
+            this.requestTimeOut = requestTimeOut;
+        }
+        return this;
     }
 
     @Config("kafka.nodes")

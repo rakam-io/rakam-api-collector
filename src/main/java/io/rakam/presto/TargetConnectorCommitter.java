@@ -50,6 +50,7 @@ public class TargetConnectorCommitter
                         .run("middlewareConnector", () -> commit(batches, table).join());
             }
             catch (Exception e) {
+                e.printStackTrace();
                 log.error(e, "Unable to commit table %s.", table);
             }
         });

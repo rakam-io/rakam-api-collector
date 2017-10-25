@@ -86,10 +86,12 @@ public class StressTest {
                 String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
                 String offset = config.getOffset();
                 String groupId = config.getGroupId();
+                String sessionTimeOut = config.getSessionTimeOut();
+                String requestTimeOut = config.getRequestTimeOut();
 
                 AtomicLong totalRecord = new AtomicLong(-1);
                 AtomicLong lastPoll = new AtomicLong(System.currentTimeMillis());
-                consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes, offset, groupId)) {
+                consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes, offset, groupId,sessionTimeOut,requestTimeOut)) {
                     @Override
                     public ConsumerRecords poll(long timeout) {
                         if (totalRecord.get() == -1) {

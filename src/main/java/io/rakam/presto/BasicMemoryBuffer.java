@@ -66,6 +66,7 @@ public class BasicMemoryBuffer<T>
         if (buffer.size() == 0) {
             return false;
         }
+
         long timelapseMillisecond = System.currentTimeMillis() - previousFlushTimeMillisecond;
         return (buffer.size() >= getNumRecordsToBuffer())
                 || (timelapseMillisecond >= getMillisecondsToBuffer())
