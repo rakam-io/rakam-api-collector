@@ -10,11 +10,13 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
 
 import javax.validation.constraints.Size;
+
 import java.util.Set;
 
 import static com.google.common.collect.Iterables.transform;
 
-public class KafkaConfig {
+public class KafkaConfig
+{
     private static final int KAFKA_DEFAULT_PORT = 9092;
     private static final int ZOOKEEPER_DEFAULT_PORT = 2181;
     private DataFormat dataFormat = DataFormat.AVRO;
@@ -27,28 +29,34 @@ public class KafkaConfig {
     private String sessionTimeOut = "12000";
     private String requestTimeOut = "15000";
 
-    public String[] getTopic() {
+    public String[] getTopic()
+    {
         return topic;
     }
 
-    public String getOffset() {
+    public String getOffset()
+    {
         return offset;
     }
 
-    public String getGroupId() {
+    public String getGroupId()
+    {
         return groupId;
     }
 
-    public String getSessionTimeOut() {
+    public String getSessionTimeOut()
+    {
         return sessionTimeOut;
     }
 
-    public String getRequestTimeOut() {
+    public String getRequestTimeOut()
+    {
         return requestTimeOut;
     }
 
     @Config("kafka.topic")
-    public KafkaConfig setTopic(String topic) {
+    public KafkaConfig setTopic(String topic)
+    {
         if (topic != null) {
             topic = topic.replaceAll("\\s+", "");
             this.topic = topic.split(",");
@@ -57,12 +65,14 @@ public class KafkaConfig {
     }
 
     @Size(min = 1)
-    public Set<HostAddress> getNodes() {
+    public Set<HostAddress> getNodes()
+    {
         return nodes;
     }
 
     @Config("session.timeout.ms")
-    public KafkaConfig setSessionTimeOut(String sessionTimeOut) {
+    public KafkaConfig setSessionTimeOut(String sessionTimeOut)
+    {
         if (sessionTimeOut != null) {
             this.sessionTimeOut = sessionTimeOut;
         }
@@ -70,7 +80,8 @@ public class KafkaConfig {
     }
 
     @Config("request.timeout.ms")
-    public KafkaConfig setRequestTimeOut(String requestTimeOut) {
+    public KafkaConfig setRequestTimeOut(String requestTimeOut)
+    {
         if (requestTimeOut != null) {
             this.requestTimeOut = requestTimeOut;
         }
@@ -78,18 +89,21 @@ public class KafkaConfig {
     }
 
     @Config("kafka.nodes")
-    public KafkaConfig setNodes(String nodes) {
+    public KafkaConfig setNodes(String nodes)
+    {
         if (nodes != null) {
             Splitter splitter = Splitter.on(',').omitEmptyStrings().trimResults();
             this.nodes = ImmutableSet.copyOf(transform(splitter.split(nodes), KafkaConfig::toKafkaHostAddress));
-        } else {
+        }
+        else {
             this.nodes = null;
         }
         return this;
     }
 
     @Config("kafka.offset")
-    public KafkaConfig setOffset(String offset) {
+    public KafkaConfig setOffset(String offset)
+    {
         if (offset != null) {
             this.offset = offset;
         }
@@ -97,7 +111,8 @@ public class KafkaConfig {
     }
 
     @Config("kafka.group.id")
-    public KafkaConfig setGroupId(String groupId) {
+    public KafkaConfig setGroupId(String groupId)
+    {
         if (groupId != null) {
             this.groupId = groupId;
         }
@@ -105,40 +120,48 @@ public class KafkaConfig {
     }
 
     @Size(min = 1)
-    public Set<HostAddress> getZookeeperNodes() {
+    public Set<HostAddress> getZookeeperNodes()
+    {
         return zkNodes;
     }
 
     @Config("zookeeper.nodes")
-    public KafkaConfig setZookeeperNodes(String nodes) {
+    public KafkaConfig setZookeeperNodes(String nodes)
+    {
         if (nodes != null) {
             Splitter splitter = Splitter.on(',').omitEmptyStrings().trimResults();
             this.zkNodes = ImmutableSet.copyOf(transform(splitter.split(nodes), KafkaConfig::toZookeeperHostAddress));
-        } else {
+        }
+        else {
             this.zkNodes = null;
         }
         return this;
     }
 
     @Config("source.data-format")
-    public KafkaConfig setDataFormat(DataFormat dataFormat) {
+    public KafkaConfig setDataFormat(DataFormat dataFormat)
+    {
         this.dataFormat = dataFormat;
         return this;
     }
 
-    public DataFormat getDataFormat() {
+    public DataFormat getDataFormat()
+    {
         return dataFormat;
     }
 
-    private static HostAddress toKafkaHostAddress(String value) {
+    private static HostAddress toKafkaHostAddress(String value)
+    {
         return HostAddress.fromString(value).withDefaultPort(KAFKA_DEFAULT_PORT);
     }
 
-    private static HostAddress toZookeeperHostAddress(String value) {
+    private static HostAddress toZookeeperHostAddress(String value)
+    {
         return HostAddress.fromString(value).withDefaultPort(ZOOKEEPER_DEFAULT_PORT);
     }
 
-    public enum DataFormat {
+    public enum DataFormat
+    {
         JSON, AVRO
     }
 }

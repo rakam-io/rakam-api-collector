@@ -219,22 +219,21 @@ public class KafkaWorkerManager
     protected static Properties createConsumerConfig(String zkNodes, String kafkaNodes, String offset, String groupId,String sessionTimeOut,String requestTimeOut)
     {
         Properties props = new Properties();
-        //props.put("zookeeper.connect", zkNodes);
+
         props.put("bootstrap.servers", kafkaNodes);
         props.put("group.id", groupId);
+        //props.put("zookeeper.connect", zkNodes);
         //props.put("zookeeper.session.timeout.ms", "400");
         //props.put("zookeeper.sync.time.ms", "200");
+        //props.put("offsets.storage", "kafka");
+        //props.put("consumer.timeout.ms", "10");
         props.put("enable.auto.commit", "false");
         props.put("auto.offset.reset", offset);
-        //props.put("offsets.storage", "kafka");
         props.put("session.timeout.ms", sessionTimeOut);
         props.put("heartbeat.interval.ms", "1000");
         props.put("request.timeout.ms", requestTimeOut);
-
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
-        //props.put("consumer.timeout.ms", "10");
-
         return props;
     }
 
