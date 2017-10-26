@@ -7,6 +7,7 @@ package io.rakam.presto;
 import com.facebook.presto.spi.Page;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
+import io.airlift.units.DataSize;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,9 +31,9 @@ public class MiddlewareBuffer
     {
         batches.add(records);
         bufferRecordCount.addAndGet(records.getTable().cellSet().stream()
-                .map(Table.Cell::getValue).map(e -> e.page).mapToLong(Page::getSizeInBytes).sum());
-        bufferSize.addAndGet(records.getTable().cellSet().stream()
                 .map(Table.Cell::getValue).map(e -> e.page).mapToLong(Page::getPositionCount).sum());
+        bufferSize.addAndGet(records.getTable().cellSet().stream()
+                .map(Table.Cell::getValue).map(e -> e.page).mapToLong(Page::getSizeInBytes).sum());
     }
 
     public boolean shouldFlush()
@@ -47,7 +48,9 @@ public class MiddlewareBuffer
     {
         ImmutableList<BatchRecords> flushed = ImmutableList.copyOf(batches);
         batches.clear();
+        System.out.println("bufferSize is " + DataSize.succinctDataSize(bufferSize.get(), DataSize.Unit.BYTE) + " bufferRecordCount is " + bufferRecordCount);
         bufferSize = new AtomicLong();
+        bufferRecordCount = new AtomicLong();
         previousFlushTimeMillisecond = System.currentTimeMillis();
         return flushed;
     }
