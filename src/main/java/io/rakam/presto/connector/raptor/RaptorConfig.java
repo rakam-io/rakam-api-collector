@@ -8,7 +8,6 @@ import io.airlift.configuration.Config;
 
 import java.io.File;
 import java.net.URI;
-import java.net.URL;
 
 public class RaptorConfig
 {
@@ -16,11 +15,14 @@ public class RaptorConfig
     private String nodeIdentifier;
     private File dataDirectory;
     private URI prestoURL;
+    private String backupThreads = "5";
 
     public String getMetadataUrl()
     {
         return metadataUrl;
     }
+
+    public String getBackupThreads() {return backupThreads;}
 
     @Config("raptor.metadata.url")
     public RaptorConfig setMetadataUrl(String metadataUrl)
@@ -32,6 +34,15 @@ public class RaptorConfig
     public String getNodeIdentifier()
     {
         return nodeIdentifier;
+    }
+
+    @Config("raptor.backup.threads")
+    public RaptorConfig setBackupThreads(String backupThreads)
+    {
+        if (backupThreads != null) {
+            this.backupThreads = backupThreads;
+        }
+        return this;
     }
 
     @Config("raptor.node.id")

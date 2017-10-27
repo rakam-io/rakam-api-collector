@@ -4,6 +4,7 @@
 
 package io.rakam.presto;
 
+import com.facebook.presto.raptor.backup.BackupConfig;
 import com.google.inject.Binder;
 import com.google.inject.Injector;
 import com.google.inject.Scopes;
@@ -82,6 +83,7 @@ public final class ServiceStarter
         protected void setup(Binder binder)
         {
             configBinder(binder).bindConfig(StreamConfig.class);
+            configBinder(binder).bindConfig(BackupConfig.class);
             configBinder(binder).bindConfig(FieldNameConfig.class);
             configBinder(binder).bindConfig(S3MiddlewareConfig.class);
             configBinder(binder).bindConfig(MiddlewareConfig.class);
