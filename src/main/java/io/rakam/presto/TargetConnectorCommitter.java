@@ -4,12 +4,7 @@
 
 package io.rakam.presto;
 
-import com.facebook.presto.spi.ColumnMetadata;
-import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.SchemaTableName;
-import com.facebook.presto.spi.block.Block;
-import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.google.common.collect.Table;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
@@ -17,8 +12,6 @@ import io.rakam.presto.deserialization.TableData;
 
 import javax.inject.Inject;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.StreamSupport;
@@ -40,6 +33,7 @@ public class TargetConnectorCommitter
                 .map(b -> new SchemaTableName(b.getRowKey(), b.getColumnKey()))).distinct().forEach(table -> {
 
             try {
+                long startTime = System.currentTimeMillis();
                 RetryDriver.retry().maxAttempts(5)
                         .stopOn(InterruptedException.class)
                         .exponentialBackoff(
@@ -48,6 +42,9 @@ public class TargetConnectorCommitter
                                 new Duration(1, TimeUnit.MILLISECONDS), 2.0)
                         .onRetry(() -> log.warn("Retrying to save data"))
                         .run("middlewareConnector", () -> commit(batches, table).join());
+                long endTime = System.currentTimeMillis();
+
+                log.info("commit execution time: " + (endTime - startTime) + "for table: " + table.getTableName());
             }
             catch (Exception e) {
                 e.printStackTrace();

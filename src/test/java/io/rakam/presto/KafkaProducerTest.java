@@ -35,7 +35,7 @@ public class KafkaProducerTest
                 "\t\t\"sender\": null\n" +
                 "\t},\n" +
                 "\t\"data\": {\n" +
-                "\t\t\"_collection\": \"new_screen_events_rakam3\",\n" +
+                "\t\t\"_collection\": \"new_screen_events_rakam_1\",\n" +
                 "\t\t\"schema\": \"screen_events_rakam\",\n" +
                 "\t\t\"_actor\": \"121222792\",\n" +
                 "\t\t\"_project\": \"dapi\",\n" +
@@ -46,6 +46,36 @@ public class KafkaProducerTest
                 "\t}\n" +
                 "}";
 
+        String fabricEvent1 = "{\n" +
+                "\t\"id\": \"d2c342a5-f488-4713-9ab4-0b5d9ad3ab0b\",\n" +
+                "\t\"metadata\": {\n" +
+                "\t\t\"timestamp\": 1504351744418,\n" +
+                "\t\t\"schema\": \"new_screen_events_rakam\",\n" +
+                "\t\t\"schemaVersion\": 1,\n" +
+                "\t\t\"type\": \"EVENT\",\n" +
+                "\t\t\"routingKey\": {\n" +
+                "\t\t\t\"type\": null,\n" +
+                "\t\t\t\"value\": \"04o3ed6LUpzTyZGR902ENwkLrX_O4WiOTQ5R_WaE4ic\"\n" +
+                "\t\t},\n" +
+                "\t\t\"lookupKey\": {\n" +
+                "\t\t\t\"type\": null,\n" +
+                "\t\t\t\"value\": \"04o3ed6LUpzTyZGR902ENwkLrX_O4WiOTQ5R_WaE4ic\"\n" +
+                "\t\t},\n" +
+                "\t\t\"tenant\": \"spock\",\n" +
+                "\t\t\"stream\": \"new_app_session_rakam\",\n" +
+                "\t\t\"sender\": null\n" +
+                "\t},\n" +
+                "\t\"data\": {\n" +
+                "\t\t\"_collection\": \"new_screen_events_rakam_2\",\n" +
+                "\t\t\"schema\": \"screen_events_rakam\",\n" +
+                "\t\t\"_actor\": \"121222792\",\n" +
+                "\t\t\"_project\": \"dapi\",\n" +
+                "\t\t\"value\": \"capi\",\n" +
+                "\t\t\"_time\": \"2017-08-02T09:47:14.519Z\",\n" +
+                "\t\t\"_shard_time\": \"2017-09-02T11:29:04.494Z\",\n" +
+                "\t\t\"name\": \"fabric stream\"\n" +
+                "\t}\n" +
+                "}";
         String defaultEvent = "{  \n" +
                 "   \"collection\":\"screen_events_rakam3\",\n" +
                 "   \"project\":\"dapi\",\n" +
@@ -92,6 +122,9 @@ public class KafkaProducerTest
         for (int i = 0; i >=0; i++) {
             producer.send(new ProducerRecord<String, String>(topicName,
                     Integer.toString(i), fabricEvent));
+
+            producer.send(new ProducerRecord<String, String>(topicName,
+                    Integer.toString(i), fabricEvent1));
         }
         System.out.println("Message sent successfully");
         producer.close();

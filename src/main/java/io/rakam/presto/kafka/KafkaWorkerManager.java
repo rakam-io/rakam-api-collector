@@ -98,7 +98,7 @@ public class KafkaWorkerManager
         String groupId = config.getGroupId();
         String sessionTimeOut = config.getSessionTimeOut();
         String requestTimeOut = config.getRequestTimeOut();
-        consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes, offset, groupId,sessionTimeOut,requestTimeOut));
+        consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes, offset, groupId, sessionTimeOut, requestTimeOut));
         consumer.subscribe(Arrays.asList(config.getTopic()));
     }
 
@@ -109,8 +109,15 @@ public class KafkaWorkerManager
 
         try {
             int recordCount = 0;
+            long startTime = System.currentTimeMillis();
             while (true) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
+                long endTime = System.currentTimeMillis();
+                if((endTime - startTime)> 1){
+                    log.info("---- poll duration: " + (endTime - startTime));
+                }
+
+                startTime = endTime;
                 recordCount += kafkaRecord.count();
                 for (ConsumerRecord<byte[], byte[]> record : kafkaRecord) {
                     buffer.consumeRecord(record, record.value().length);
@@ -124,9 +131,8 @@ public class KafkaWorkerManager
                             long conversionEndTime = System.currentTimeMillis();
                             buffer.clear();
 
-
                             middlewareBuffer.add(new BatchRecords(convert, createCheckpointer(findLatestRecord(records))));
-                            log.info("----Conversion execution time: "+ (conversionEndTime - conversionStartTime) +" for records: "+ recordCount);
+                            log.info("----Conversion time: " + (conversionEndTime - conversionStartTime) + " for records: " + recordCount);
                             recordCount = 0;
                         }
 
@@ -207,16 +213,18 @@ public class KafkaWorkerManager
         };
 
         if (record == null) {
-            consumer.commitAsync(callback);
+            //consumer.commitAsync(callback);
+            consumer.commitSync();
         }
         else {
             Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
             offsets.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1));
-            consumer.commitAsync(offsets, callback);
+            //consumer.commitAsync(offsets, callback);
+            consumer.commitSync(offsets);
         }
     }
 
-    protected static Properties createConsumerConfig(String zkNodes, String kafkaNodes, String offset, String groupId,String sessionTimeOut,String requestTimeOut)
+    protected static Properties createConsumerConfig(String zkNodes, String kafkaNodes, String offset, String groupId, String sessionTimeOut, String requestTimeOut)
     {
         Properties props = new Properties();
 
@@ -230,7 +238,7 @@ public class KafkaWorkerManager
         props.put("enable.auto.commit", "false");
         props.put("auto.offset.reset", offset);
         props.put("session.timeout.ms", sessionTimeOut);
-        props.put("heartbeat.interval.ms", "1000");
+        props.put("heartbeat.interval.ms", "100");
         props.put("request.timeout.ms", requestTimeOut);
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
