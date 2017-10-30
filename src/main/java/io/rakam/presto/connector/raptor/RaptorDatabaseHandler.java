@@ -115,7 +115,6 @@ public class RaptorDatabaseHandler
                 .put("metadata.db.url", config.getMetadataUrl())
                 .put("storage.data-directory", config.getDataDirectory().getAbsolutePath())
                 .put("metadata.db.connections.max", "200")
-                .put("db.connections.max", "200")
                 .put("storage.compaction-enabled", "false")
                 .put("storage.max-recovery-threads", "1")
                 .put("storage.missing-shard-discovery-interval", "999999d")
