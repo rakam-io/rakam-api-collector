@@ -6,7 +6,6 @@ package io.rakam.presto.deserialization.json;
 
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
-import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
 import io.airlift.log.Logger;
 import io.rakam.presto.DatabaseHandler;
@@ -30,7 +29,7 @@ public abstract class JsonMessageEventTransformer<T>
     public JsonMessageEventTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler database)
     {
         super(fieldNameConfig, database);
-        jsonDecoder = new JsonDeserializer(database);
+        jsonDecoder = new JsonDeserializer(database, fieldNameConfig);
         this.checkpointColumn = fieldNameConfig.getCheckpointField();
     }
 

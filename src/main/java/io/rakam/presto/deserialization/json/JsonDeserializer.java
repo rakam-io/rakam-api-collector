@@ -1,8 +1,7 @@
+package io.rakam.presto.deserialization.json;
 /*
  * Licensed under the Rakam Incorporation
  */
-
-package io.rakam.presto.deserialization.json;
 
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
@@ -20,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
 import com.google.common.collect.ImmutableList;
 import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.deserialization.PageBuilder;
 import io.rakam.presto.deserialization.PageReader;
 import org.rakam.collection.FieldType;
@@ -39,7 +39,6 @@ import java.util.stream.Collectors;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
-import static com.facebook.presto.spi.type.ParameterKind.TYPE;
 import static com.facebook.presto.spi.type.TimeType.TIME;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
@@ -58,6 +57,7 @@ public class JsonDeserializer
 {
     private static final JsonFactory READER = new ObjectMapper().getFactory();
     private final DatabaseHandler databaseHandler;
+    private final FieldNameConfig fieldNameConfig;
 
     private Map<Type, FieldType> typeCache = new ConcurrentHashMap<>();
     private String project;
@@ -65,9 +65,10 @@ public class JsonDeserializer
     private JsonParser jp;
     TokenBuffer propertiesBuffer = null;
 
-    public JsonDeserializer(DatabaseHandler databaseHandler)
+    public JsonDeserializer(DatabaseHandler databaseHandler, FieldNameConfig fieldNameConfig)
     {
         this.databaseHandler = databaseHandler;
+        this.fieldNameConfig = fieldNameConfig;
     }
 
     public void setData(byte[] data)
@@ -103,42 +104,42 @@ public class JsonDeserializer
         else {
             throw new IllegalArgumentException("Invalid json");
         }
+        for (; ; t = jp.nextToken()) {
 
-        for (; t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
-            String fieldName = jp.getCurrentName();
+            if (JsonToken.FIELD_NAME.equals(t)) {
+                t = jp.nextToken();
+            }
+
+            if (jp.getCurrentName().equals("data")) {
+                if (t != START_OBJECT) {
+                    throw new IllegalArgumentException("data must be an object");
+                }
+                propertiesBuffer = jp.readValueAs(TokenBuffer.class);
+                break;
+            }
+        }
+        jp = propertiesBuffer.asParser(jp);
+
+        t = jp.nextToken();
+        //Extract project and collection
+        for (t = this.jp.nextToken(); t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
+            if (project != null && collection != null) {
+                break;
+            }
 
             t = jp.nextToken();
-
+            String fieldName = jp.getCurrentName();
             switch (fieldName) {
-                case "project":
+                case "_project":
                     project = jp.getValueAsString();
                     if (project == null || project.isEmpty()) {
                         throw new RuntimeException("Project can't be null");
                     }
                     project = project.toLowerCase();
                     break;
-                case "collection":
+                case "_collection":
                     collection = checkCollectionValid(jp.getValueAsString());
                     break;
-                case "properties":
-                    if (t != START_OBJECT) {
-                        throw new IllegalArgumentException("properties must be an object");
-                    }
-
-                    if (project == null || collection == null) {
-                        propertiesBuffer = jp.readValueAs(TokenBuffer.class);
-                    }
-                    else {
-                        if (pageReader != null) {
-                            parseProperties(pageReader);
-                        }
-                        else {
-                            return;
-                        }
-                    }
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unknown field");
             }
         }
     }
@@ -151,17 +152,10 @@ public class JsonDeserializer
         PageBuilder pageBuilder = pageReader.getPageBuilder();
         pageBuilder.declarePosition();
         int currentPosition = pageBuilder.getPositionCount();
-
-        JsonParser jp;
-        if (propertiesBuffer != null) {
-            jp = propertiesBuffer.asParser(this.jp);
-        }
-        else {
-            jp = this.jp;
-        }
+        JsonParser jp = this.jp;
 
         JsonToken t = jp.nextToken();
-        for (; t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
+        for (t = jp.nextToken(); t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
             String fieldName = jp.getCurrentName();
 
             int idx = -1;
@@ -175,36 +169,35 @@ public class JsonDeserializer
             jp.nextToken();
 
             if (idx == -1) {
-                FieldType type = getTypeForUnknown(jp);
-                if (type != null) {
-                    if (newFields == null) {
-                        newFields = new ArrayList<>();
-                    }
+                if (!fieldNameConfig.getExcludedColumns().contains(fieldName)) {
+                    FieldType type = getTypeForUnknown(jp);
+                    if (type != null) {
+                        if (newFields == null) {
+                            newFields = new ArrayList<>();
+                        }
 
-                    ColumnMetadata newField = new ColumnMetadata(fieldName, toType(type));
+                        ColumnMetadata newField = new ColumnMetadata(fieldName, toType(type));
 
-                    pageBuilder = pageBuilder.newPageBuilderWithType(toType(type));
-                    pageReader.setPageBuilder(pageBuilder);
-                    columns = ImmutableList.<ColumnMetadata>builder()
-                            .addAll(columns)
-                            .add(newField)
-                            .build();
+                        pageBuilder = pageBuilder.newPageBuilderWithType(toType(type));
+                        pageReader.setPageBuilder(pageBuilder);
+                        columns = ImmutableList.<ColumnMetadata>builder().addAll(columns).add(newField).build();
 
-                    newFields.add(newField);
-                    idx = columns.size() - 1;
+                        newFields.add(newField);
+                        idx = columns.size() - 1;
 
-                    if (type.isArray() || type.isMap()) {
-                        // if the type of new field is ARRAY, we already switched to next token
-                        // so current token is not START_ARRAY.
-                        getValue(pageBuilder.getBlockBuilder(idx), jp, type, newField, true);
+                        if (type.isArray() || type.isMap()) {
+                            // if the type of new field is ARRAY, we already switched to next token
+                            // so current token is not START_ARRAY.
+                            getValue(pageBuilder.getBlockBuilder(idx), jp, type, newField, true);
+                        }
+                        else {
+                            getValue(pageBuilder.getBlockBuilder(idx), jp, type, newField, false);
+                        }
                     }
                     else {
-                        getValue(pageBuilder.getBlockBuilder(idx), jp, type, newField, false);
+                        // the type is null or an empty array, pass it
+                        t = jp.getCurrentToken();
                     }
-                }
-                else {
-                    // the type is null or an empty array, pass it
-                    t = jp.getCurrentToken();
                 }
             }
             else {
@@ -256,7 +249,8 @@ public class JsonDeserializer
 
                 for (int i = 0; i < blockBuilders.length; i++) {
                     if (blockBuilders[i] == null) {
-                        BlockBuilder blockBuilder = newColumns.get(i).getType().createBlockBuilder(new BlockBuilderStatus(), pageBuilder.getPositionCount());
+                        BlockBuilder blockBuilder = newColumns.get(i).getType()
+                                .createBlockBuilder(new BlockBuilderStatus(), pageBuilder.getPositionCount());
                         for (int i1 = 0; i1 < pageBuilder.getPositionCount(); i1++) {
                             blockBuilder.appendNull();
                         }
@@ -291,7 +285,8 @@ public class JsonDeserializer
         return collection;
     }
 
-    private void getValue(BlockBuilder blockBuilder, JsonParser jp, FieldType type, ColumnMetadata field, boolean passInitialToken)
+    private void getValue(BlockBuilder blockBuilder, JsonParser jp, FieldType type, ColumnMetadata field,
+            boolean passInitialToken)
             throws IOException
     {
         if (jp.getCurrentToken().isScalarValue() && !passInitialToken) {
@@ -367,8 +362,9 @@ public class JsonDeserializer
                     }
                     break;
                 default:
-                    throw new JsonMappingException(jp, format("Scalar value '%s' cannot be cast to %s type for '%s' field.",
-                            jp.getValueAsString(), type.name(), field.getName()));
+                    throw new JsonMappingException(jp,
+                            format("Scalar value '%s' cannot be cast to %s type for '%s' field.", jp.getValueAsString(),
+                                    type.name(), field.getName()));
             }
         }
         else {
@@ -412,7 +408,9 @@ public class JsonDeserializer
 
                     if (!jp.nextToken().isScalarValue()) {
                         if (type.getMapValueType() != STRING) {
-                            throw new JsonMappingException(jp, String.format("Nested properties are not supported if the type is not MAP_STRING. ('%s' field)", field.getName()));
+                            throw new JsonMappingException(jp, String.format(
+                                    "Nested properties are not supported if the type is not MAP_STRING. ('%s' field)",
+                                    field.getName()));
                         }
                         String value = JsonHelper.encode(jp.readValueAsTree());
 
@@ -444,7 +442,9 @@ public class JsonDeserializer
                 for (; t != JsonToken.END_ARRAY; t = jp.nextToken()) {
                     if (!t.isScalarValue()) {
                         if (type.getArrayElementType() != STRING) {
-                            throw new JsonMappingException(jp, String.format("Nested properties are not supported if the type is not MAP_STRING. ('%s' field)", field.getName()));
+                            throw new JsonMappingException(jp, String.format(
+                                    "Nested properties are not supported if the type is not MAP_STRING. ('%s' field)",
+                                    field.getName()));
                         }
 
                         VARCHAR.writeString(arrayElementBlockBuilder, JsonHelper.encode(jp.readValueAsTree()));

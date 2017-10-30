@@ -11,11 +11,17 @@ import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.VarcharType;
 import io.airlift.configuration.Config;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 public class FieldNameConfig
 {
     private String checkpointField = "_shard_time";
-    private String userFieldName = "_user";
+    private String userFieldName = "_actor";
     private String timeField = "_time";
+    private Set<String> excludedColumns = new HashSet<>();
+
     private UserType userFieldType = UserType.STRING;
 
     @Config("database.checkpoint-field")
@@ -46,6 +52,16 @@ public class FieldNameConfig
         return this;
     }
 
+    @Config("database.user-excluded-columns")
+    public FieldNameConfig setExcludedColumns(String excludedColumns)
+    {
+        if (excludedColumns != null) {
+            excludedColumns = excludedColumns.replaceAll("\\s+", "");
+            this.excludedColumns = new HashSet<>(Arrays.asList(excludedColumns.split(",")));
+        }
+        return this;
+    }
+
     public String getCheckpointField()
     {
         return checkpointField;
@@ -66,9 +82,17 @@ public class FieldNameConfig
         return timeField;
     }
 
+    public Set<String> getExcludedColumns()
+    {
+        return excludedColumns;
+    }
+
     public enum UserType
     {
-        DOUBLE(DoubleType.DOUBLE), INTEGER(IntegerType.INTEGER), LONG(BigintType.BIGINT), STRING(VarcharType.VARCHAR);
+        DOUBLE(DoubleType.DOUBLE),
+        INTEGER(IntegerType.INTEGER),
+        LONG(BigintType.BIGINT),
+        STRING(VarcharType.VARCHAR);
 
         private final Type type;
 
