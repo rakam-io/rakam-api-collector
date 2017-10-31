@@ -44,7 +44,7 @@ public class TargetConnectorCommitter
                         .run("middlewareConnector", () -> commit(batches, table).join());
                 long endTime = System.currentTimeMillis();
 
-                log.info("commit execution time: " + (endTime - startTime) + "for table: " + table.getTableName());
+                log.info("commit execution time: " + (endTime - startTime) + " for table: " + table.getTableName());
             }
             catch (Exception e) {
                 e.printStackTrace();
@@ -56,14 +56,15 @@ public class TargetConnectorCommitter
     private CompletableFuture<Void> commit(Iterable<Table<String, String, TableData>> batches, SchemaTableName table)
     {
         DatabaseHandler.Inserter insert = databaseHandler.insert(table.getSchemaName(), table.getTableName());
-
+        long size = 0;
         for (Table<String, String, TableData> batch : batches) {
             TableData tableData = batch.get(table.getSchemaName(), table.getTableName());
             if (tableData != null) {
+                size += tableData.page.getSizeInBytes();
                 insert.addPage(tableData.page);
             }
         }
-
+        log.info("size in Bytes: " + (size));
         return insert.commit();
     }
 }

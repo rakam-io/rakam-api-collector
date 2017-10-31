@@ -100,6 +100,7 @@ public class KafkaWorkerManager
         String requestTimeOut = config.getRequestTimeOut();
         consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes, offset, groupId, sessionTimeOut, requestTimeOut));
         consumer.subscribe(Arrays.asList(config.getTopic()));
+
     }
 
     @PostConstruct
@@ -113,7 +114,7 @@ public class KafkaWorkerManager
             while (true) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
                 long endTime = System.currentTimeMillis();
-                if((endTime - startTime)> 1){
+                if((endTime - startTime)> 100){
                     log.info("---- poll duration: " + (endTime - startTime));
                 }
 

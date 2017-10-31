@@ -16,6 +16,7 @@ public class RaptorConfig
     private File dataDirectory;
     private URI prestoURL;
     private String backupThreads = "5";
+    private String dbMaxConnections = "100";
 
     public String getMetadataUrl()
     {
@@ -24,10 +25,23 @@ public class RaptorConfig
 
     public String getBackupThreads() {return backupThreads;}
 
+    public String getDbMaxConnections() {return dbMaxConnections;}
+
     @Config("raptor.metadata.url")
     public RaptorConfig setMetadataUrl(String metadataUrl)
     {
-        this.metadataUrl = metadataUrl;
+        if (metadataUrl != null && metadataUrl.length() > 0) {
+            this.metadataUrl = metadataUrl;
+        }
+        return this;
+    }
+
+    @Config("metadata.db.connections.max")
+    public RaptorConfig setDbMaxConnections(String connections)
+    {
+        if (connections != null) {
+            this.dbMaxConnections = connections;
+        }
         return this;
     }
 
@@ -48,7 +62,9 @@ public class RaptorConfig
     @Config("raptor.node.id")
     public RaptorConfig setNodeIdentifier(String nodeIdentifier)
     {
-        this.nodeIdentifier = nodeIdentifier;
+        if(nodeIdentifier!=null) {
+            this.nodeIdentifier = nodeIdentifier;
+        }
         return this;
     }
 
@@ -60,7 +76,9 @@ public class RaptorConfig
     @Config("raptor.storage.data-directory")
     public RaptorConfig setDataDirectory(File dataDirectory)
     {
-        this.dataDirectory = dataDirectory;
+        if (dataDirectory != null & dataDirectory.length() > 0) {
+            this.dataDirectory = dataDirectory;
+        }
         return this;
     }
 
@@ -72,7 +90,9 @@ public class RaptorConfig
     @Config("raptor.presto-url")
     public RaptorConfig setPrestoURL(URI prestoURL)
     {
-        this.prestoURL = prestoURL;
+        if (prestoURL != null) {
+            this.prestoURL = prestoURL;
+        }
         return this;
     }
 }
