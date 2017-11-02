@@ -5,6 +5,7 @@
 package io.rakam.presto.kafka;
 
 import io.airlift.configuration.Config;
+import io.rakam.presto.deserialization.json.JsonDeserializer;
 import io.rakam.presto.deserialization.json.RakamJsonDeserializer;
 
 public class JsonConfig {
@@ -23,13 +24,13 @@ public class JsonConfig {
     public enum JsonFormat {
         RAKAM(RakamJsonDeserializer.class);
 
-        private final Class<RakamJsonDeserializer> jsonDeserializerClass;
+        private final Class<? extends JsonDeserializer> jsonDeserializerClass;
 
-        JsonFormat(Class<RakamJsonDeserializer> jsonDeserializerClass) {
+        JsonFormat(Class<? extends JsonDeserializer> jsonDeserializerClass) {
             this.jsonDeserializerClass = jsonDeserializerClass;
         }
 
-        public Class<RakamJsonDeserializer> getJsonDeserializerClass() {
+        public Class<? extends JsonDeserializer> getJsonDeserializerClass() {
             return jsonDeserializerClass;
         }
     }
