@@ -26,10 +26,10 @@ public abstract class JsonMessageEventTransformer<T>
     private final JsonDeserializer jsonDecoder;
     private final String checkpointColumn;
 
-    public JsonMessageEventTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler database)
+    public JsonMessageEventTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler database, JsonDeserializer jsonDecoder)
     {
         super(fieldNameConfig, database);
-        jsonDecoder = new JsonDeserializer(database, fieldNameConfig);
+        this.jsonDecoder = jsonDecoder;
         this.checkpointColumn = fieldNameConfig.getCheckpointField();
     }
 
