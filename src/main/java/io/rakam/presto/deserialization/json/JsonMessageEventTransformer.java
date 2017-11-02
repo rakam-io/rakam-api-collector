@@ -54,12 +54,16 @@ public abstract class JsonMessageEventTransformer<T>
                 continue;
             }
 
-            PageReader pageBuilder = getReader(builderMap, collection);
-            if (pageBuilder == null) {
+            try {
+                PageReader pageBuilder = getReader(builderMap, collection);
+                if (pageBuilder == null) {
+                    continue;
+                }
+                pageBuilder.read(jsonDecoder);
+            }catch (Exception e){
+                LOGGER.error(e, "Unable to parse message skipping it.");
                 continue;
             }
-
-            pageBuilder.read(jsonDecoder);
         }
 
         return buildTable(builderMap);

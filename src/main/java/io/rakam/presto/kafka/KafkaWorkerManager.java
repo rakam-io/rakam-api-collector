@@ -55,6 +55,7 @@ public class KafkaWorkerManager
     protected KafkaConsumer<byte[], byte[]> consumer;
     protected KafkaConfig config;
     private ExecutorService executor;
+    private boolean infiniteLoop = true;
 
     @Inject
     public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
@@ -113,7 +114,7 @@ public class KafkaWorkerManager
         try {
             int recordCount = 0;
             long startTime = System.currentTimeMillis();
-            while (true) {
+            while (infiniteLoop) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
                 long endTime = System.currentTimeMillis();
                 if((endTime - startTime)> 1000){
@@ -155,6 +156,10 @@ public class KafkaWorkerManager
                                 });
                             }
                         }
+                    }
+                    catch (UncheckedIOException e){
+                        log.error(e.getMessage());
+                        infiniteLoop = false;
                     }
                     catch (Throwable e) {
                         log.error(e, "Error processing Kafka records, passing record to latest offset.");
