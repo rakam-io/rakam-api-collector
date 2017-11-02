@@ -31,7 +31,6 @@ public class TestKafkaRakamJsonDeserializer extends TestKafkaJsonDeserializer {
                     "properties", ImmutableMap.of("newcolumn1", "test1", "newcolumn2", "test2"))));
             builder.add(record);
         }
-
         return builder.build();
     }
 
