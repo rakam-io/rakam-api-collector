@@ -4,6 +4,7 @@
 
 package io.rakam.presto.kafka;
 
+import com.facebook.presto.hive.$internal.jodd.exception.UncheckedException;
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Table;
@@ -30,6 +31,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -114,7 +116,7 @@ public class KafkaWorkerManager
             while (true) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
                 long endTime = System.currentTimeMillis();
-                if((endTime - startTime)> 100){
+                if((endTime - startTime)> 1000){
                     log.info("---- poll duration: " + (endTime - startTime));
                 }
 
