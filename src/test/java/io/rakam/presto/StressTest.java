@@ -11,6 +11,7 @@ import io.airlift.log.Logger;
 import io.rakam.presto.connector.raptor.RaptorConfig;
 import io.rakam.presto.connector.raptor.RaptorDatabaseHandler;
 import io.rakam.presto.connector.raptor.S3BackupConfig;
+import io.rakam.presto.deserialization.json.RakamJsonDeserializer;
 import io.rakam.presto.kafka.KafkaConfig;
 import io.rakam.presto.kafka.KafkaJsonMessageTransformer;
 import io.rakam.presto.kafka.KafkaWorkerManager;
@@ -78,7 +79,7 @@ public class StressTest
         FieldNameConfig fieldNameConfig = new FieldNameConfig();
         RaptorDatabaseHandler databaseHandler = new RaptorDatabaseHandler(raptorConfig, new S3BackupConfig(), fieldNameConfig);
 
-        StreamWorkerContext context = new StreamWorkerContext(new KafkaJsonMessageTransformer(fieldNameConfig, databaseHandler), new StreamConfig());
+        StreamWorkerContext context = new StreamWorkerContext(new KafkaJsonMessageTransformer(fieldNameConfig, databaseHandler, new RakamJsonDeserializer(databaseHandler)), new StreamConfig());
         TargetConnectorCommitter targetConnectorCommitter = new TargetConnectorCommitter(databaseHandler);
 
         KafkaWorkerManager kafkaWorkerManager = new KafkaWorkerManager(kafkaConfig, new MiddlewareConfig(), context, targetConnectorCommitter)
