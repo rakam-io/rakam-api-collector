@@ -4,6 +4,7 @@
 
 package io.rakam.presto.kafka;
 
+import com.facebook.presto.hive.$internal.jodd.exception.UncheckedException;
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Table;
@@ -30,6 +31,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -53,6 +55,7 @@ public class KafkaWorkerManager
     protected KafkaConsumer<byte[], byte[]> consumer;
     protected KafkaConfig config;
     private ExecutorService executor;
+    private boolean infiniteLoop = true;
 
     @Inject
     public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
@@ -100,6 +103,7 @@ public class KafkaWorkerManager
         String requestTimeOut = config.getRequestTimeOut();
         consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes, offset, groupId, sessionTimeOut, requestTimeOut));
         consumer.subscribe(Arrays.asList(config.getTopic()));
+
     }
 
     @PostConstruct
@@ -110,10 +114,10 @@ public class KafkaWorkerManager
         try {
             int recordCount = 0;
             long startTime = System.currentTimeMillis();
-            while (true) {
+            while (infiniteLoop) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
                 long endTime = System.currentTimeMillis();
-                if((endTime - startTime)> 1){
+                if((endTime - startTime)> 1000){
                     log.info("---- poll duration: " + (endTime - startTime));
                 }
 
@@ -152,6 +156,10 @@ public class KafkaWorkerManager
                                 });
                             }
                         }
+                    }
+                    catch (UncheckedIOException e){
+                        log.error(e.getMessage());
+                        infiniteLoop = false;
                     }
                     catch (Throwable e) {
                         log.error(e, "Error processing Kafka records, passing record to latest offset.");
