@@ -5,7 +5,6 @@
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.HostAddress;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Table;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -21,7 +20,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
-import org.apache.kafka.clients.consumer.OffsetCommitCallback;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -31,6 +29,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,12 +89,10 @@ public class KafkaWorkerManager
         }
     }
 
-    public void subscribe() {
-        String zkNodes = config.getZookeeperNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
-        String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
-
-        consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes));
-        consumer.subscribe(ImmutableList.of(config.getTopic()));
+    public void subscribe()
+    {
+        consumer = new KafkaConsumer(createConsumerConfig(config));
+        consumer.subscribe(Arrays.asList(config.getTopic()));
     }
 
     @PostConstruct
@@ -139,7 +136,7 @@ public class KafkaWorkerManager
                     }
                     catch (Throwable e) {
                         log.error(e, "Error processing Kafka records, passing record to latest offset.");
-                        commitAsyncOffset(null);
+                        commitSyncOffset(null);
                     }
                 }
             }
@@ -177,49 +174,47 @@ public class KafkaWorkerManager
             public void checkpoint()
                     throws BatchRecords.CheckpointException
             {
-                commitAsyncOffset(record);
+                commitSyncOffset(record);
             }
         };
     }
 
-    public void commitAsyncOffset(ConsumerRecord record)
+    public void commitSyncOffset(ConsumerRecord record)
     {
-        OffsetCommitCallback callback = new OffsetCommitCallback()
-        {
-            @Override
-            public void onComplete(Map<TopicPartition, OffsetAndMetadata> offsets, Exception e)
-            {
-                if (e != null) {
-                    log.error(e, "Kafka offset commit fail. %s", offsets.toString());
-                }
-            }
-        };
-
         if (record == null) {
-            consumer.commitAsync(callback);
+            consumer.commitSync();
         }
         else {
             Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
             offsets.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1));
-            consumer.commitAsync(offsets, callback);
+            consumer.commitSync(offsets);
         }
     }
 
-    protected static Properties createConsumerConfig(String zkNodes, String kafkaNodes)
+    protected static Properties createConsumerConfig(KafkaConfig config)
     {
+        String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
+        String zkNodes = config.getZookeeperNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
+        String offset = config.getOffset();
+        String groupId = config.getGroupId();
+        String sessionTimeOut = config.getSessionTimeOut();
+        String requestTimeOut = config.getRequestTimeOut();
+
         Properties props = new Properties();
-        props.put("zookeeper.connect", zkNodes);
         props.put("bootstrap.servers", kafkaNodes);
-        props.put("group.id", "presto_streaming");
-        props.put("zookeeper.session.timeout.ms", "400");
-        props.put("zookeeper.sync.time.ms", "200");
-        props.put("auto.commit.enable", "false");
-        props.put("auto.offset.reset", "earliest");
-        props.put("offsets.storage", "kafka");
+        props.put("group.id", groupId);
+        //props.put("zookeeper.connect", zkNodes);
+        //props.put("zookeeper.session.timeout.ms", "400");
+        //props.put("zookeeper.sync.time.ms", "200");
+        //props.put("offsets.storage", "kafka");
+        //props.put("consumer.timeout.ms", "10");
+        props.put("enable.auto.commit", "false");
+        props.put("auto.offset.reset", offset);
+        props.put("session.timeout.ms", sessionTimeOut);
+        props.put("heartbeat.interval.ms", "1000");
+        props.put("request.timeout.ms", requestTimeOut);
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
-        props.put("consumer.timeout.ms", "10");
-
         return props;
     }
 

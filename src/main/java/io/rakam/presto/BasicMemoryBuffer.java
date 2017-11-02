@@ -58,10 +58,15 @@ public class BasicMemoryBuffer<T>
         buffer.clear();
         bulkBuffer.clear();
         previousFlushTimeMillisecond = System.currentTimeMillis();
+        totalBytes = 0;
     }
 
     public boolean shouldFlush()
     {
+        if (buffer.size() == 0) {
+            return false;
+        }
+
         long timelapseMillisecond = System.currentTimeMillis() - previousFlushTimeMillisecond;
         return (buffer.size() >= getNumRecordsToBuffer())
                 || (timelapseMillisecond >= getMillisecondsToBuffer())
