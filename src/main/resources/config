@@ -28,9 +28,9 @@ middleware.max-flush-records=500000
 database.checkpoint-field=_shard_time
 database.user-excluded-columns=_shard_time,_project,_collection
 
-metadata.db.connections.max=30
+#metadata.db.connections.max=30
 
-raptor.aws.region=us-east-1
+#raptor.aws.region=us-east-1
 #raptor.aws.s3-bucket=
 raptor.metadata.url=jdbc:mysql://localhost/raptor1?user=satsahu&password=satsahu@1234
 raptor.node.id=ffffffff-ffff-ffff-ffff-ffffffffffff

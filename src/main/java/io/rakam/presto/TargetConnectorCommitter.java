@@ -51,10 +51,8 @@ public class TargetConnectorCommitter
                 log.info("commit execution time: " + (endTime - startTime) + " for table: " + table.getTableName());
             }
             catch (Exception e) {
-                if (e.getCause().getCause().getClass().equals(PrestoException.class)) {
-                    if (e.getCause().getCause().getCause()!=null && e.getCause().getCause().getCause().getClass().equals(com.amazonaws.SdkClientException.class)) {
+                if (e.getCause().getCause().getCause()!=null  && e.getCause().getCause().getClass().equals(com.amazonaws.SdkClientException.class)) {
                         throw new UncheckedIOException(new IOException("Unable to upload data to s3. Check the credentials"));
-                    }
                 }
                 log.error(e, "Unable to commit table %s.", table);
             }
