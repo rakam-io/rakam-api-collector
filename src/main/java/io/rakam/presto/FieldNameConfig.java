@@ -18,7 +18,7 @@ import java.util.Set;
 public class FieldNameConfig
 {
     private String checkpointField = "_shard_time";
-    private String userFieldName = "_actor";
+    private String userFieldName = "_user";
     private String timeField = "_time";
     private Set<String> excludedColumns = new HashSet<>();
 
