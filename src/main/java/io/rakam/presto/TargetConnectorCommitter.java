@@ -4,6 +4,7 @@
 
 package io.rakam.presto;
 
+import com.amazonaws.SdkClientException;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.Table;
@@ -15,6 +16,7 @@ import javax.inject.Inject;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.SocketTimeoutException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.StreamSupport;
@@ -51,8 +53,12 @@ public class TargetConnectorCommitter
                 log.info("commit execution time: " + (endTime - startTime) + " for table: " + table.getTableName());
             }
             catch (Exception e) {
-                if (e.getCause().getCause().getCause()!=null  && e.getCause().getCause().getClass().equals(com.amazonaws.SdkClientException.class)) {
+                Throwable throwable = e.getCause().getCause();
+                if (throwable.getClass() != null && throwable.getClass().equals(PrestoException.class)) {
+                    throwable = throwable.getCause();
+                    if (throwable != null && (throwable.getClass().equals(SdkClientException.class) || throwable.getClass().equals(SocketTimeoutException.class))) {
                         throw new UncheckedIOException(new IOException("Unable to upload data to s3. Check the credentials"));
+                    }
                 }
                 log.error(e, "Unable to commit table %s.", table);
             }

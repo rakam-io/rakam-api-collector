@@ -62,7 +62,7 @@ public class RaptorConfig
     @Config("raptor.node.id")
     public RaptorConfig setNodeIdentifier(String nodeIdentifier)
     {
-        if(nodeIdentifier!=null) {
+        if (nodeIdentifier != null) {
             this.nodeIdentifier = nodeIdentifier;
         }
         return this;
@@ -76,9 +76,10 @@ public class RaptorConfig
     @Config("raptor.storage.data-directory")
     public RaptorConfig setDataDirectory(File dataDirectory)
     {
-        if (dataDirectory != null & dataDirectory.length() > 0) {
-            this.dataDirectory = dataDirectory;
+        if (dataDirectory == null || dataDirectory.length() < 1) {
+            throw new RuntimeException("storage directory cannot be null");
         }
+        this.dataDirectory = dataDirectory;
         return this;
     }
 
