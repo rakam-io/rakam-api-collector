@@ -55,6 +55,19 @@ import static org.rakam.collection.FieldType.MAP_STRING;
 import static org.rakam.collection.FieldType.STRING;
 import static org.rakam.presto.analysis.PrestoRakamRaptorMetastore.toType;
 
+/**
+ * Support for https://github.com/olacabs/fabric document structure.
+ * Sample:
+ * {
+ *      "id":"1"
+ *     "metadata":{},
+ *     "data":{
+ *         "_project":"",
+ *         "_collection":""
+ *     }
+ * }
+ *
+ */
 public class FabricJsonDeserializer implements JsonDeserializer
 {
     private static final JsonFactory READER = new ObjectMapper().getFactory();
