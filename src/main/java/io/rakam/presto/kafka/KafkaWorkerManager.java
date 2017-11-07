@@ -20,7 +20,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
-import org.apache.kafka.clients.consumer.OffsetCommitCallback;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
@@ -92,13 +91,7 @@ public class KafkaWorkerManager
 
     public void subscribe()
     {
-        String zkNodes = config.getZookeeperNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
-        String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
-        String offset = config.getOffset();
-        String groupId = config.getGroupId();
-        String sessionTimeOut = config.getSessionTimeOut();
-        String requestTimeOut = config.getRequestTimeOut();
-        consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes, offset, groupId,sessionTimeOut,requestTimeOut));
+        consumer = new KafkaConsumer(createConsumerConfig(config));
         consumer.subscribe(Arrays.asList(config.getTopic()));
     }
 
@@ -108,26 +101,20 @@ public class KafkaWorkerManager
         subscribe();
 
         try {
-            int recordCount = 0;
             while (true) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
-                recordCount += kafkaRecord.count();
                 for (ConsumerRecord<byte[], byte[]> record : kafkaRecord) {
                     buffer.consumeRecord(record, record.value().length);
                 }
                 if (buffer.shouldFlush()) {
                     try {
-                        long conversionStartTime = System.currentTimeMillis();
                         Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> records = buffer.getRecords();
+
                         if (!records.getValue().isEmpty() || !records.getKey().isEmpty()) {
                             Table<String, String, TableData> convert = context.convert(records.getKey(), records.getValue());
-                            long conversionEndTime = System.currentTimeMillis();
                             buffer.clear();
 
-
                             middlewareBuffer.add(new BatchRecords(convert, createCheckpointer(findLatestRecord(records))));
-                            log.info("----Conversion execution time: "+ (conversionEndTime - conversionStartTime) +" for records: "+ recordCount);
-                            recordCount = 0;
                         }
 
                         if (middlewareBuffer.shouldFlush()) {
@@ -149,7 +136,7 @@ public class KafkaWorkerManager
                     }
                     catch (Throwable e) {
                         log.error(e, "Error processing Kafka records, passing record to latest offset.");
-                        commitAsyncOffset(null);
+                        commitSyncOffset(null);
                     }
                 }
             }
@@ -187,39 +174,33 @@ public class KafkaWorkerManager
             public void checkpoint()
                     throws BatchRecords.CheckpointException
             {
-                commitAsyncOffset(record);
+                commitSyncOffset(record);
             }
         };
     }
 
-    public void commitAsyncOffset(ConsumerRecord record)
+    public void commitSyncOffset(ConsumerRecord record)
     {
-        OffsetCommitCallback callback = new OffsetCommitCallback()
-        {
-            @Override
-            public void onComplete(Map<TopicPartition, OffsetAndMetadata> offsets, Exception e)
-            {
-                if (e != null) {
-                    e.printStackTrace();
-                    log.error(e, "Kafka offset commit fail. %s", offsets.toString());
-                }
-            }
-        };
-
         if (record == null) {
-            consumer.commitAsync(callback);
+            consumer.commitSync();
         }
         else {
             Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
             offsets.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1));
-            consumer.commitAsync(offsets, callback);
+            consumer.commitSync(offsets);
         }
     }
 
-    protected static Properties createConsumerConfig(String zkNodes, String kafkaNodes, String offset, String groupId,String sessionTimeOut,String requestTimeOut)
+    protected static Properties createConsumerConfig(KafkaConfig config)
     {
-        Properties props = new Properties();
+        String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
+        String zkNodes = config.getZookeeperNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
+        String offset = config.getOffset();
+        String groupId = config.getGroupId();
+        String sessionTimeOut = config.getSessionTimeOut();
+        String requestTimeOut = config.getRequestTimeOut();
 
+        Properties props = new Properties();
         props.put("bootstrap.servers", kafkaNodes);
         props.put("group.id", groupId);
         //props.put("zookeeper.connect", zkNodes);
