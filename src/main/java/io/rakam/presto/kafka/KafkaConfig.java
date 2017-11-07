@@ -70,7 +70,7 @@ public class KafkaConfig
         return nodes;
     }
 
-    @Config("session.timeout.ms")
+    @Config("kafka.session.timeout.ms")
     public KafkaConfig setSessionTimeOut(String sessionTimeOut)
     {
         if (sessionTimeOut != null) {
@@ -79,7 +79,7 @@ public class KafkaConfig
         return this;
     }
 
-    @Config("request.timeout.ms")
+    @Config("kafka.request.timeout.ms")
     public KafkaConfig setRequestTimeOut(String requestTimeOut)
     {
         if (requestTimeOut != null) {

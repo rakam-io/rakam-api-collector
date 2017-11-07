@@ -20,8 +20,7 @@ public class FieldNameConfig
     private String checkpointField = "_shard_time";
     private String userFieldName = "_actor";
     private String timeField = "_time";
-    private Set<String> excludedColumns = new HashSet<String>();
-    private Set<String> whitelistedCollections = new HashSet<String>();
+    private Set<String> excludedColumns = new HashSet<>();
 
     private UserType userFieldType = UserType.STRING;
 

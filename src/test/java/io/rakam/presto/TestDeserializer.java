@@ -38,7 +38,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
@@ -126,7 +125,7 @@ public abstract class TestDeserializer<T>
 
     public abstract MessageEventTransformer getMessageEventTransformer();
 
-    public abstract List<T> getRecords(String project, String collection, Optional<int[]> columnIdx)
+    public abstract List<T> getRecordsForEvents(String project, String collection, Optional<int[]> columnIdx)
             throws IOException;
 
     @Test
@@ -134,7 +133,7 @@ public abstract class TestDeserializer<T>
             throws IOException
     {
         MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
-        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecords("testproject", "testcollection", Optional.empty()), ImmutableList.of());
+        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.empty()), ImmutableList.of());
         Map<String, TableData> testproject = pageTable.row("testproject");
         TableData testcollection = testproject.get("testcollection");
 
@@ -163,7 +162,7 @@ public abstract class TestDeserializer<T>
     {
         MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
 
-        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecords("testproject", "testcollection", Optional.of(new int[] {
+        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.of(new int[] {
                 1})), ImmutableList.of());
         Map<String, TableData> testproject = pageTable.row("testproject");
         TableData testcollection = testproject.get("testcollection");

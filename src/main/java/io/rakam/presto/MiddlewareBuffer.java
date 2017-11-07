@@ -48,7 +48,6 @@ public class MiddlewareBuffer
     {
         ImmutableList<BatchRecords> flushed = ImmutableList.copyOf(batches);
         batches.clear();
-        System.out.println("bufferSize is " + DataSize.succinctDataSize(bufferSize.get(), DataSize.Unit.BYTE) + " bufferRecordCount is " + bufferRecordCount);
         bufferSize = new AtomicLong();
         bufferRecordCount = new AtomicLong();
         previousFlushTimeMillisecond = System.currentTimeMillis();
