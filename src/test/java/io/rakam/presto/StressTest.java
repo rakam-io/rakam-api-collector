@@ -30,12 +30,10 @@ import java.util.stream.IntStream;
 
 import static io.rakam.presto.kafka.KafkaConfig.DataFormat.JSON;
 
-public class StressTest
-{
+public class StressTest {
     private static final Logger log = Logger.get(StressTest.class);
 
-    public static void main(String[] args)
-    {
+    public static void main(String[] args) {
         List<ConsumerRecord<byte[], byte[]>> records = IntStream.range(0, 30000).mapToObj(i -> {
             byte[] bytes = JsonHelper.encodeAsBytes(ImmutableMap.of(
                     "project", "presto",
@@ -60,7 +58,7 @@ public class StressTest
                             .put("is_reply", false)
                             .put("latitude", 432342 + i)
                             .put("is_positive", false).build()));
-            return new ConsumerRecord<>("test", -1, 0, new byte[] {}, bytes);
+            return new ConsumerRecord<>("test", -1, 0, new byte[]{}, bytes);
         }).collect(Collectors.toList());
         ConsumerRecords consumerRecords = new ConsumerRecords(ImmutableMap.of(new TopicPartition("test", -1), records));
 
@@ -82,33 +80,31 @@ public class StressTest
         StreamWorkerContext context = new StreamWorkerContext(new KafkaJsonMessageTransformer(fieldNameConfig, databaseHandler, new RakamJsonDeserializer(databaseHandler)), new StreamConfig());
         TargetConnectorCommitter targetConnectorCommitter = new TargetConnectorCommitter(databaseHandler);
 
-        KafkaWorkerManager kafkaWorkerManager = new KafkaWorkerManager(kafkaConfig, new MiddlewareConfig(), context, targetConnectorCommitter)
-        {
+        KafkaWorkerManager kafkaWorkerManager = new KafkaWorkerManager(kafkaConfig, new MiddlewareConfig(), context, targetConnectorCommitter) {
             @Override
-            public void subscribe()
-            {
+            public void subscribe() {
                 String zkNodes = config.getZookeeperNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
                 String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
+                String offset = config.getOffset();
+                String groupId = config.getGroupId();
+                String sessionTimeOut = config.getSessionTimeOut();
+                String requestTimeOut = config.getRequestTimeOut();
 
                 AtomicLong totalRecord = new AtomicLong(-1);
                 AtomicLong lastPoll = new AtomicLong(System.currentTimeMillis());
-                consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes))
-                {
+                consumer = new KafkaConsumer(createConsumerConfig(config)) {
                     @Override
-                    public ConsumerRecords poll(long timeout)
-                    {
+                    public ConsumerRecords poll(long timeout) {
                         if (totalRecord.get() == -1) {
                             totalRecord.set(0);
-                        }
-                        else {
+                        } else {
                             totalRecord.addAndGet(consumerRecords.count());
                         }
 
                         log.info("poll start. since last poll: " + ((System.currentTimeMillis() - lastPoll.get())) + "ms. total records:" + totalRecord.get());
                         try {
                             Thread.sleep(timeout);
-                        }
-                        catch (InterruptedException e) {
+                        } catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
                         lastPoll.set(System.currentTimeMillis());
