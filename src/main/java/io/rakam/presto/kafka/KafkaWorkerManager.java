@@ -4,7 +4,6 @@
 
 package io.rakam.presto.kafka;
 
-import com.facebook.presto.hive.$internal.jodd.exception.UncheckedException;
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Table;
@@ -55,6 +54,7 @@ public class KafkaWorkerManager
     protected KafkaConfig config;
     private ExecutorService executor;
     private boolean infiniteLoop = true;
+    private int recordCount = 0;
 
     @Inject
     public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
@@ -96,29 +96,37 @@ public class KafkaWorkerManager
     {
         consumer = new KafkaConsumer(createConsumerConfig(config));
         consumer.subscribe(Arrays.asList(config.getTopic()));
-
     }
 
     @PostConstruct
     public void run()
     {
         subscribe();
-
+        long startTime = System.currentTimeMillis();
         try {
-            while (true) {
+            while (infiniteLoop) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
+                long endTime = System.currentTimeMillis();
+                if ((endTime - startTime) > 1000) {
+                    log.info("---- poll duration: " + (endTime - startTime));
+                }
+
+                startTime = endTime;
+                recordCount += kafkaRecord.count();
                 for (ConsumerRecord<byte[], byte[]> record : kafkaRecord) {
                     buffer.consumeRecord(record, record.value().length);
                 }
+
                 if (buffer.shouldFlush()) {
                     try {
                         Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> records = buffer.getRecords();
 
                         if (!records.getValue().isEmpty() || !records.getKey().isEmpty()) {
-                            Table<String, String, TableData> convert = context.convert(records.getKey(), records.getValue());
-                            buffer.clear();
-
+                            Table<String, String, TableData> convert = flushStream();
+                            long conversionEndTime = System.currentTimeMillis();
                             middlewareBuffer.add(new BatchRecords(convert, createCheckpointer(findLatestRecord(records))));
+                            log.info("----Conversion time: " + (conversionEndTime - conversionEndTime) + " for records: " + recordCount);
+                            recordCount = 0;
                         }
 
                         if (middlewareBuffer.shouldFlush()) {
@@ -138,7 +146,7 @@ public class KafkaWorkerManager
                             }
                         }
                     }
-                    catch (UncheckedIOException e){
+                    catch (UncheckedIOException e) {
                         log.error(e.getMessage());
                         infiniteLoop = false;
                     }
@@ -156,21 +164,21 @@ public class KafkaWorkerManager
 
     private Table<String, String, TableData> flushStream()
     {
-        Table<String, String, TableData> pages;
+        Table<String, String, TableData> pages = null;
         try {
             Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> list = buffer.getRecords();
 
             if (list.getValue().isEmpty() && list.getKey().isEmpty()) {
                 return null;
             }
-
             pages = context.convert(list.getKey(), list.getValue());
         }
         catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-        buffer.clear();
+        finally {
+            buffer.clear();
+        }
         return pages;
     }
 

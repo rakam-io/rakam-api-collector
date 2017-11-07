@@ -10,7 +10,7 @@ import io.rakam.presto.deserialization.json.JsonDeserializer;
 import io.rakam.presto.deserialization.json.RakamJsonDeserializer;
 
 public class JsonConfig {
-    private JsonFormat dataLayout = JsonFormat.RAKAM;
+    private JsonFormat dataLayout = JsonFormat.FABRIC;
 
     @Config("source.data-format.json.layout")
     public JsonConfig setDataLayout(JsonFormat dataLayout) {

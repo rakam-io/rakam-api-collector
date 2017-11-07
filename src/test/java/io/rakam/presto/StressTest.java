@@ -92,11 +92,8 @@ public class StressTest {
 
                 AtomicLong totalRecord = new AtomicLong(-1);
                 AtomicLong lastPoll = new AtomicLong(System.currentTimeMillis());
-<<<<<<< HEAD
-                consumer = new KafkaConsumer(createConsumerConfig(zkNodes, kafkaNodes, offset, groupId,sessionTimeOut,requestTimeOut)) {
-=======
                 consumer = new KafkaConsumer(createConsumerConfig(config)) {
->>>>>>> ramesh-b/rakam-presto-collector-master
+
                     @Override
                     public ConsumerRecords poll(long timeout) {
                         if (totalRecord.get() == -1) {

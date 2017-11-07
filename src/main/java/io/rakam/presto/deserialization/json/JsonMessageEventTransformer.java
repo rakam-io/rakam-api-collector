@@ -13,6 +13,7 @@ import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -45,7 +46,7 @@ public abstract class JsonMessageEventTransformer<T>
             SchemaTableName collection;
             try {
                 collection = extractCollection(record, jsonDecoder);
-                if (whitelistedCollections.size()>0 && !whitelistedCollections.contains(collection.getTableName())) {
+                if (whitelistedCollections.size() > 0 && !whitelistedCollections.contains(collection.getTableName())) {
                     continue;
                 }
             }
@@ -60,8 +61,9 @@ public abstract class JsonMessageEventTransformer<T>
                     continue;
                 }
                 pageBuilder.read(jsonDecoder);
-            }catch (Exception e){
-                LOGGER.error(e, "Unable to parse message skipping it.");
+            }
+            catch (Exception e) {
+                LOGGER.error(e, "Unable to parse message skipping it");
                 continue;
             }
         }

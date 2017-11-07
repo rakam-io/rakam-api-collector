@@ -54,7 +54,7 @@ public class TargetConnectorCommitter
             }
             catch (Exception e) {
                 Throwable throwable = e.getCause().getCause();
-                if (throwable.getClass() != null && throwable.getClass().equals(PrestoException.class)) {
+                if (throwable!=null && throwable.getClass() != null && throwable.getClass().equals(PrestoException.class)) {
                     throwable = throwable.getCause();
                     if (throwable != null && (throwable.getClass().equals(SdkClientException.class) || throwable.getClass().equals(SocketTimeoutException.class))) {
                         throw new UncheckedIOException(new IOException("Unable to upload data to s3. Check the credentials"));
