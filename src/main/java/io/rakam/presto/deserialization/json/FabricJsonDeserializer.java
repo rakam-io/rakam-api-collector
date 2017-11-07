@@ -378,6 +378,7 @@ public class FabricJsonDeserializer implements JsonDeserializer
                     }
                     break;
                 default:
+                    blockBuilder.appendNull();
                     throw new JsonMappingException(jp,
                             format("Scalar value '%s' cannot be cast to %s type for '%s' field.", jp.getValueAsString(),
                                     type.name(), field.getName()));

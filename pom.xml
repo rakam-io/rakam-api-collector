@@ -22,7 +22,7 @@
         <air.check.skip-findbugs>true</air.check.skip-findbugs>
         <air.check.skip-duplicate-finder>true</air.check.skip-duplicate-finder>
         <air.check.skip-jacoco>true</air.check.skip-jacoco>
-        <kafka.client.version>0.11.0.0</kafka.client.version>
+        <kafka.client.version>0.9.0.2.3.4.25-3</kafka.client.version>
     </properties>
 
     <dependencies>

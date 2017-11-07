@@ -21,7 +21,7 @@ public class FieldNameConfig
     private String userFieldName = "_actor";
     private String timeField = "_time";
     private Set<String> excludedColumns = new HashSet<>();
-
+    private Set<String> whitelistedCollections = new HashSet<>();
     private UserType userFieldType = UserType.STRING;
 
     @Config("database.checkpoint-field")
