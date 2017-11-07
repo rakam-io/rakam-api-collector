@@ -6,7 +6,7 @@ package io.rakam.presto.deserialization.json;
 
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
-import com.google.common.collect.Table;
+import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
@@ -34,7 +34,7 @@ public abstract class JsonMessageEventTransformer<T>
     }
 
     @Override
-    public synchronized Table<String, String, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
+    public synchronized Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
             throws IOException
     {
         Map<SchemaTableName, PageReader> builderMap = new HashMap<>();
@@ -56,7 +56,12 @@ public abstract class JsonMessageEventTransformer<T>
             pageBuilder.read(jsonDecoder);
         }
 
-        return buildTable(builderMap);
+        ImmutableMap.Builder<SchemaTableName, TableData> builder = ImmutableMap.builder();
+        for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
+            builder.put(entry.getKey(), new TableData(entry.getValue().getPage(), entry.getValue().getActualSchema()));
+        }
+
+        return builder.build();
     }
 
     @Override
