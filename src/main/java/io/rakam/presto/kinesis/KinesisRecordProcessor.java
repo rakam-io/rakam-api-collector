@@ -10,6 +10,7 @@ import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessor;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorCheckpointer;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.ShutdownReason;
 import com.amazonaws.services.kinesis.model.Record;
+import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Table;
@@ -77,7 +78,7 @@ public class KinesisRecordProcessor
         }
 
         if (streamBuffer.shouldFlush()) {
-            Table<String, String, TableData> pages = flushStream();
+            Map<SchemaTableName, TableData> pages = flushStream();
 
             middlewareBuffer.add(new BatchRecords(pages, () -> {
                 try {
@@ -88,21 +89,12 @@ public class KinesisRecordProcessor
                 }
             }));
 
-            if (middlewareBuffer.shouldFlush()) {
-                List<BatchRecords> list = middlewareBuffer.flush();
+                Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> list = middlewareBuffer.flush();
                 if (!list.isEmpty()) {
-                    committer.process(Iterables.transform(list, BatchRecords::getTable));
-
-                    list.forEach(l -> {
-                        try {
-                            l.checkpoint();
-                        }
-                        catch (BatchRecords.CheckpointException e) {
-                            log.error(e, "Error while checkpointing records");
-                        }
-                    });
+                    for (Map.Entry<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> entry : list.entrySet()) {
+                        committer.process(entry.getKey(), entry.getValue());
+                    }
                 }
-            }
         }
     }
 
@@ -113,9 +105,9 @@ public class KinesisRecordProcessor
         log.error("Shutdown %s, the reason is %s", shardId, shutdownReason.name());
     }
 
-    private Table<String, String, TableData> flushStream()
+    private Map<SchemaTableName, TableData> flushStream()
     {
-        Table<String, String, TableData> pages;
+        Map<SchemaTableName, TableData> pages;
         try {
             Map.Entry<List, List> list = streamBuffer.getRecords();
             pages = context.convert(list.getKey(), list.getValue());
