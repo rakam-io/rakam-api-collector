@@ -5,6 +5,7 @@
 package io.rakam.presto.kafka;
 
 import io.airlift.configuration.Config;
+import io.rakam.presto.deserialization.json.FabricJsonDeserializer;
 import io.rakam.presto.deserialization.json.JsonDeserializer;
 import io.rakam.presto.deserialization.json.RakamJsonDeserializer;
 
@@ -12,7 +13,7 @@ public class JsonConfig {
     private JsonFormat dataLayout = JsonFormat.RAKAM;
 
     @Config("source.data-format.json.layout")
-    public JsonConfig setDataFormat(JsonFormat dataLayout) {
+    public JsonConfig setDataLayout(JsonFormat dataLayout) {
         this.dataLayout = dataLayout;
         return this;
     }
@@ -22,7 +23,7 @@ public class JsonConfig {
     }
 
     public enum JsonFormat {
-        RAKAM(RakamJsonDeserializer.class);
+        RAKAM(RakamJsonDeserializer.class),FABRIC(FabricJsonDeserializer.class);
 
         private final Class<? extends JsonDeserializer> jsonDeserializerClass;
 
