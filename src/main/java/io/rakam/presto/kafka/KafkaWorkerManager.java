@@ -4,6 +4,7 @@
 
 package io.rakam.presto.kafka;
 
+import com.facebook.presto.hive.$internal.jodd.exception.UncheckedException;
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Table;
@@ -29,6 +30,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -52,6 +54,7 @@ public class KafkaWorkerManager
     protected KafkaConsumer<byte[], byte[]> consumer;
     protected KafkaConfig config;
     private ExecutorService executor;
+    private boolean infiniteLoop = true;
 
     @Inject
     public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
@@ -93,6 +96,7 @@ public class KafkaWorkerManager
     {
         consumer = new KafkaConsumer(createConsumerConfig(config));
         consumer.subscribe(Arrays.asList(config.getTopic()));
+
     }
 
     @PostConstruct
@@ -133,6 +137,10 @@ public class KafkaWorkerManager
                                 });
                             }
                         }
+                    }
+                    catch (UncheckedIOException e){
+                        log.error(e.getMessage());
+                        infiniteLoop = false;
                     }
                     catch (Throwable e) {
                         log.error(e, "Error processing Kafka records, passing record to latest offset.");
@@ -211,7 +219,7 @@ public class KafkaWorkerManager
         props.put("enable.auto.commit", "false");
         props.put("auto.offset.reset", offset);
         props.put("session.timeout.ms", sessionTimeOut);
-        props.put("heartbeat.interval.ms", "1000");
+        props.put("heartbeat.interval.ms", "100");
         props.put("request.timeout.ms", requestTimeOut);
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");

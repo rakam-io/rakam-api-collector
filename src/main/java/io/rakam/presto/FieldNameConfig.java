@@ -62,6 +62,16 @@ public class FieldNameConfig
         return this;
     }
 
+    @Config("database.whitelisted.collections")
+    public FieldNameConfig setWhitelistedCollections(String collections)
+    {
+        if (collections != null) {
+            collections = collections.replaceAll("\\s+", "");
+            this.whitelistedCollections = new HashSet<>(Arrays.asList(collections.split(",")));
+        }
+        return this;
+    }
+
     public String getCheckpointField()
     {
         return checkpointField;
@@ -86,6 +96,8 @@ public class FieldNameConfig
     {
         return excludedColumns;
     }
+
+    public Set<String> getWhitelistedCollections() {return whitelistedCollections;}
 
     public enum UserType
     {

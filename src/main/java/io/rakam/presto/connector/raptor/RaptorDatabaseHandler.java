@@ -108,16 +108,19 @@ public class RaptorDatabaseHandler
                 new DatabaseMetadataModule(),
                 ImmutableMap.of("s3", new S3BackupStoreModule()));
 
+
+
         ImmutableMap.Builder<String, String> props = ImmutableMap.<String, String>builder()
                 .put("metadata.db.type", "mysql")
                 .put("metadata.db.url", config.getMetadataUrl())
                 .put("storage.data-directory", config.getDataDirectory().getAbsolutePath())
-                .put("metadata.db.connections.max", "200")
+                .put("metadata.db.connections.max", config.getDbMaxConnections())
                 .put("storage.compaction-enabled", "false")
                 .put("storage.max-recovery-threads", "1")
                 .put("storage.missing-shard-discovery-interval", "999999d")
                 .put("storage.organization-enabled", "false")
-                .put("backup.timeout", "20m");
+                .put("backup.timeout", "20m")
+                .put("backup.threads",config.getBackupThreads());
 
         if (s3BackupConfig.getS3Bucket() != null) {
             props.put("backup.provider", "s3");
@@ -261,7 +264,10 @@ public class RaptorDatabaseHandler
             @Override
             public CompletableFuture<Void> commit()
             {
+                long startTime = System.currentTimeMillis();
                 CompletableFuture<Collection<Slice>> finish = pageSink.finish();
+                long endTime = System.currentTimeMillis();
+                log.info("Page Sink: "+ (endTime-startTime));
                 return finish.thenAccept(slices -> connectorMetadata.finishInsert(session, insertTableHandle, slices));
             }
         };
