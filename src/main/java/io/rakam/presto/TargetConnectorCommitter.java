@@ -76,7 +76,7 @@ public class TargetConnectorCommitter
                 insert.addPage(tableData.page);
             }
         }
-        log.info("size in Bytes: " + (size));
+        log.info(size + " bytes written for table: " + table.getTableName());
         return insert.commit();
     }
 }
