@@ -125,7 +125,7 @@ public class KafkaWorkerManager
                             Table<String, String, TableData> convert = flushStream();
                             long conversionEndTime = System.currentTimeMillis();
                             middlewareBuffer.add(new BatchRecords(convert, createCheckpointer(findLatestRecord(records))));
-                            log.info("----Conversion time: " + (conversionEndTime - conversionEndTime) + " for records: " + recordCount);
+                            log.info("----Conversion time: " + (conversionEndTime - startTime) + " for records: " + recordCount);
                             recordCount = 0;
                         }
 
