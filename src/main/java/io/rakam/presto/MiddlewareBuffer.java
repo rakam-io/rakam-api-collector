@@ -7,7 +7,6 @@ package io.rakam.presto;
 import com.facebook.presto.spi.Page;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
-import io.airlift.units.DataSize;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +45,7 @@ public class MiddlewareBuffer
 
     public synchronized List<BatchRecords> flush()
     {
+        System.out.println("total records: " + bufferRecordCount + " total bytes: " + bufferSize);
         ImmutableList<BatchRecords> flushed = ImmutableList.copyOf(batches);
         batches.clear();
         bufferSize = new AtomicLong();
