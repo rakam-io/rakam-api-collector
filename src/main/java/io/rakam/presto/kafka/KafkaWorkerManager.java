@@ -106,7 +106,7 @@ public class KafkaWorkerManager
                             Map<SchemaTableName, TableData> convert = context.convert(records.getKey(), records.getValue());
                             buffer.clear();
 
-                            middlewareBuffer.add(new BatchRecords(convert, createCheckpointer(findLatestRecord(records))));
+                            middlewareBuffer.add(new BatchRecords(convert, () -> commitSyncOffset(findLatestRecord(records))));
                         }
 
                         Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.flush();
@@ -145,16 +145,6 @@ public class KafkaWorkerManager
         return pages;
     }
 
-    private BatchRecords.Checkpointer createCheckpointer(ConsumerRecord record) {
-        return new BatchRecords.Checkpointer() {
-            @Override
-            public void checkpoint()
-                    throws BatchRecords.CheckpointException {
-                commitSyncOffset(record);
-            }
-        };
-    }
-
     public void commitSyncOffset(ConsumerRecord record) {
         if (record == null) {
             consumer.commitSync();
@@ -167,7 +157,6 @@ public class KafkaWorkerManager
 
     protected static Properties createConsumerConfig(KafkaConfig config) {
         String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
-        String zkNodes = config.getZookeeperNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
         String offset = config.getOffset();
         String groupId = config.getGroupId();
         String sessionTimeOut = config.getSessionTimeOut();
@@ -176,11 +165,6 @@ public class KafkaWorkerManager
         Properties props = new Properties();
         props.put("bootstrap.servers", kafkaNodes);
         props.put("group.id", groupId);
-        //props.put("zookeeper.connect", zkNodes);
-        //props.put("zookeeper.session.timeout.ms", "400");
-        //props.put("zookeeper.sync.time.ms", "200");
-        //props.put("offsets.storage", "kafka");
-        //props.put("consumer.timeout.ms", "10");
         props.put("enable.auto.commit", "false");
         props.put("auto.offset.reset", offset);
         props.put("session.timeout.ms", sessionTimeOut);

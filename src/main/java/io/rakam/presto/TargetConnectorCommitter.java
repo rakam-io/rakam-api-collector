@@ -5,21 +5,31 @@
 package io.rakam.presto;
 
 import com.facebook.presto.spi.SchemaTableName;
+import com.nurkiewicz.asyncretry.AsyncRetryExecutor;
 import io.airlift.log.Logger;
-import io.airlift.units.Duration;
 
 import javax.inject.Inject;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class TargetConnectorCommitter {
     private static final Logger log = Logger.get(TargetConnectorCommitter.class);
     private final DatabaseHandler databaseHandler;
+    private final AsyncRetryExecutor executor;
 
     @Inject
     public TargetConnectorCommitter(DatabaseHandler databaseHandler) {
         this.databaseHandler = databaseHandler;
+
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        executor = new AsyncRetryExecutor(scheduler).
+                firstRetryNoDelay().
+                withExponentialBackoff(500, 2).
+                withMaxDelay(10_000).
+                withUniformJitter().
+                withMaxRetries(5);
     }
 
     private CompletableFuture<Void> commit(List<MiddlewareBuffer.TableCheckpoint> batches, SchemaTableName table) {
@@ -32,20 +42,21 @@ public class TargetConnectorCommitter {
         return insert.commit();
     }
 
-    public void process(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> value) {
-        try {
-            RetryDriver.retry().maxAttempts(5)
-                    .stopOn(InterruptedException.class)
-                    .exponentialBackoff(
-                            new Duration(1, TimeUnit.SECONDS),
-                            new Duration(1, TimeUnit.MINUTES),
-                            new Duration(1, TimeUnit.MILLISECONDS), 2.0)
-                    .onRetry(() -> log.warn("Retrying to save data"))
-                    .run("middlewareConnector", () -> commit(value, table).join());
-        } catch (Exception e) {
-            log.error(e, "Unable to commit table %s.", table);
-        }
+    private CompletableFuture<Void> processInternal(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> value) {
+        return commit(value, table).thenRun(() -> checkpoint(value));
+    }
 
+    public void process(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> value) {
+        executor.getFutureWithRetry(retryContext -> processInternal(table, value)).whenComplete((aVoid, throwable) -> {
+            if (throwable != null) {
+                log.error(throwable, "Error while processing records");
+                // TODO: What should we do if we can't process the data?
+                checkpoint(value);
+            }
+        });
+    }
+
+    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value) {
         for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
             try {
                 tableCheckpoint.checkpoint();
