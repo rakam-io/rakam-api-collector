@@ -4,6 +4,8 @@
 
 package io.rakam.presto;
 
+import com.facebook.presto.orc.stream.OrcInputStream;
+import com.facebook.presto.raptor.backup.BackupConfig;
 import com.google.inject.Binder;
 import com.google.inject.Injector;
 import com.google.inject.Scopes;
@@ -13,6 +15,7 @@ import io.airlift.log.Logger;
 import io.rakam.presto.connector.raptor.RaptorModule;
 import io.rakam.presto.kafka.KafkaStreamSourceModule;
 import io.rakam.presto.kinesis.KinesisStreamSourceModule;
+import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -82,6 +85,7 @@ public final class ServiceStarter
         protected void setup(Binder binder)
         {
             configBinder(binder).bindConfig(StreamConfig.class);
+            configBinder(binder).bindConfig(BackupConfig.class);
             configBinder(binder).bindConfig(FieldNameConfig.class);
             configBinder(binder).bindConfig(S3MiddlewareConfig.class);
             configBinder(binder).bindConfig(MiddlewareConfig.class);

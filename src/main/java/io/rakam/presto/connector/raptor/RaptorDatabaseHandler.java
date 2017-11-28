@@ -18,9 +18,12 @@ import com.facebook.presto.raptor.RaptorConnectorFactory;
 import com.facebook.presto.raptor.RaptorModule;
 import com.facebook.presto.raptor.backup.BackupModule;
 import com.facebook.presto.raptor.metadata.DatabaseMetadataModule;
-import com.facebook.presto.raptor.storage.*;
-import com.facebook.presto.raptor.storage.backup.S3BackupStoreModule;
+import com.facebook.presto.raptor.storage.InMemoryFileSystem;
+import com.facebook.presto.raptor.storage.InMemoryOrcStorageManager;
+import com.facebook.presto.raptor.storage.StorageManager;
+import com.facebook.presto.raptor.storage.StorageModule;
 import com.facebook.presto.raptor.storage.backup.RemoteBackupManager;
+import com.facebook.presto.raptor.storage.backup.S3BackupStoreModule;
 import com.facebook.presto.raptor.util.RebindSafeMBeanServer;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorInsertTableHandle;
@@ -95,7 +98,8 @@ import static java.util.Locale.ENGLISH;
 import static org.rakam.presto.analysis.PrestoQueryExecution.fromPrestoType;
 
 public class RaptorDatabaseHandler
-        implements DatabaseHandler {
+        implements DatabaseHandler
+{
     private static final Logger log = Logger.get(RaptorDatabaseHandler.class);
 
     private static final String RAKAM_RAPTOR_CONNECTOR = "RAKAM_RAPTOR_CONNECTOR";
@@ -107,16 +111,19 @@ public class RaptorDatabaseHandler
     private final Supplier<ConnectorMetadata> writeMetadata;
 
     @Inject
-    public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig) {
+    public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig)
+    {
         DatabaseMetadataModule metadataModule = new DatabaseMetadataModule();
         ImmutableMap<String, Module> backupProviders = ImmutableMap.of("s3", new S3BackupStoreModule());
 
         RaptorConnectorFactory raptorConnectorFactory = new RaptorConnectorFactory(
                 RAKAM_RAPTOR_CONNECTOR,
                 metadataModule,
-                backupProviders) {
+                backupProviders)
+        {
             @Override
-            public Connector create(String connectorId, Map<String, String> config, ConnectorContext context) {
+            public Connector create(String connectorId, Map<String, String> config, ConnectorContext context)
+            {
                 NodeManager nodeManager = context.getNodeManager();
                 try {
                     Bootstrap app = new Bootstrap(
@@ -144,7 +151,8 @@ public class RaptorDatabaseHandler
                             .initialize();
 
                     return injector.getInstance(RaptorConnector.class);
-                } catch (Exception e) {
+                }
+                catch (Exception e) {
                     throw Throwables.propagate(e);
                 }
             }
@@ -154,12 +162,13 @@ public class RaptorDatabaseHandler
                 .put("metadata.db.type", "mysql")
                 .put("metadata.db.url", config.getMetadataUrl())
                 .put("storage.data-directory", config.getDataDirectory().getAbsolutePath())
-                .put("metadata.db.connections.max", "200")
+                .put("metadata.db.connections.max", config.getDbMaxConnections())
                 .put("storage.compaction-enabled", "false")
                 .put("storage.max-recovery-threads", "1")
                 .put("storage.missing-shard-discovery-interval", "999999d")
                 .put("storage.organization-enabled", "false")
-                .put("backup.timeout", "20m");
+                .put("backup.timeout", "20m")
+                .put("backup.threads", config.getBackupThreads());
 
         if (s3BackupConfig.getS3Bucket() != null) {
             props.put("backup.provider", "s3");
@@ -177,10 +186,12 @@ public class RaptorDatabaseHandler
             if (s3BackupConfig.getEndpoint() != null) {
                 props.put("aws.s3-endpoint", s3BackupConfig.getEndpoint());
             }
-        } else {
-            log.warn("------------");
-            log.warn("THE BACKUP IS NOT ENABLED! YOU WILL LOSE DATA IF THIS NODE DIES!!!!!");
-            log.warn("------------");
+        }
+        else {
+            throw new RuntimeException("THE BACKUP IS NOT ENABLED!");
+//            log.warn("------------");
+//            log.warn("THE BACKUP IS NOT ENABLED! YOU WILL LOSE DATA IF THIS NODE DIES!!!!!");
+//            log.warn("------------");
         }
 
         ImmutableMap<String, String> properties = props.build();
@@ -224,12 +235,14 @@ public class RaptorDatabaseHandler
                 String[] split = elem.split("=", 2);
                 if (split[0].equals("user")) {
                     jdbcConfig.setUsername(URLDecoder.decode(split[1], "UTF-8"));
-                } else if (split[0].equals("password")) {
+                }
+                else if (split[0].equals("password")) {
                     jdbcConfig.setPassword(URLDecoder.decode(split[1], "UTF-8"));
                 }
             }
             jdbcConfig.setUrl(config.getMetadataUrl());
-        } catch (URISyntaxException | UnsupportedEncodingException e) {
+        }
+        catch (URISyntaxException | UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
 
@@ -243,13 +256,15 @@ public class RaptorDatabaseHandler
                     new EventBus(), new ProjectConfig()
                     .setTimeColumn(fieldNameConfig.getTimeField())
                     .setUserColumn(fieldNameConfig.getUserFieldName()), prestoConfig);
-        } else {
+        }
+        else {
             metastore = null;
         }
     }
 
     @Override
-    public List<ColumnMetadata> getColumns(String schema, String table) {
+    public List<ColumnMetadata> getColumns(String schema, String table)
+    {
         Map<SchemaTableName, List<ColumnMetadata>> schemaTableNameListMap =
                 metadata.listTableColumns(session, new SchemaTablePrefix(schema, table));
         List<ColumnMetadata> columnMetadatas = schemaTableNameListMap.get(new SchemaTableName(schema, table));
@@ -261,7 +276,8 @@ public class RaptorDatabaseHandler
     }
 
     @Override
-    public List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns) {
+    public List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns)
+    {
         if (metastore == null) {
             throw new IllegalStateException();
         }
@@ -278,7 +294,8 @@ public class RaptorDatabaseHandler
     }
 
     @Override
-    public Inserter insert(String schema, String table) {
+    public Inserter insert(String schema, String table)
+    {
         // 2 Mysql queries
         ConnectorTableHandle tableHandle = metadata.getTableHandle(session, new SchemaTableName(schema, table));
         ConnectorMetadata connectorMetadata = writeMetadata.get();
@@ -287,16 +304,22 @@ public class RaptorDatabaseHandler
 
         ConnectorPageSink pageSink = pageSinkProvider.createPageSink(connectorTransactionHandle, session, insertTableHandle);
 
-        return new Inserter() {
+        return new Inserter()
+        {
             @Override
-            public void addPage(Page page) {
+            public void addPage(Page page)
+            {
                 pageSink.appendPage(page);
             }
 
             @Override
-            public CompletableFuture<Void> commit() {
+            public CompletableFuture<Void> commit()
+            {
+                long startTime = System.currentTimeMillis();
                 CompletableFuture<Collection<Slice>> finish = pageSink.finish();
                 finish.join();
+                long endTime = System.currentTimeMillis();
+                log.info("Page Sink: " + (endTime - startTime));
                 return finish.thenAccept(slices ->
                         // 6 mysql insert queries
                         connectorMetadata.finishInsert(session, insertTableHandle, slices));
@@ -305,59 +328,71 @@ public class RaptorDatabaseHandler
     }
 
     private static class ProxyConnectorContext
-            implements ConnectorContext {
+            implements ConnectorContext
+    {
         private final NodeManager nodeManager;
         private final TypeRegistry typeRegistry;
         private final PagesIndexPageSorter pageSorter;
 
-        public ProxyConnectorContext(NodeManager nodeManager, TypeRegistry typeRegistry, PagesIndexPageSorter pageSorter) {
+        public ProxyConnectorContext(NodeManager nodeManager, TypeRegistry typeRegistry, PagesIndexPageSorter pageSorter)
+        {
             this.nodeManager = nodeManager;
             this.typeRegistry = typeRegistry;
             this.pageSorter = pageSorter;
         }
 
-        public NodeManager getNodeManager() {
+        public NodeManager getNodeManager()
+        {
             return nodeManager;
         }
 
-        public TypeManager getTypeManager() {
+        public TypeManager getTypeManager()
+        {
             return typeRegistry;
         }
 
-        public PageSorter getPageSorter() {
+        public PageSorter getPageSorter()
+        {
             return pageSorter;
         }
 
-        public PageIndexerFactory getPageIndexerFactory() {
+        public PageIndexerFactory getPageIndexerFactory()
+        {
             throw new UnsupportedOperationException();
         }
     }
 
     private static class SingleNodeManager
-            implements NodeManager {
+            implements NodeManager
+    {
         private final PrestoNode prestoNode;
 
-        public SingleNodeManager(String nodeIdentifier) {
+        public SingleNodeManager(String nodeIdentifier)
+        {
             this.prestoNode = new PrestoNode(nodeIdentifier, URI.create("http://127.0.0.1:8080"), NodeVersion.UNKNOWN, false);
         }
 
         @Override
-        public Set<Node> getAllNodes() {
+        public Set<Node> getAllNodes()
+        {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public Set<Node> getWorkerNodes() {
+        public Set<Node> getWorkerNodes()
+        {
             return ImmutableSet.of();
         }
 
         @Override
-        public Node getCurrentNode() {
+        public Node getCurrentNode()
+        {
             return prestoNode;
         }
 
         @Override
-        public String getEnvironment() {
+        public String getEnvironment()
+        {
             throw new UnsupportedOperationException();
         }
     }

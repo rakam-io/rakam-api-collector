@@ -153,6 +153,7 @@ public class StressTest {
                 AtomicLong totalRecord = new AtomicLong(-1);
                 AtomicLong lastPoll = new AtomicLong(System.currentTimeMillis());
                 consumer = new KafkaConsumer(createConsumerConfig(config)) {
+
                     @Override
                     public ConsumerRecords poll(long timeout) {
 

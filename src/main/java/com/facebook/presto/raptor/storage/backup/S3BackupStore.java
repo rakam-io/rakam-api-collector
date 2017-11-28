@@ -61,7 +61,9 @@ public class S3BackupStore implements BackupStore {
             objectMetadata.setContentLength(slice.length());
             objectMetadata.setContentMD5(Base64.getEncoder().encodeToString(md5.digest()));
             this.s3Client.putObject(this.config.getS3Bucket(), uuid.toString(), slice.getInput(), objectMetadata);
+
         } catch (Exception ex) {
+            ex.printStackTrace();
             throw new PrestoException(RaptorErrorCode.RAPTOR_BACKUP_ERROR, "Failed to create backup shard file on S3", ex);
         }
 
