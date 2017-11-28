@@ -18,10 +18,10 @@ import java.util.Set;
 public class FieldNameConfig
 {
     private String checkpointField = "_shard_time";
-    private String userFieldName = "_user";
+    private String userFieldName = "_actor";
     private String timeField = "_time";
     private Set<String> excludedColumns = new HashSet<>();
-
+    private Set<String> whitelistedCollections = new HashSet<>();
     private UserType userFieldType = UserType.STRING;
 
     @Config("database.checkpoint-field")
@@ -62,6 +62,16 @@ public class FieldNameConfig
         return this;
     }
 
+    @Config("database.whitelisted.collections")
+    public FieldNameConfig setWhitelistedCollections(String collections)
+    {
+        if (collections != null) {
+            collections = collections.replaceAll("\\s+", "");
+            this.whitelistedCollections = new HashSet<>(Arrays.asList(collections.split(",")));
+        }
+        return this;
+    }
+
     public String getCheckpointField()
     {
         return checkpointField;
@@ -86,6 +96,8 @@ public class FieldNameConfig
     {
         return excludedColumns;
     }
+
+    public Set<String> getWhitelistedCollections() {return whitelistedCollections;}
 
     public enum UserType
     {

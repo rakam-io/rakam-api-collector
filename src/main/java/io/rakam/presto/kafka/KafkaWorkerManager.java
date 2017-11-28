@@ -29,6 +29,7 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -40,7 +41,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class KafkaWorkerManager
-        implements Watcher {
+        implements Watcher
+{
     private static final Logger log = Logger.get(KafkaWorkerManager.class);
 
     private final StreamWorkerContext<ConsumerRecord> context;
@@ -50,9 +52,12 @@ public class KafkaWorkerManager
     protected KafkaConsumer<byte[], byte[]> consumer;
     protected KafkaConfig config;
     private ExecutorService executor;
+    private boolean infiniteLoop = true;
+    private int recordCount = 0;
 
     @Inject
-    public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer) {
+    public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
+    {
         this.config = config;
         this.context = context;
         this.committer = committer;
@@ -61,12 +66,14 @@ public class KafkaWorkerManager
         this.executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("kafka-topic-consumer").build());
     }
 
-    public ExecutorService getExecutor() {
+    public ExecutorService getExecutor()
+    {
         return executor;
     }
 
     @PreDestroy
-    public void shutdown() {
+    public void shutdown()
+    {
         context.shutdown();
         if (consumer != null) {
             consumer.close();
@@ -78,56 +85,77 @@ public class KafkaWorkerManager
             if (!executor.awaitTermination(5000, TimeUnit.MILLISECONDS)) {
                 log.warn("Timed out waiting for consumer threads to shut down, exiting uncleanly");
             }
-        } catch (InterruptedException e) {
+        }
+        catch (InterruptedException e) {
             log.warn("Interrupted during shutdown, exiting uncleanly");
         }
     }
 
-    public void subscribe() {
+    public void subscribe()
+    {
         consumer = new KafkaConsumer(createConsumerConfig(config));
         consumer.subscribe(Arrays.asList(config.getTopic()));
     }
 
     @PostConstruct
-    public void run() {
+    public void run()
+    {
         subscribe();
-
+        long startTime = System.currentTimeMillis();
         try {
-            while (true) {
+            while (infiniteLoop) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
+                long endTime = System.currentTimeMillis();
+                if ((endTime - startTime) > 1000) {
+                    //log.info("---- poll duration: " + (endTime - startTime));
+                }
+
+                startTime = endTime;
+                recordCount += kafkaRecord.count();
                 for (ConsumerRecord<byte[], byte[]> record : kafkaRecord) {
                     buffer.consumeRecord(record, record.value().length);
                 }
+
                 if (buffer.shouldFlush()) {
                     try {
                         Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> records = buffer.getRecords();
 
                         if (!records.getValue().isEmpty() || !records.getKey().isEmpty()) {
                             Map<SchemaTableName, TableData> convert = context.convert(records.getKey(), records.getValue());
-                            buffer.clear();
-
+                            long conversionEndTime = System.currentTimeMillis();
                             middlewareBuffer.add(new BatchRecords(convert, () -> commitSyncOffset(findLatestRecord(records))));
+                            log.debug("----Conversion time: " + (conversionEndTime - startTime) + " for records: " + recordCount);
+                            recordCount = 0;
                         }
 
+                        buffer.clear();
                         Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.flush();
-
                         if (!map.isEmpty()) {
+                            log.info("total available tables: " + map.size());
                             for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
+                                log.debug("committing data for table: " + entry.getKey().getTableName());
                                 committer.process(entry.getKey(), entry.getValue());
                             }
                         }
-                    } catch (Throwable e) {
+                    }
+                    catch (UncheckedIOException e) {
+                        log.error(e.getMessage());
+                        infiniteLoop = false;
+                    }
+                    catch (Throwable e) {
                         log.error(e, "Error processing Kafka records, passing record to latest offset.");
                         commitSyncOffset(null);
                     }
                 }
             }
-        } finally {
+        }
+        finally {
             consumer.close();
         }
     }
 
-    private Map<SchemaTableName, TableData> flushStream() {
+    private Map<SchemaTableName, TableData> flushStream()
+    {
         Map<SchemaTableName, TableData> pages;
         try {
             Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> list = buffer.getRecords();
@@ -137,7 +165,8 @@ public class KafkaWorkerManager
             }
 
             pages = context.convert(list.getKey(), list.getValue());
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             throw new RuntimeException(e);
         }
 
@@ -145,17 +174,20 @@ public class KafkaWorkerManager
         return pages;
     }
 
-    public void commitSyncOffset(ConsumerRecord record) {
+    public void commitSyncOffset(ConsumerRecord record)
+    {
         if (record == null) {
             consumer.commitSync();
-        } else {
+        }
+        else {
             Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
             offsets.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1));
             consumer.commitSync(offsets);
         }
     }
 
-    protected static Properties createConsumerConfig(KafkaConfig config) {
+    protected static Properties createConsumerConfig(KafkaConfig config)
+    {
         String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
         String offset = config.getOffset();
         String groupId = config.getGroupId();
@@ -168,21 +200,23 @@ public class KafkaWorkerManager
         props.put("enable.auto.commit", "false");
         props.put("auto.offset.reset", offset);
         props.put("session.timeout.ms", sessionTimeOut);
-        props.put("heartbeat.interval.ms", "1000");
+        props.put("heartbeat.interval.ms", "100");
         props.put("request.timeout.ms", requestTimeOut);
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         return props;
     }
 
-    private ConsumerRecord findLatestRecord(Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> records) {
+    private ConsumerRecord findLatestRecord(Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> records)
+    {
         ConsumerRecord lastSingleRecord = records.getKey().isEmpty() ? null : records.getKey().get(records.getKey().size() - 1);
         ConsumerRecord lastBatchRecord = records.getValue().isEmpty() ? null : records.getValue().get(records.getValue().size() - 1);
 
         ConsumerRecord lastRecord;
         if (lastBatchRecord != null && lastSingleRecord != null) {
             lastRecord = lastBatchRecord.offset() > lastBatchRecord.offset() ? lastBatchRecord : lastSingleRecord;
-        } else {
+        }
+        else {
             lastRecord = lastBatchRecord != null ? lastBatchRecord : lastSingleRecord;
         }
 
@@ -190,7 +224,8 @@ public class KafkaWorkerManager
     }
 
     @Override
-    public void process(WatchedEvent event) {
+    public void process(WatchedEvent event)
+    {
         switch (event.getType()) {
             case NodeChildrenChanged:
                 break;

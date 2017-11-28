@@ -121,12 +121,8 @@ public class FabricJsonDeserializer implements JsonDeserializer
             throw new IllegalArgumentException("Invalid json");
         }
         for (; ; t = jp.nextToken()) {
-
-            if (JsonToken.FIELD_NAME.equals(t)) {
+            if (JsonToken.FIELD_NAME.equals(t) && jp.getCurrentName().equals("data")) {
                 t = jp.nextToken();
-            }
-
-            if (jp.getCurrentName().equals("data")) {
                 if (t != START_OBJECT) {
                     throw new IllegalArgumentException("data must be an object");
                 }
@@ -143,6 +139,7 @@ public class FabricJsonDeserializer implements JsonDeserializer
                 break;
             }
 
+            //get value
             t = jp.nextToken();
             String fieldName = jp.getCurrentName();
             switch (fieldName) {
@@ -378,6 +375,7 @@ public class FabricJsonDeserializer implements JsonDeserializer
                     }
                     break;
                 default:
+                    blockBuilder.appendNull();
                     throw new JsonMappingException(jp,
                             format("Scalar value '%s' cannot be cast to %s type for '%s' field.", jp.getValueAsString(),
                                     type.name(), field.getName()));
