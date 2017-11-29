@@ -13,11 +13,13 @@ import com.facebook.presto.raptor.backup.BackupStore;
 import com.facebook.presto.raptor.storage.InMemoryFileSystem;
 import com.facebook.presto.spi.PrestoException;
 import io.airlift.log.Logger;
+import io.airlift.slice.BasicSliceInput;
 import io.airlift.slice.Slice;
-import io.airlift.units.DataSize;
 
 import javax.inject.Inject;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
@@ -60,7 +62,9 @@ public class S3BackupStore implements BackupStore {
             ObjectMetadata objectMetadata = new ObjectMetadata();
             objectMetadata.setContentLength(slice.length());
             objectMetadata.setContentMD5(Base64.getEncoder().encodeToString(md5.digest()));
-            this.s3Client.putObject(this.config.getS3Bucket(), uuid.toString(), slice.getInput(), objectMetadata);
+            SafeSliceInputStream input = new SafeSliceInputStream(slice.getInput());
+            this.s3Client.putObject(this.config.getS3Bucket(), uuid.toString(), input, objectMetadata);
+            input.close();
         } catch (Exception ex) {
             throw new PrestoException(RaptorErrorCode.RAPTOR_BACKUP_ERROR, "Failed to create backup shard file on S3", ex);
         }
@@ -86,6 +90,50 @@ public class S3BackupStore implements BackupStore {
             } else {
                 throw var3;
             }
+        }
+    }
+
+    private class SafeSliceInputStream extends InputStream {
+        private final BasicSliceInput sliceInput;
+
+        public SafeSliceInputStream(BasicSliceInput sliceInput) {
+            this.sliceInput = sliceInput;
+        }
+
+        public int read() throws IOException {
+            return this.sliceInput.read();
+        }
+
+        public int read(byte[] b) throws IOException {
+            return this.sliceInput.read(b);
+        }
+
+        public int read(byte[] b, int off, int len) throws IOException {
+            return this.sliceInput.read(b, off, len);
+        }
+
+        public long skip(long n) throws IOException {
+            return this.sliceInput.skip(n);
+        }
+
+        public int available() throws IOException {
+            return this.sliceInput.available();
+        }
+
+        public void close() throws IOException {
+            this.sliceInput.close();
+        }
+
+        public synchronized void mark(int readlimit) {
+            throw new RuntimeException("mark/reset not supported");
+        }
+
+        public synchronized void reset() throws IOException {
+            throw new IOException("mark/reset not supported");
+        }
+
+        public boolean markSupported() {
+            return false;
         }
     }
 }
