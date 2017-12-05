@@ -75,7 +75,9 @@ public class KafkaWorkerManager
     public void shutdown()
     {
         context.shutdown();
+        System.out.println("shutdown: " + System.currentTimeMillis());
         if (consumer != null) {
+            System.out.println("shutdown: " + System.currentTimeMillis());
             consumer.close();
         }
         if (executor != null) {
@@ -97,6 +99,8 @@ public class KafkaWorkerManager
         consumer.subscribe(Arrays.asList(config.getTopic()));
     }
 
+
+
     @PostConstruct
     public void run()
     {
@@ -104,7 +108,8 @@ public class KafkaWorkerManager
         long startTime = System.currentTimeMillis();
         try {
             while (infiniteLoop) {
-                ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
+
+                ConsumerRecords<byte[], byte[]> kafkaRecord = getRecords();
                 long endTime = System.currentTimeMillis();
                 if ((endTime - startTime) > 1000) {
                     //log.info("---- poll duration: " + (endTime - startTime));
@@ -139,7 +144,7 @@ public class KafkaWorkerManager
                         }
                     }
                     catch (UncheckedIOException e) {
-                        log.error(e.getMessage());
+                        log.error("Unchecked Exception: " + e.getMessage());
                         infiniteLoop = false;
                     }
                     catch (Throwable e) {
@@ -150,7 +155,8 @@ public class KafkaWorkerManager
             }
         }
         finally {
-            consumer.close();
+            System.out.println("finally: " + System.currentTimeMillis());
+            //consumer.close();
         }
     }
 
@@ -174,7 +180,12 @@ public class KafkaWorkerManager
         return pages;
     }
 
-    public void commitSyncOffset(ConsumerRecord record)
+    private synchronized ConsumerRecords<byte[], byte[]> getRecords()
+    {
+        return consumer.poll(5);
+    }
+
+    public synchronized void commitSyncOffset(ConsumerRecord record)
     {
         if (record == null) {
             consumer.commitSync();
