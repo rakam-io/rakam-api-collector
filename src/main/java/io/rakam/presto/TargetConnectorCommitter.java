@@ -12,7 +12,6 @@ import javax.inject.Inject;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -27,6 +26,7 @@ public class TargetConnectorCommitter
     {
         this.databaseHandler = databaseHandler;
 
+        //ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
         executor = new AsyncRetryExecutor(scheduler).
                 firstRetryNoDelay().
@@ -55,23 +55,13 @@ public class TargetConnectorCommitter
 
     public void process(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> value)
     {
-
-        try {
-            processInternal(table, value).get();
-        }
-        catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        catch (ExecutionException e) {
-            e.printStackTrace();
-        }
-        /*executor.getFutureWithRetry(retryContext -> processInternal(table, value)).whenComplete((aVoid, throwable) -> {
+        executor.getFutureWithRetry(retryContext -> processInternal(table, value)).whenComplete((aVoid, throwable) -> {
             if (throwable != null) {
                 log.error(throwable, "Error while processing records");
                 // TODO: What should we do if we can't process the data?
                 checkpoint(value);
             }
-        });*/
+        });
     }
 
     public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value)
