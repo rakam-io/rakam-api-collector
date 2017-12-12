@@ -44,7 +44,7 @@ public abstract class MessageEventTransformer<T, C>
 
     public abstract byte[] getData(T record);
 
-    public abstract Table<String, String, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
+    public abstract Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
             throws IOException;
 
     protected PageReader generatePageBuilder(String project, String collection)

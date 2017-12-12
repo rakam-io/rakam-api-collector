@@ -6,11 +6,13 @@ package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
 
 import javax.validation.constraints.Size;
 
+import java.util.List;
 import java.util.Set;
 
 import static com.google.common.collect.Iterables.transform;
@@ -29,9 +31,9 @@ public class KafkaConfig
     private String sessionTimeOut = "12000";
     private String requestTimeOut = "15000";
 
-    public String[] getTopic()
+    public List<String> getTopic()
     {
-        return topic;
+        return ImmutableList.copyOf(topic);
     }
 
     public String getOffset()

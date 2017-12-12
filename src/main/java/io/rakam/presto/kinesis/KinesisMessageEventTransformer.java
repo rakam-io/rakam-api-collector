@@ -57,7 +57,7 @@ public class KinesisMessageEventTransformer
         } else
         if (dataFormatType == 2) {
             if (decoder == null) {
-                decoder = DecoderFactory.get().binaryDecoder(array, decoder);
+                decoder = DecoderFactory.get().binaryDecoder(array, null);
             }
             collection = decoder.readString();
         }

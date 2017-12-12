@@ -20,7 +20,7 @@ import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 public abstract class PageReader<T>
 {
     private final PageReaderDeserializer<T> datumReader;
-    private final String checkpointColumn;
+    protected final String checkpointColumn;
     private List<ColumnMetadata> expectedSchema;
     private List<ColumnMetadata> actualSchema;
     private PageBuilder pageBuilder;
