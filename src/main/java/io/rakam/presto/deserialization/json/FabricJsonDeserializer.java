@@ -156,6 +156,9 @@ public class FabricJsonDeserializer implements JsonDeserializer
                 case "_collection":
                     collection = checkCollectionValid(jp.getValueAsString());
                     break;
+                default:
+                    // TODO: what to do?
+                    break;
             }
         }
     }

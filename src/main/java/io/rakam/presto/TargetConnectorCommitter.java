@@ -4,68 +4,65 @@
 
 package io.rakam.presto;
 
-import com.facebook.presto.spi.ColumnMetadata;
-import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.SchemaTableName;
-import com.facebook.presto.spi.block.Block;
-import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.block.BlockBuilderStatus;
-import com.google.common.collect.Table;
+import com.nurkiewicz.asyncretry.AsyncRetryExecutor;
 import io.airlift.log.Logger;
-import io.airlift.units.Duration;
-import io.rakam.presto.deserialization.TableData;
 
 import javax.inject.Inject;
-
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.StreamSupport;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
-public class TargetConnectorCommitter
-{
+public class TargetConnectorCommitter {
     private static final Logger log = Logger.get(TargetConnectorCommitter.class);
     private final DatabaseHandler databaseHandler;
+    private final AsyncRetryExecutor executor;
 
     @Inject
-    public TargetConnectorCommitter(DatabaseHandler databaseHandler)
-    {
+    public TargetConnectorCommitter(DatabaseHandler databaseHandler) {
         this.databaseHandler = databaseHandler;
+
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        executor = new AsyncRetryExecutor(scheduler).
+                firstRetryNoDelay().
+                withExponentialBackoff(500, 2).
+                withMaxDelay(10_000).
+                withUniformJitter().
+                withMaxRetries(5);
     }
 
-    public void process(Iterable<Table<String, String, TableData>> batches)
-    {
-        StreamSupport.stream(batches.spliterator(), false).flatMap(t -> t.cellSet().stream()
-                .map(b -> new SchemaTableName(b.getRowKey(), b.getColumnKey()))).distinct().forEach(table -> {
+    private CompletableFuture<Void> commit(List<MiddlewareBuffer.TableCheckpoint> batches, SchemaTableName table) {
+        DatabaseHandler.Inserter insert = databaseHandler.insert(table.getSchemaName(), table.getTableName());
 
-            try {
-                RetryDriver.retry().maxAttempts(5)
-                        .stopOn(InterruptedException.class)
-                        .exponentialBackoff(
-                                new Duration(1, TimeUnit.SECONDS),
-                                new Duration(1, TimeUnit.MINUTES),
-                                new Duration(1, TimeUnit.MILLISECONDS), 2.0)
-                        .onRetry(() -> log.warn("Retrying to save data"))
-                        .run("middlewareConnector", () -> commit(batches, table).join());
-            }
-            catch (Exception e) {
-                log.error(e, "Unable to commit table %s.", table);
+        for (MiddlewareBuffer.TableCheckpoint batch : batches) {
+            insert.addPage(batch.getTable().page);
+        }
+
+        return insert.commit();
+    }
+
+    private CompletableFuture<Void> processInternal(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> value) {
+        return commit(value, table).thenRun(() -> checkpoint(value));
+    }
+
+    public void process(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> value) {
+        executor.getFutureWithRetry(retryContext -> processInternal(table, value)).whenComplete((aVoid, throwable) -> {
+            if (throwable != null) {
+                log.error(throwable, "Error while processing records");
+                // TODO: What should we do if we can't process the data?
+                checkpoint(value);
             }
         });
     }
 
-    private CompletableFuture<Void> commit(Iterable<Table<String, String, TableData>> batches, SchemaTableName table)
-    {
-        DatabaseHandler.Inserter insert = databaseHandler.insert(table.getSchemaName(), table.getTableName());
-
-        for (Table<String, String, TableData> batch : batches) {
-            TableData tableData = batch.get(table.getSchemaName(), table.getTableName());
-            if (tableData != null) {
-                insert.addPage(tableData.page);
+    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value) {
+        for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
+            try {
+                tableCheckpoint.checkpoint();
+            } catch (BatchRecords.CheckpointException e) {
+                log.error(e, "Error while checkpointing records");
             }
         }
-
-        return insert.commit();
     }
 }

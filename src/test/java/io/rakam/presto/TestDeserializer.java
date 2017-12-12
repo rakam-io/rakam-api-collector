@@ -4,22 +4,18 @@
 
 package io.rakam.presto;
 
+import com.facebook.presto.block.BlockEncodingManager;
+import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.spi.ColumnMetadata;
+import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.RunLengthEncodedBlock;
-import com.facebook.presto.spi.type.ArrayType;
-import com.facebook.presto.spi.type.BigintType;
-import com.facebook.presto.spi.type.BooleanType;
-import com.facebook.presto.spi.type.DateType;
-import com.facebook.presto.spi.type.DoubleType;
-import com.facebook.presto.spi.type.IntegerType;
-import com.facebook.presto.spi.type.MapType;
-import com.facebook.presto.spi.type.TimeType;
-import com.facebook.presto.spi.type.TimestampType;
-import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.spi.type.VarbinaryType;
+import com.facebook.presto.spi.function.OperatorType;
+import com.facebook.presto.spi.type.*;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
+import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
 import io.rakam.presto.deserialization.MessageEventTransformer;
@@ -28,6 +24,7 @@ import org.rakam.collection.FieldType;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -39,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.facebook.presto.spi.block.MethodHandleUtil.compose;
+import static com.facebook.presto.spi.block.MethodHandleUtil.nativeValueGetter;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -47,6 +46,12 @@ import static org.testng.Assert.assertTrue;
 
 public abstract class TestDeserializer<T>
 {
+    private static final TypeManager TYPE_MANAGER = new TypeRegistry();
+    static {
+        // associate TYPE_MANAGER with a function registry
+        new FunctionRegistry(TYPE_MANAGER, new BlockEncodingManager(TYPE_MANAGER), new FeaturesConfig());
+    }
+
     protected static final List<FieldType> FIELDS = Arrays.stream(FieldType.values())
             .filter(e -> e != FieldType.DECIMAL && e != FieldType.ARRAY_DECIMAL && e != FieldType.MAP_DECIMAL)
             .filter(e -> e != FieldType.BINARY && e != FieldType.ARRAY_BINARY && e != FieldType.MAP_BINARY)
@@ -133,9 +138,8 @@ public abstract class TestDeserializer<T>
             throws IOException
     {
         MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
-        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.empty()), ImmutableList.of());
-        Map<String, TableData> testproject = pageTable.row("testproject");
-        TableData testcollection = testproject.get("testcollection");
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.empty()), ImmutableList.of());
+        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         assertEquals(testcollection.metadata, COLUMNS);
         assertEquals(testcollection.page.getChannelCount(), COLUMNS.size());
@@ -162,10 +166,9 @@ public abstract class TestDeserializer<T>
     {
         MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
 
-        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.of(new int[] {
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.of(new int[] {
                 1})), ImmutableList.of());
-        Map<String, TableData> testproject = pageTable.row("testproject");
-        TableData testcollection = testproject.get("testcollection");
+        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         assertEquals(testcollection.metadata, COLUMNS);
         assertEquals(testcollection.page.getChannelCount(), COLUMNS.size());
@@ -223,7 +226,7 @@ public abstract class TestDeserializer<T>
                 }
 
                 if (fieldType.isMap()) {
-                    MapType mapType = new MapType(false, VARCHAR, toType(fieldType.getMapValueType()), null, null, null);
+                    MapType mapType = mapType(VARCHAR, toType(fieldType.getMapValueType()));
                     BlockBuilder builder = mapType.createBlockBuilder(new BlockBuilderStatus(), 100);
 
                     Block key = getBlock(FieldType.STRING);
@@ -275,9 +278,16 @@ public abstract class TestDeserializer<T>
                     return new ArrayType(toType(type.getArrayElementType()));
                 }
                 if (type.isMap()) {
-                    return new MapType(false, VARCHAR, toType(type.getMapValueType()), null, null, null);
+                    return mapType(VARCHAR, toType(type.getMapValueType()));
                 }
                 throw new IllegalStateException();
         }
+    }
+
+    public static MapType mapType(Type keyType, Type valueType)
+    {
+        return (MapType) TYPE_MANAGER.getParameterizedType(StandardTypes.MAP, ImmutableList.of(
+                TypeSignatureParameter.of(keyType.getTypeSignature()),
+                TypeSignatureParameter.of(valueType.getTypeSignature())));
     }
 }

@@ -5,6 +5,7 @@
 package io.rakam.presto;
 
 import com.facebook.presto.spi.ColumnMetadata;
+import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.block.Block;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Table;
@@ -45,9 +46,8 @@ public abstract class TestKafkaJsonDeserializer
 
         ImmutableList<ConsumerRecord<byte[], byte[]>> build = getSampleData();
 
-        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(build, ImmutableList.of());
-        Map<String, TableData> testproject = pageTable.row("testproject");
-        TableData testcollection = testproject.get("testcollection");
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(build, ImmutableList.of());
+        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         ImmutableList<ColumnMetadata> columns = ImmutableList.<ColumnMetadata>builder()
                 .addAll(COLUMNS)
@@ -77,9 +77,9 @@ public abstract class TestKafkaJsonDeserializer
         ConsumerRecord<byte[], byte[]> record = getDuplicateFieldRecord();
         TestDatabaseHandler databaseHandler = new TestDatabaseHandler();
         MessageEventTransformer messageEventTransformer = new KafkaJsonMessageTransformer(new FieldNameConfig(), databaseHandler, getJsonDeserializer(databaseHandler));
-        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(ImmutableList.of(record), ImmutableList.of());
-        Map<String, TableData> testproject = pageTable.row("testproject");
-        TableData testcollection = testproject.get("testcollection");
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(ImmutableList.of(record), ImmutableList.of());
+        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
+
         assertEquals(testcollection.metadata.size(), 4);
         assertEquals(testcollection.page.getChannelCount(), 4);
         assertEquals(testcollection.page.getPositionCount(), 1);
@@ -98,10 +98,10 @@ public abstract class TestKafkaJsonDeserializer
     {
         TestDatabaseHandler databaseHandler = new TestDatabaseHandler();
         MessageEventTransformer messageEventTransformer = new KafkaJsonMessageTransformer(new FieldNameConfig(), databaseHandler, getJsonDeserializer(databaseHandler));
-        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection2", Optional.of(new int[] {
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection2", Optional.of(new int[] {
                 1})), ImmutableList.of());
-        Map<String, TableData> testproject = pageTable.row("testproject");
-        TableData testcollection = testproject.get("testcollection2");
+        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection2"));
+
         assertEquals(testcollection.metadata.size(), 4);
         assertEquals(testcollection.page.getChannelCount(), 4);
         assertEquals(testcollection.page.getPositionCount(), ITERATION_COUNT);
@@ -133,9 +133,8 @@ public abstract class TestKafkaJsonDeserializer
         };
         MessageEventTransformer messageEventTransformer = new KafkaJsonMessageTransformer(new FieldNameConfig(), databaseHandler, getJsonDeserializer(databaseHandler));
 
-        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getSampleData(), ImmutableList.of());
-        Map<String, TableData> testproject = pageTable.row("testproject");
-        TableData testcollection = testproject.get("testcollection");
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getSampleData(), ImmutableList.of());
+        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         assertEquals(testcollection.metadata, latestColumns);
         assertEquals(testcollection.page.getChannelCount(), latestColumns.size());

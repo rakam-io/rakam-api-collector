@@ -30,8 +30,8 @@ public class KafkaJsonMessageTransformer
     public SchemaTableName extractCollection(ConsumerRecord<byte[], byte[]> message, @Nullable JsonDeserializer decoder)
             throws IOException
     {
-        decoder.setData(message.value());
-        return decoder.getTable();
+        jsonDecoder.setData(message.value());
+        return jsonDecoder.getTable();
     }
 
     @Override
