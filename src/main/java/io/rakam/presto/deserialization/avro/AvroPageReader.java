@@ -16,12 +16,9 @@ import static io.rakam.presto.deserialization.avro.AvroUtil.convertAvroSchema;
 
 public class AvroPageReader extends PageReader<BinaryDecoder>
 {
-    private final String checkpointColumn;
-
     public AvroPageReader(String checkpointColumn, List<ColumnMetadata> rakamSchema)
     {
         super(checkpointColumn, rakamSchema);
-        this.checkpointColumn = checkpointColumn;
     }
 
     @Override

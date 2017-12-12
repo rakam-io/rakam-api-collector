@@ -23,7 +23,7 @@ public abstract class JsonMessageEventTransformer<T>
         extends MessageEventTransformer<T, JsonDeserializer>
 {
     static final Logger LOGGER = Logger.get(JsonMessageEventTransformer.class);
-    private final JsonDeserializer jsonDecoder;
+    protected final JsonDeserializer jsonDecoder;
     private final String checkpointColumn;
 
     public JsonMessageEventTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler database, JsonDeserializer jsonDecoder)

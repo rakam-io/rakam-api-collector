@@ -73,19 +73,20 @@ public class KafkaWorkerManager
         }
         if (executor != null) {
             executor.shutdown();
-        }
-        try {
-            if (!executor.awaitTermination(5000, TimeUnit.MILLISECONDS)) {
-                log.warn("Timed out waiting for consumer threads to shut down, exiting uncleanly");
+
+            try {
+                if (!executor.awaitTermination(5000, TimeUnit.MILLISECONDS)) {
+                    log.warn("Timed out waiting for consumer threads to shut down, exiting uncleanly");
+                }
+            } catch (InterruptedException e) {
+                log.warn("Interrupted during shutdown, exiting uncleanly");
             }
-        } catch (InterruptedException e) {
-            log.warn("Interrupted during shutdown, exiting uncleanly");
         }
     }
 
     public void subscribe() {
         consumer = new KafkaConsumer(createConsumerConfig(config));
-        consumer.subscribe(Arrays.asList(config.getTopic()));
+        consumer.subscribe(config.getTopic());
     }
 
     @PostConstruct
@@ -191,10 +192,6 @@ public class KafkaWorkerManager
 
     @Override
     public void process(WatchedEvent event) {
-        switch (event.getType()) {
-            case NodeChildrenChanged:
-                break;
-        }
-        event.getPath();
+        //
     }
 }

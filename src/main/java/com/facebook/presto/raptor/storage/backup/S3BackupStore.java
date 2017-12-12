@@ -93,7 +93,7 @@ public class S3BackupStore implements BackupStore {
         }
     }
 
-    private class SafeSliceInputStream extends InputStream {
+    private static class SafeSliceInputStream extends InputStream {
         private final BasicSliceInput sliceInput;
 
         public SafeSliceInputStream(BasicSliceInput sliceInput) {
