@@ -91,7 +91,6 @@ public class MiddlewareBuffer
                 iterator.remove();
                 bufferRecordCount.remove(tableName);
                 bufferSize.remove(tableName);
-                //bufferLastUpdated.remove(tableName);
             }
         }
         return map;

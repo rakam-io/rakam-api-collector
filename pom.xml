@@ -548,6 +548,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.1.0</version>
+                <configuration>
+                    <finalName>rakam-data-collector</finalName>
+                </configuration>
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -576,6 +579,46 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>docker</id>
+            <activation>
+                <file>
+                    <exists>docker</exists>
+                </file>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.spotify</groupId>
+                        <artifactId>docker-maven-plugin</artifactId>
+                        <version>0.3.7</version>
+                        <configuration>
+                            <imageName>artifactory.corp.olacabs.com:6001/collector:${project.version}</imageName>
+                            <serverId>docker</serverId>
+                            <dockerDirectory>${project.basedir}</dockerDirectory>
+                            <resources>
+                                <resource>
+                                    <targetPath>/</targetPath>
+                                    <directory>${project.build.directory}</directory>
+                                    <include>${project.build.finalName}.jar</include>
+                                </resource>
+                            </resources>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>build</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <scm>
         <connection>scm:git:https://github.com/rakam-io/rakam-presto-collector.git</connection>

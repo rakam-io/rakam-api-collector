@@ -75,9 +75,7 @@ public class KafkaWorkerManager
     public void shutdown()
     {
         context.shutdown();
-        System.out.println("shutdown: " + System.currentTimeMillis());
         if (consumer != null) {
-            System.out.println("shutdown: " + System.currentTimeMillis());
             consumer.close();
         }
         if (executor != null) {
@@ -136,7 +134,6 @@ public class KafkaWorkerManager
                         buffer.clear();
                         Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.flush();
                         if (!map.isEmpty()) {
-                            log.info("total available tables: " + map.size());
                             for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
                                 log.debug("committing data for table: " + entry.getKey().getTableName());
                                 committer.process(entry.getKey(), entry.getValue());
@@ -155,8 +152,7 @@ public class KafkaWorkerManager
             }
         }
         finally {
-            System.out.println("finally: " + System.currentTimeMillis());
-            //consumer.close();
+            consumer.close();
         }
     }
 
