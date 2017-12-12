@@ -25,7 +25,7 @@ public class JsonPageReader
         return new JsonPageDeserializer(this);
     }
 
-    public class JsonPageDeserializer
+    public static class JsonPageDeserializer
             implements PageReaderDeserializer<JsonDeserializer>
     {
         private final JsonPageReader jsonPageReader;

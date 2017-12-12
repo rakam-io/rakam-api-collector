@@ -57,13 +57,15 @@ public class RemoteBackupManager {
         executorService.shutdownNow();
     }
 
+    @SuppressWarnings("NP_NONNULL_PARAM_VIOLATION")
     public CompletableFuture<?> submit(UUID uuid, File source)
     {
         requireNonNull(uuid, "uuid is null");
         requireNonNull(source, "source is null");
 
         if (!backupStore.isPresent()) {
-            return completedFuture(null);
+            // See https://github.com/findbugsproject/findbugs/issues/79
+            return completedFuture(0);
         }
 
         // TODO: decrement when the running task is finished (not immediately on cancel)

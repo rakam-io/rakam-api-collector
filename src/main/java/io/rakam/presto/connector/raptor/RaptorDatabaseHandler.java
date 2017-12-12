@@ -188,7 +188,7 @@ public class RaptorDatabaseHandler
         NodeManager nodeManager = new SingleNodeManager(config.getNodeIdentifier());
 
         PagesIndexPageSorter pageSorter = new PagesIndexPageSorter(
-                new PagesIndex.DefaultFactory(new OrderingCompiler(), new JoinCompiler()));
+                new PagesIndex.DefaultFactory(new OrderingCompiler(), new JoinCompiler(), new FeaturesConfig()));
 
         TypeRegistry typeRegistry = new TypeRegistry();
         BlockEncodingManager blockEncodingManager = new BlockEncodingManager(typeRegistry);

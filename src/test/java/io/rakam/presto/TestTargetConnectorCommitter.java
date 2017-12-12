@@ -54,7 +54,7 @@ public class TestTargetConnectorCommitter {
         MetadataManager testMetadataManager = createTestMetadataManager(testTransactionManager);
         TestingMetadata connectorMetadata = new LatchTestingMetadata(latch);
         connectorMetadata.createTable(session.toConnectorSession(),
-                new ConnectorTableMetadata(new SchemaTableName("test", "test"), ImmutableList.of()));
+                new ConnectorTableMetadata(new SchemaTableName("test", "test"), ImmutableList.of()), false);
 
         catalogManager.registerCatalog(createTestingCatalog("testconnector", new ConnectorId("testconnector"),
                 new TestingConnector(connectorMetadata),
@@ -71,6 +71,42 @@ public class TestTargetConnectorCommitter {
 
         ImmutableList<MiddlewareBuffer.TableCheckpoint> checkpoints = ImmutableList.of(new MiddlewareBuffer.TableCheckpoint(batchRecords, table));
         committer.process(table, checkpoints);
+
+        latch.await(1, TimeUnit.SECONDS);
+    }
+
+    @Test
+    public void testMultipleCommitter()
+            throws Exception {
+        CountDownLatch latch = new CountDownLatch(4);
+        CatalogManager catalogManager = new CatalogManager();
+        TransactionManager testTransactionManager = TransactionManager.createTestTransactionManager(catalogManager);
+        Session session = TestingSession.testSessionBuilder().setCatalog("testconnector").build();
+
+        MetadataManager testMetadataManager = createTestMetadataManager(testTransactionManager);
+        TestingMetadata connectorMetadata = new LatchTestingMetadata(latch);
+        connectorMetadata.createTable(session.toConnectorSession(),
+                new ConnectorTableMetadata(new SchemaTableName("test", "test0"), ImmutableList.of()), false);
+        connectorMetadata.createTable(session.toConnectorSession(),
+                new ConnectorTableMetadata(new SchemaTableName("test", "test1"), ImmutableList.of()), false);
+
+        catalogManager.registerCatalog(createTestingCatalog("testconnector", new ConnectorId("testconnector"),
+                new TestingConnector(connectorMetadata),
+                testTransactionManager, testMetadataManager));
+
+        PageSinkManager pageSinkManager = new PageSinkManager();
+        pageSinkManager.addConnectorPageSinkProvider(new ConnectorId("testconnector"), new TestingConnectorPageSinkProvider(latch));
+
+        TargetConnectorCommitter committer = new TargetConnectorCommitter(new TestDatabaseHandler("test", "test", ImmutableList.of()));
+
+        SchemaTableName table0 = new SchemaTableName("test", "test0");
+        SchemaTableName table1 = new SchemaTableName("test", "test1");
+
+        TableData tableData = new TableData(new Page(1), ImmutableList.of());
+        BatchRecords batchRecords = new BatchRecords(ImmutableMap.of(table0, tableData, table1, tableData), () -> latch.countDown());
+
+//        ImmutableList<MiddlewareBuffer.TableCheckpoint> checkpoints = ImmutableList.of(new MiddlewareBuffer.TableCheckpoint(batchRecords, table));
+//        committer.process(table, checkpoints);
 
         latch.await(1, TimeUnit.SECONDS);
     }
@@ -95,7 +131,7 @@ public class TestTargetConnectorCommitter {
                 new ColumnMetadata("test1", VarcharType.VARCHAR),
                 new ColumnMetadata("test2", BigintType.BIGINT));
         connectorMetadata.createTable(session.toConnectorSession(),
-                new ConnectorTableMetadata(new SchemaTableName("test", "test"), schema));
+                new ConnectorTableMetadata(new SchemaTableName("test", "test"), schema), false);
 
         PageSinkManager pageSinkManager = new PageSinkManager();
         pageSinkManager.addConnectorPageSinkProvider(new ConnectorId("testconnector"), new TestingConnectorPageSinkProvider(latch));

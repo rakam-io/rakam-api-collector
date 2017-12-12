@@ -26,7 +26,6 @@ public class KafkaAvroMessageTransformer
         super(fieldNameConfig, databaseHandler);
     }
 
-    @SuppressWarnings("Duplicates")
     @Override
     public SchemaTableName extractCollection(ConsumerRecord<byte[], byte[]> message, BinaryDecoder decoder)
             throws IOException
@@ -44,7 +43,7 @@ public class KafkaAvroMessageTransformer
         }
         else {
             if (decoder == null) {
-                decoder = DecoderFactory.get().binaryDecoder(array, decoder);
+                decoder = DecoderFactory.get().binaryDecoder(array, null);
             }
             collection = decoder.readString();
         }
