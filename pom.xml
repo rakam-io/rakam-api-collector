@@ -182,7 +182,7 @@
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-rakam-raptor</artifactId>
-            <version>0.190.1-SNAPSHOT</version>
+            <version>0.190.1</version>
         </dependency>
 
         <dependency>
