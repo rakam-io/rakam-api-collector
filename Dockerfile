@@ -20,9 +20,10 @@ VOLUME /var/log/rakam_data_collector
 RUN chmod -R 777 /var/log/rakam_data_collector
 RUN useradd -ms /bin/bash rakam
 WORKDIR /home/rakam
-COPY rakam-presto-collector/src/main/resources/config.properties .
+RUN ls -la
+COPY rakam-presto-collector/src/main/resources/config.properties /home/rakam
 RUN mvn clean install -Dmaven.test.skip=true 
-COPY rakam-presto-collector/target/rakam-data-collector.jar .
+COPY rakam-presto-collector/target/rakam-data-collector.jar /home/rakam
 
 
 
