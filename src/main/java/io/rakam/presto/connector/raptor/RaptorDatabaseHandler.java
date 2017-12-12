@@ -189,9 +189,6 @@ public class RaptorDatabaseHandler
         }
         else {
             throw new RuntimeException("THE BACKUP IS NOT ENABLED!");
-//            log.warn("------------");
-//            log.warn("THE BACKUP IS NOT ENABLED! YOU WILL LOSE DATA IF THIS NODE DIES!!!!!");
-//            log.warn("------------");
         }
 
         ImmutableMap<String, String> properties = props.build();
