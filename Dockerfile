@@ -28,7 +28,7 @@ COPY pom.xml /home/rakam/
 COPY *.sh /home/rakam/
 WORKDIR /home/rakam
 RUN ls -la
-COPY src/main/resources/config.properties /home/rakam
+COPY /home/rakam/src/main/resources/config.properties /home/rakam
 RUN ls -la /home/rakam
 
 RUN mvn clean install -Dmaven.test.skip=true
