@@ -21,11 +21,11 @@ VOLUME /var/log/rakam_data_collector
 RUN chmod -R 777 /var/log/rakam_data_collector
 RUN useradd -ms /bin/bash rakam
 
+COPY * /home/rakam/
 COPY src/main/resources/config.properties /home/rakam
 CMD ["export JAVA_HOME=/usr/bin/java"]
 
-COPY * /home/rakam/
-WORKDIR /home/rakam
+ WORKDIR /home/rakam
 
 RUN mvn clean install -Dmaven.test.skip=true
 COPY target/rakam-data-collector.jar /home/rakam
