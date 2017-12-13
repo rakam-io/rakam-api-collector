@@ -26,9 +26,8 @@ RUN pwd
 COPY src/* /home/rakam/src/
 COPY pom.xml /home/rakam/
 COPY *.sh /home/rakam/
-RUN chmod +x *.sh
 WORKDIR /home/rakam
-
+RUN ls -la
 COPY src/main/resources/config.properties /home/rakam
 RUN ls -la /home/rakam
 
