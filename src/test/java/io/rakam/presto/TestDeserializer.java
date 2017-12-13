@@ -5,6 +5,7 @@
 package io.rakam.presto;
 
 import com.facebook.presto.spi.ColumnMetadata;
+import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
@@ -38,7 +39,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
@@ -126,7 +126,7 @@ public abstract class TestDeserializer<T>
 
     public abstract MessageEventTransformer getMessageEventTransformer();
 
-    public abstract List<T> getRecords(String project, String collection, Optional<int[]> columnIdx)
+    public abstract List<T> getRecordsForEvents(String project, String collection, Optional<int[]> columnIdx)
             throws IOException;
 
     @Test
@@ -134,9 +134,8 @@ public abstract class TestDeserializer<T>
             throws IOException
     {
         MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
-        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecords("testproject", "testcollection", Optional.empty()), ImmutableList.of());
-        Map<String, TableData> testproject = pageTable.row("testproject");
-        TableData testcollection = testproject.get("testcollection");
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.empty()), ImmutableList.of());
+        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         assertEquals(testcollection.metadata, COLUMNS);
         assertEquals(testcollection.page.getChannelCount(), COLUMNS.size());
@@ -163,10 +162,9 @@ public abstract class TestDeserializer<T>
     {
         MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
 
-        Table<String, String, TableData> pageTable = messageEventTransformer.createPageTable(getRecords("testproject", "testcollection", Optional.of(new int[] {
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.of(new int[] {
                 1})), ImmutableList.of());
-        Map<String, TableData> testproject = pageTable.row("testproject");
-        TableData testcollection = testproject.get("testcollection");
+        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         assertEquals(testcollection.metadata, COLUMNS);
         assertEquals(testcollection.page.getChannelCount(), COLUMNS.size());
