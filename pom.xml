@@ -593,9 +593,9 @@
                     <plugin>
                         <groupId>com.spotify</groupId>
                         <artifactId>docker-maven-plugin</artifactId>
-                        <version>0.3.7</version>
+                        <version>0.3.9</version>
                         <configuration>
-                            <imageName>artifactory.corp.olacabs.com:5002/collector:${project.version}</imageName>
+                            <imageName>artifactory.corp.olacabs.com:6001/collector:${project.version}</imageName>
                             <serverId>docker</serverId>
                             <dockerDirectory>${project.basedir}</dockerDirectory>
                             <resources>
