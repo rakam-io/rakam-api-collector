@@ -626,15 +626,4 @@
         <url>https://github.com/rakam-io/rakam</url>
         <tag>HEAD</tag>
     </scm>
-
-   <!-- <repositories>
-        <repository>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>bintray-buremba-maven</id>
-            <name>bintray</name>
-            <url>http://dl.bintray.com/buremba/maven</url>
-        </repository>
-    </repositories>-->
 </project>
