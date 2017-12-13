@@ -12,6 +12,7 @@ RUN \
   && pip install awscli==1.10.18 \
   && apt-get install -y --no-install-recommends oracle-java8-installer \
   && apt-get install -y  python-pip=1.5.4-1 \
+  && apt-get install -y maven \
   && pip install awscli==1.10.18 \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
@@ -19,11 +20,18 @@ RUN \
 VOLUME /var/log/rakam_data_collector
 RUN chmod -R 777 /var/log/rakam_data_collector
 RUN useradd -ms /bin/bash rakam
+
+COPY src/main/resources/config.properties /home/rakam
+CMD ["export JAVA_HOME=/usr/bin/java"]
+
+COPY * /home/rakam/
 WORKDIR /home/rakam
-RUN echo ls -la
-COPY rakam-presto-collector/src/main/resources/config.properties /home/rakam
-RUN mvn clean install -Dmaven.test.skip=true 
-COPY rakam-presto-collector/target/rakam-data-collector.jar /home/rakam
+
+RUN mvn clean install -Dmaven.test.skip=true
+COPY target/rakam-data-collector.jar /home/rakam
+RUN chmod +x *.sh
+
+CMD ["/home/rakam/start.sh"]
 
 
 
