@@ -37,7 +37,7 @@ public class TestKinesisAvroDeserializer
         return new KinesisMessageEventTransformer(new FieldNameConfig(), new TestDatabaseHandler("testproject", "testcollection", COLUMNS), new S3MiddlewareConfig());
     }
 
-    public List<Record> getRecords(String project, String collection, Optional<int[]> columnIdx)
+    public List<Record> getRecordsForEvents(String project, String collection, Optional<int[]> columnIdx)
             throws IOException
     {
         Schema schema = AvroUtil.convertAvroSchema(COLUMNS, "_shard_time");
