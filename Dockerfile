@@ -25,11 +25,11 @@ RUN pwd
 #COPY * /home/rakam/
 COPY src/* /home/rakam/src/
 COPY pom.xml /home/rakam/
+COPY src/main/resources/config.properties /home/rakam/
 COPY *.sh /home/rakam/
 WORKDIR /home/rakam
 RUN ls -lR
 RUN find . -name '*.properties'
-RUN cp /home/rakam/src/resources/config.properties /home/rakam
 RUN ls -la /home/rakam
 
 RUN mvn clean install -Dmaven.test.skip=true
