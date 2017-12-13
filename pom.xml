@@ -627,7 +627,7 @@
         <tag>HEAD</tag>
     </scm>
 
-    <repositories>
+   <!-- <repositories>
         <repository>
             <snapshots>
                 <enabled>false</enabled>
@@ -636,5 +636,5 @@
             <name>bintray</name>
             <url>http://dl.bintray.com/buremba/maven</url>
         </repository>
-    </repositories>
+    </repositories>-->
 </project>

@@ -20,16 +20,17 @@ RUN \
 VOLUME /var/log/rakam_data_collector
 RUN chmod -R 777 /var/log/rakam_data_collector
 RUN useradd -ms /bin/bash rakam
-RUN pwd
 
-#COPY * /home/rakam/
+ARG CACHEBUST=1
+RUN pwd
+RUN find . -name '*.properties'
+
 COPY src/* /home/rakam/src/
 COPY pom.xml /home/rakam/
 COPY src/main/resources/config.properties /home/rakam/
 COPY *.sh /home/rakam/
 WORKDIR /home/rakam
 RUN ls -lR
-RUN find . -name '*.properties'
 RUN ls -la /home/rakam
 
 RUN mvn clean install -Dmaven.test.skip=true
