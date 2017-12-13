@@ -1,5 +1,5 @@
 FROM artifactory.corp.olacabs.com:5000/ubuntu-ola:14.04
-MAINTAINER dataservices <dataservices@olacabs.com>
+
 RUN \
   apt-get update \
   && apt-get install -y --no-install-recommends software-properties-common \

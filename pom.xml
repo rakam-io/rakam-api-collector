@@ -595,7 +595,7 @@
                         <artifactId>docker-maven-plugin</artifactId>
                         <version>0.3.7</version>
                         <configuration>
-                            <imageName>artifactory.corp.olacabs.com:6001/collector:${project.version}</imageName>
+                            <imageName>artifactory.corp.olacabs.com:5002/collector:${project.version}</imageName>
                             <serverId>docker</serverId>
                             <dockerDirectory>${project.basedir}</dockerDirectory>
                             <resources>
@@ -626,4 +626,15 @@
         <url>https://github.com/rakam-io/rakam</url>
         <tag>HEAD</tag>
     </scm>
+
+    <repositories>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-buremba-maven</id>
+            <name>bintray</name>
+            <url>http://dl.bintray.com/buremba/maven</url>
+        </repository>
+    </repositories>
 </project>
