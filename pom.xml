@@ -619,11 +619,4 @@
             </build>
         </profile>
     </profiles>
-
-    <scm>
-        <connection>scm:git:https://github.com/rakam-io/rakam-presto-collector.git</connection>
-        <developerConnection>scm:git:git@github.com:rakam-io/rakam-presto-collector.git</developerConnection>
-        <url>https://github.com/rakam-io/rakam</url>
-        <tag>HEAD</tag>
-    </scm>
 </project>
