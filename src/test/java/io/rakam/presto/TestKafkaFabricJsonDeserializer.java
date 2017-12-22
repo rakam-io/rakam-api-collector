@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.rakam.presto.deserialization.json.FabricJsonDeserializer;
 import io.rakam.presto.deserialization.json.JsonDeserializer;
-import io.rakam.presto.deserialization.json.RakamJsonDeserializer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.rakam.util.JsonHelper;
 
@@ -39,6 +38,7 @@ public class TestKafkaFabricJsonDeserializer extends TestKafkaJsonDeserializer {
         return record;
     }
 
+    @SuppressWarnings("Duplicates")
     public List<ConsumerRecord<byte[], byte[]>> getRecordsForEvents(String project, String collection, Optional<int[]> columnIdx)
             throws IOException {
         ImmutableList.Builder<ConsumerRecord<byte[], byte[]>> builder = ImmutableList.builder();
@@ -55,13 +55,13 @@ public class TestKafkaFabricJsonDeserializer extends TestKafkaJsonDeserializer {
                 }
             }
 
-            ImmutableMap.Builder<Object, Object> put = ImmutableMap.builder()
+            ImmutableMap.Builder<Object, Object> data = ImmutableMap.builder()
                     .put("_project", project)
                     .put("_collection", collection);
 
-            event.forEach((s, o) -> put.put(s, o));
+            event.forEach((s, o) -> data.put(s, o));
 
-            ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[]{}, JsonHelper.encodeAsBytes(ImmutableMap.of("data", put.build())));
+            ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[]{}, JsonHelper.encodeAsBytes(ImmutableMap.of("data", data.build())));
             builder.add(record);
         }
 
