@@ -1,3 +1,5 @@
+[![Wercker](https://img.shields.io/wercker/ci/wercker/docs.svg)]()
+
 # rakam-presto-collector
 
 1. Poll data data from Kinesis
