@@ -159,6 +159,8 @@ public class RaptorDatabaseHandler
                 .put("storage.max-recovery-threads", "1")
                 .put("storage.missing-shard-discovery-interval", "999999d")
                 .put("storage.organization-enabled", "false")
+                .put("storage.max-deletion-threads", "1")
+                .put("raptor.backup-cleaner-interval", "999999d")
                 .put("backup.timeout", "20m");
 
         if (s3BackupConfig.getS3Bucket() != null) {
