@@ -296,7 +296,6 @@ public class RaptorDatabaseHandler
             @Override
             public CompletableFuture<Void> commit() {
                 CompletableFuture<Collection<Slice>> finish = pageSink.finish();
-                finish.join();
                 return finish.thenAccept(slices ->
                         // 6 mysql insert queries
                         connectorMetadata.finishInsert(session, insertTableHandle, slices));

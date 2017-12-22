@@ -80,7 +80,7 @@ public class KinesisRecordProcessor
                 try {
                     checkpointer.checkpoint();
                 } catch (InvalidStateException | ShutdownException e) {
-                    throw Throwables.propagate(e);
+                    throw new RuntimeException(e);
                 }
             }));
 
