@@ -29,14 +29,12 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public class KafkaWorkerManager
@@ -50,6 +48,8 @@ public class KafkaWorkerManager
     protected KafkaConsumer<byte[], byte[]> consumer;
     protected KafkaConfig config;
     private ExecutorService executor;
+    private Thread workerThread;
+    private AtomicBoolean working;
 
     @Inject
     public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer) {
@@ -59,6 +59,7 @@ public class KafkaWorkerManager
         this.middlewareBuffer = new MiddlewareBuffer(middlewareConfig);
         buffer = context.createBuffer();
         this.executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("kafka-topic-consumer").build());
+        working = new AtomicBoolean(true);
     }
 
     public ExecutorService getExecutor() {
@@ -67,34 +68,24 @@ public class KafkaWorkerManager
 
     @PreDestroy
     public void shutdown() {
-        context.shutdown();
-        if (consumer != null) {
-            consumer.close();
-        }
-        if (executor != null) {
-            executor.shutdown();
-
-            try {
-                if (!executor.awaitTermination(5000, TimeUnit.MILLISECONDS)) {
-                    log.warn("Timed out waiting for consumer threads to shut down, exiting uncleanly");
-                }
-            } catch (InterruptedException e) {
-                log.warn("Interrupted during shutdown, exiting uncleanly");
-            }
-        }
-    }
-
-    public void subscribe() {
-        consumer = new KafkaConsumer(createConsumerConfig(config));
-        consumer.subscribe(config.getTopic());
+        working.set(false);
     }
 
     @PostConstruct
+    public void start() {
+        workerThread = new Thread(this::run);
+        workerThread.setDaemon(true);
+        workerThread.start();
+    }
+
     public void run() {
-        subscribe();
+        consumer = new KafkaConsumer(createConsumerConfig(config));
+        consumer.subscribe(config.getTopic());
+
+        Queue<List<TableCheckpoint>> checkpintQueue = new ConcurrentLinkedQueue<>();
 
         try {
-            while (true) {
+            while (working.get()) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
                 for (ConsumerRecord<byte[], byte[]> record : kafkaRecord) {
                     buffer.consumeRecord(record, record.value().length);
@@ -114,7 +105,14 @@ public class KafkaWorkerManager
 
                         if (!map.isEmpty()) {
                             for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
-                                committer.process(entry.getKey(), entry.getValue());
+                                committer.process(entry.getKey(), entry.getValue()).whenComplete((aVoid, throwable) -> {
+                                    if (throwable != null) {
+                                        log.error(throwable, "Error while processing records");
+                                    }
+
+                                    // TODO: What should we do if we can't process the data?
+                                    checkpintQueue.add(entry.getValue());
+                                });
                             }
                         }
                     } catch (Throwable e) {
@@ -122,9 +120,40 @@ public class KafkaWorkerManager
                         commitSyncOffset(null);
                     }
                 }
+
+                List<TableCheckpoint> poll = checkpintQueue.poll();
+                while (poll != null) {
+                    checkpoint(poll);
+                    poll = checkpintQueue.poll();
+                }
+
             }
         } finally {
-            consumer.close();
+            context.shutdown();
+            if (consumer != null) {
+                consumer.close();
+            }
+            if (executor != null) {
+                executor.shutdown();
+
+                try {
+                    if (!executor.awaitTermination(5000, TimeUnit.MILLISECONDS)) {
+                        log.warn("Timed out waiting for consumer threads to shut down, exiting uncleanly");
+                    }
+                } catch (InterruptedException e) {
+                    log.warn("Interrupted during shutdown, exiting uncleanly");
+                }
+            }
+        }
+    }
+
+    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value) {
+        for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
+            try {
+                tableCheckpoint.checkpoint();
+            } catch (BatchRecords.CheckpointException e) {
+                log.error(e, "Error while checkpointing records");
+            }
         }
     }
 

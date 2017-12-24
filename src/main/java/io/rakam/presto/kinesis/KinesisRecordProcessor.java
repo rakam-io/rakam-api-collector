@@ -87,8 +87,26 @@ public class KinesisRecordProcessor
             Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> list = middlewareBuffer.flush();
             if (!list.isEmpty()) {
                 for (Map.Entry<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> entry : list.entrySet()) {
-                    committer.process(entry.getKey(), entry.getValue());
+                    List<MiddlewareBuffer.TableCheckpoint> checkpoints = entry.getValue();
+                    committer.process(entry.getKey(), checkpoints).whenComplete((aVoid, throwable) -> {
+                        if (throwable != null) {
+                            log.error(throwable, "Error while processing records");
+                        }
+
+                        // TODO: What should we do if we can't process the data?
+                        checkpoint(entry.getValue());
+                    });
                 }
+            }
+        }
+    }
+
+    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value) {
+        for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
+            try {
+                tableCheckpoint.checkpoint();
+            } catch (BatchRecords.CheckpointException e) {
+                log.error(e, "Error while checkpointing records");
             }
         }
     }

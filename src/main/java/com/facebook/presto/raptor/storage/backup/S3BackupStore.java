@@ -5,6 +5,7 @@
 package com.facebook.presto.raptor.storage.backup;
 
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.facebook.presto.rakam.S3BackupConfig;
@@ -36,6 +37,8 @@ public class S3BackupStore implements BackupStore {
     public S3BackupStore(S3BackupConfig config, InMemoryFileSystem inMemoryFileSystem) {
         this.config = config;
         this.s3Client = new AmazonS3Client(config.getCredentials());
+        s3Client.setS3ClientOptions(S3ClientOptions.builder().setPathStyleAccess(true).disableChunkedEncoding().build());
+
         this.s3Client.setRegion(config.getAWSRegion());
         if (config.getEndpoint() != null) {
             this.s3Client.setEndpoint(config.getEndpoint());

@@ -32,17 +32,6 @@ public class StreamConfig
         this.maxFlushRecords = maxFlushRecords;
     }
 
-    @Config("stream.max-table-size")
-    public void setMaxSizeOfView(DataSize maxSizeOfView)
-    {
-        this.maxSizeOfView = maxSizeOfView;
-    }
-
-    public DataSize getMaxSizeOfView()
-    {
-        return maxSizeOfView;
-    }
-
     public Duration getMaxFlushDuration()
     {
         return maxFlushDuration;

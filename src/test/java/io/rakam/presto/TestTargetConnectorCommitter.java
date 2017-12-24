@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 
 import static com.facebook.presto.connector.ConnectorId.createInformationSchemaConnectorId;
 import static com.facebook.presto.connector.ConnectorId.createSystemTablesConnectorId;
@@ -70,7 +71,7 @@ public class TestTargetConnectorCommitter {
         BatchRecords batchRecords = new BatchRecords(ImmutableMap.of(table, tableData), () -> latch.countDown());
 
         ImmutableList<MiddlewareBuffer.TableCheckpoint> checkpoints = ImmutableList.of(new MiddlewareBuffer.TableCheckpoint(batchRecords, table));
-        committer.process(table, checkpoints);
+        committer.process(table, checkpoints).whenComplete(generate(checkpoints));
 
         latch.await(1, TimeUnit.SECONDS);
     }
@@ -144,11 +145,28 @@ public class TestTargetConnectorCommitter {
         BatchRecords batchRecords1 = new BatchRecords(ImmutableMap.of(table, page1), () -> latch.countDown());
         BatchRecords batchRecords2 = new BatchRecords(ImmutableMap.of(table, page2), () -> latch.countDown());
 
-        committer.process(table, ImmutableList.of(
+        ImmutableList<MiddlewareBuffer.TableCheckpoint> checkpoints = ImmutableList.of(
                 new MiddlewareBuffer.TableCheckpoint(batchRecords1, table),
-                new MiddlewareBuffer.TableCheckpoint(batchRecords2, table)));
+                new MiddlewareBuffer.TableCheckpoint(batchRecords2, table));
+        committer.process(table, checkpoints).whenComplete(generate(checkpoints));
 
         latch.await(1, TimeUnit.SECONDS);
+    }
+
+    public BiConsumer<Void, Throwable> generate(ImmutableList<MiddlewareBuffer.TableCheckpoint> checkpoints) {
+        return (aVoid, throwable) -> {
+            if (throwable != null) {
+                throw new IllegalStateException(throwable);
+            }
+
+            for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : checkpoints) {
+                try {
+                    tableCheckpoint.checkpoint();
+                } catch (BatchRecords.CheckpointException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        };
     }
 
     private static class TestingConnectorPageSinkProvider
