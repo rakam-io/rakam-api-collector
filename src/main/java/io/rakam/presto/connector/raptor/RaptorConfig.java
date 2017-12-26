@@ -13,7 +13,7 @@ import java.net.URL;
 public class RaptorConfig
 {
     private String metadataUrl;
-    private String nodeIdentifier;
+    private String nodeIdentifier = "collector";
     private File dataDirectory;
     private URI prestoURL;
 

@@ -60,7 +60,6 @@ public class InMemoryOrcStorageManager
     private static final DataSize HUGE_MAX_READ_BLOCK_SIZE = new DataSize(1, PETABYTE);
     private static final JsonCodec<OrcFileMetadata> METADATA_CODEC = jsonCodec(OrcFileMetadata.class);
 
-    private final String nodeId;
     private final StorageService storageService;
     private final Optional<BackupStore> backupStore;
     private final ReaderAttributes defaultReaderAttributes;
@@ -76,7 +75,6 @@ public class InMemoryOrcStorageManager
 
     @Inject
     public InMemoryOrcStorageManager(
-            NodeManager nodeManager,
             StorageService storageService,
             Optional<BackupStore> backupStore,
             ReaderAttributes readerAttributes,
@@ -86,7 +84,7 @@ public class InMemoryOrcStorageManager
             ShardRecorder shardRecorder,
             TypeManager typeManager,
             InMemoryFileSystem inMemoryFileSystem) {
-        this(nodeManager.getCurrentNode().getNodeIdentifier(),
+        this(
                 storageService,
                 backupStore,
                 readerAttributes,
@@ -102,7 +100,6 @@ public class InMemoryOrcStorageManager
     }
 
     public InMemoryOrcStorageManager(
-            String nodeId,
             StorageService storageService,
             Optional<BackupStore> backupStore,
             ReaderAttributes readerAttributes,
@@ -115,7 +112,6 @@ public class InMemoryOrcStorageManager
             DataSize maxShardSize,
             DataSize minAvailableSpace,
             InMemoryFileSystem inMemoryFileSystem) {
-        this.nodeId = requireNonNull(nodeId, "nodeId is null");
         this.storageService = requireNonNull(storageService, "storageService is null");
         this.backupStore = requireNonNull(backupStore, "backupStore is null");
         this.defaultReaderAttributes = requireNonNull(readerAttributes, "readerAttributes is null");
@@ -153,9 +149,6 @@ public class InMemoryOrcStorageManager
 
     @Override
     public StoragePageSink createStoragePageSink(long transactionId, OptionalInt bucketNumber, List<Long> columnIds, List<Type> columnTypes, boolean checkSpace) {
-        if (storageService.getAvailableBytes() < minAvailableSpace.toBytes()) {
-            throw new PrestoException(RAPTOR_LOCAL_DISK_FULL, "Local disk is full on node " + nodeId);
-        }
         return new OrcStoragePageSink(transactionId, columnIds, columnTypes, bucketNumber);
     }
 
@@ -321,11 +314,10 @@ public class InMemoryOrcStorageManager
                 File stagingFile = storageService.getStagingFile(shardUuid);
                 futures.add(backupManager.submit(shardUuid, stagingFile));
 
-                Set<String> nodes = ImmutableSet.of(nodeId);
                 long rowCount = writer.getRowCount();
                 long uncompressedSize = writer.getUncompressedSize();
 
-                shards.add(createShardInfo(shardUuid, bucketNumber, stagingFile, nodes, rowCount, uncompressedSize));
+                shards.add(createShardInfo(shardUuid, bucketNumber, stagingFile, ImmutableSet.of(), rowCount, uncompressedSize));
 
                 writer = null;
                 shardUuid = null;

@@ -76,6 +76,7 @@ public class TestTargetConnectorCommitter {
         latch.await(1, TimeUnit.SECONDS);
     }
 
+    // TODO
     @Test
     public void testMultipleCommitter()
             throws Exception {
@@ -107,7 +108,7 @@ public class TestTargetConnectorCommitter {
         BatchRecords batchRecords = new BatchRecords(ImmutableMap.of(table0, tableData, table1, tableData), () -> latch.countDown());
 
 //        ImmutableList<MiddlewareBuffer.TableCheckpoint> checkpoints = ImmutableList.of(new MiddlewareBuffer.TableCheckpoint(batchRecords, table));
-//        committer.process(table, checkpoints);
+//        committer.commit(table, checkpoints);
 
         latch.await(1, TimeUnit.SECONDS);
     }

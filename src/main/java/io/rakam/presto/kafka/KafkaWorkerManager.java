@@ -8,13 +8,9 @@ import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.log.Logger;
-import io.rakam.presto.BasicMemoryBuffer;
-import io.rakam.presto.BatchRecords;
-import io.rakam.presto.MiddlewareBuffer;
+import io.rakam.presto.*;
 import io.rakam.presto.MiddlewareBuffer.TableCheckpoint;
-import io.rakam.presto.MiddlewareConfig;
-import io.rakam.presto.StreamWorkerContext;
-import io.rakam.presto.TargetConnectorCommitter;
+import io.rakam.presto.deserialization.DecoupleMessage;
 import io.rakam.presto.deserialization.TableData;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -27,13 +23,9 @@ import org.apache.zookeeper.Watcher;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
-
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -45,6 +37,7 @@ public class KafkaWorkerManager
     private final TargetConnectorCommitter committer;
     private final MiddlewareBuffer middlewareBuffer;
     private final BasicMemoryBuffer<ConsumerRecord> buffer;
+    private final DecoupleMessage<ConsumerRecord<byte[], byte[]>> decoupleMessage;
     protected KafkaConsumer<byte[], byte[]> consumer;
     protected KafkaConfig config;
     private ExecutorService executor;
@@ -52,18 +45,16 @@ public class KafkaWorkerManager
     private AtomicBoolean working;
 
     @Inject
-    public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer) {
+    public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, DecoupleMessage decoupleMessage, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer) {
         this.config = config;
         this.context = context;
         this.committer = committer;
+        this.decoupleMessage = decoupleMessage;
         this.middlewareBuffer = new MiddlewareBuffer(middlewareConfig);
         buffer = context.createBuffer();
-        this.executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("kafka-topic-consumer").build());
+        this.executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder()
+                .setNameFormat("kafka-topic-consumer").build());
         working = new AtomicBoolean(true);
-    }
-
-    public ExecutorService getExecutor() {
-        return executor;
     }
 
     @PreDestroy
@@ -78,18 +69,31 @@ public class KafkaWorkerManager
         workerThread.start();
     }
 
-    public void run() {
+    public void subscribe() {
         consumer = new KafkaConsumer(createConsumerConfig(config));
         consumer.subscribe(config.getTopic());
+    }
 
-        Queue<List<TableCheckpoint>> checkpintQueue = new ConcurrentLinkedQueue<>();
+    public void run() {
+        subscribe();
+        Queue<List<TableCheckpoint>> checkpointQueue = new ConcurrentLinkedQueue<>();
 
         try {
             while (working.get()) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
                 for (ConsumerRecord<byte[], byte[]> record : kafkaRecord) {
+                    try {
+                        boolean recentData = decoupleMessage.isRecentData(record);
+                        if (!recentData) {
+                            continue;
+                        }
+                    } catch (IOException e) {
+                        log.error(e, "Error while parsing data");
+                        continue;
+                    }
                     buffer.consumeRecord(record, record.value().length);
                 }
+
                 if (buffer.shouldFlush()) {
                     try {
                         Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> records = buffer.getRecords();
@@ -105,13 +109,14 @@ public class KafkaWorkerManager
 
                         if (!map.isEmpty()) {
                             for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
-                                committer.process(entry.getKey(), entry.getValue()).whenComplete((aVoid, throwable) -> {
+                                CompletableFuture<Void> dbWriteWork = committer.process(entry.getKey(), entry.getValue());
+                                dbWriteWork.whenComplete((aVoid, throwable) -> {
                                     if (throwable != null) {
                                         log.error(throwable, "Error while processing records");
                                     }
 
-                                    // TODO: What should we do if we can't process the data?
-                                    checkpintQueue.add(entry.getValue());
+                                    // TODO: What should we do if we can't isRecentData the data?
+                                    checkpointQueue.add(entry.getValue());
                                 });
                             }
                         }
@@ -121,12 +126,11 @@ public class KafkaWorkerManager
                     }
                 }
 
-                List<TableCheckpoint> poll = checkpintQueue.poll();
+                List<TableCheckpoint> poll = checkpointQueue.poll();
                 while (poll != null) {
                     checkpoint(poll);
-                    poll = checkpintQueue.poll();
+                    poll = checkpointQueue.poll();
                 }
-
             }
         } finally {
             context.shutdown();
@@ -157,24 +161,6 @@ public class KafkaWorkerManager
         }
     }
 
-    private Map<SchemaTableName, TableData> flushStream() {
-        Map<SchemaTableName, TableData> pages;
-        try {
-            Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> list = buffer.getRecords();
-
-            if (list.getValue().isEmpty() && list.getKey().isEmpty()) {
-                return null;
-            }
-
-            pages = context.convert(list.getKey(), list.getValue());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        buffer.clear();
-        return pages;
-    }
-
     public void commitSyncOffset(ConsumerRecord record) {
         if (record == null) {
             consumer.commitSync();
@@ -185,7 +171,7 @@ public class KafkaWorkerManager
         }
     }
 
-    protected static Properties createConsumerConfig(KafkaConfig config) {
+    public static Properties createConsumerConfig(KafkaConfig config) {
         String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
         String offset = config.getOffset();
         String groupId = config.getGroupId();
@@ -200,6 +186,8 @@ public class KafkaWorkerManager
         props.put("session.timeout.ms", sessionTimeOut);
         props.put("heartbeat.interval.ms", "1000");
         props.put("request.timeout.ms", requestTimeOut);
+        props.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
+        props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         return props;

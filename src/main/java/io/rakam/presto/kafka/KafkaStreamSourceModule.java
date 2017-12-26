@@ -7,6 +7,8 @@ package io.rakam.presto.kafka;
 import com.google.inject.Binder;
 import com.google.inject.Scopes;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
+import io.rakam.presto.HistoricalDataHandler;
+import io.rakam.presto.deserialization.DecoupleMessage;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.json.JsonDeserializer;
 
@@ -21,6 +23,7 @@ public class KafkaStreamSourceModule
         KafkaConfig config = buildConfigObject(KafkaConfig.class);
 
         binder.bind(KafkaWorkerManager.class).in(Scopes.SINGLETON);
+        binder.bind(HistoricalDataHandler.class).to(KafkaHistoricalDataHandler.class).in(Scopes.SINGLETON);
 
         Class<? extends MessageEventTransformer> clazz;
         switch (config.getDataFormat()) {
@@ -36,6 +39,7 @@ public class KafkaStreamSourceModule
                 throw new IllegalStateException(format("The data format %s is not supported.", config.getDataFormat().toString()));
         }
 
+        binder.bind(DecoupleMessage.class).to(KafkaDecoupleMessage.class).in(Scopes.SINGLETON);
         binder.bind(MessageEventTransformer.class).to(clazz).in(Scopes.SINGLETON);
     }
 

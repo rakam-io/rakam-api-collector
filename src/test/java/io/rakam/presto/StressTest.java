@@ -4,7 +4,7 @@
 
 package io.rakam.presto;
 
-import com.facebook.presto.raptor.storage.OrcFileWriter;
+import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
@@ -16,7 +16,6 @@ import io.rakam.presto.deserialization.json.RakamJsonDeserializer;
 import io.rakam.presto.kafka.KafkaConfig;
 import io.rakam.presto.kafka.KafkaJsonMessageTransformer;
 import io.rakam.presto.kafka.KafkaWorkerManager;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -25,11 +24,11 @@ import org.rakam.util.JsonHelper;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.net.URI;
-import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -48,12 +47,12 @@ public class StressTest {
         long l = System.currentTimeMillis();
         int i = 0;
 
-        while(true) {
+        while (true) {
             messageTransformer.createPageTable(data, ImmutableList.of());
             i += 30000;
 
             long gap = System.currentTimeMillis() - l;
-            if(gap > 1000) {
+            if (gap > 1000) {
                 System.out.println(i + " records in " + gap + "ms");
                 i = 0;
                 l = System.currentTimeMillis();
@@ -97,8 +96,8 @@ public class StressTest {
     private static List<byte[]> getDataForRakam() {
         return IntStream.range(0, 30000).mapToObj(i -> {
             return JsonHelper.encodeAsBytes(ImmutableMap.of(
-                    "project", "presto",
-                    "collection", "tweet",
+                    "project", "demo",
+                    "collection", "tweet3",
                     "properties", ImmutableMap.builder()
                             .put("place", "USA")
                             .put("id", 34235435 * i)
@@ -134,30 +133,43 @@ public class StressTest {
         RaptorConfig raptorConfig = new RaptorConfig()
                 .setMetadataUrl("jdbc:mysql://127.0.0.1/presto?user=root&password=")
                 .setDataDirectory(new File("/tmp/test"))
-                .setNodeIdentifier("dead")
                 .setPrestoURL(URI.create("http://127.0.0.1:8080"));
 
         FieldNameConfig fieldNameConfig = new FieldNameConfig();
         S3BackupConfig s3BackupConfig = new S3BackupConfig();
         s3BackupConfig.setS3Bucket("test");
-        RaptorDatabaseHandler databaseHandler = new RaptorDatabaseHandler(raptorConfig, s3BackupConfig, fieldNameConfig);
+
+        RaptorDatabaseHandler databaseHandler = new RaptorDatabaseHandler(raptorConfig, s3BackupConfig, fieldNameConfig, new TestBackupStoreModule(new BiConsumer<UUID, File>() {
+            @Override
+            public void accept(UUID uuid, File file) {
+                try {
+                    Thread.sleep(3000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }));
+//        databaseHandler.addColumns("test", "tweet", ImmutableList.of());
 
         AtomicLong committedRecords = new AtomicLong(0);
 
-        StreamWorkerContext context = new StreamWorkerContext(new KafkaJsonMessageTransformer(fieldNameConfig, databaseHandler, new RakamJsonDeserializer(databaseHandler)), new StreamConfig());
-        TargetConnectorCommitter targetConnectorCommitter = new TargetConnectorCommitter(databaseHandler);
+        StreamConfig streamConfig = new StreamConfig().setMaxFlushRecords(0);
+        MiddlewareConfig middlewareConfig = new MiddlewareConfig().setMaxFlushRecords(0);
 
-        KafkaWorkerManager kafkaWorkerManager = new KafkaWorkerManager(kafkaConfig, new MiddlewareConfig(), context, targetConnectorCommitter) {
+        StreamWorkerContext context = new StreamWorkerContext(new KafkaJsonMessageTransformer(fieldNameConfig, databaseHandler, new RakamJsonDeserializer(databaseHandler)), streamConfig);
+        TargetConnectorCommitter targetConnectorCommitter = new TargetConnectorCommitter(databaseHandler);
+        AtomicLong totalRecord = new AtomicLong(-1);
+        AtomicLong lastPoll = new AtomicLong(System.currentTimeMillis());
+
+        KafkaWorkerManager kafkaWorkerManager = new KafkaWorkerManager(kafkaConfig, middlewareConfig, context, targetConnectorCommitter) {
             @Override
             public void subscribe() {
-                AtomicLong totalRecord = new AtomicLong(-1);
-                AtomicLong lastPoll = new AtomicLong(System.currentTimeMillis());
                 consumer = new KafkaConsumer(createConsumerConfig(config)) {
                     @Override
                     public ConsumerRecords poll(long timeout) {
 
                         long currentTotalRecord = totalRecord.get();
-                        log.info("poll start. since last poll: " + ((System.currentTimeMillis() - lastPoll.get())) + "ms. total records:" + currentTotalRecord+", lag: "+(currentTotalRecord - committedRecords.get())+" records ");
+                        log.info("poll start. since last poll: " + ((System.currentTimeMillis() - lastPoll.get())) + "ms. total records:" + currentTotalRecord + ", lag: " + (currentTotalRecord - committedRecords.get()) + " records ");
 
                         try {
                             Thread.sleep(timeout);
@@ -183,7 +195,11 @@ public class StressTest {
 
             @Override
             public void commitSyncOffset(ConsumerRecord record) {
-                committedRecords.set(record.offset());
+                if (record == null) {
+                    committedRecords.set(totalRecord.get());
+                } else {
+                    committedRecords.set(record.offset());
+                }
             }
         };
 

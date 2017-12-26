@@ -21,15 +21,17 @@ public class StreamConfig
     private DataSize maxFlushDataSize = DataSize.succinctDataSize(100, MEGABYTE);
 
     @Config("stream.max-flush-duration")
-    public void setMaxFlushDuration(Duration maxFlushDuration)
+    public StreamConfig setMaxFlushDuration(Duration maxFlushDuration)
     {
         this.maxFlushDuration = maxFlushDuration;
+        return this;
     }
 
     @Config("stream.max-flush-records")
-    public void setMaxFlushRecords(int maxFlushRecords)
+    public StreamConfig setMaxFlushRecords(int maxFlushRecords)
     {
         this.maxFlushRecords = maxFlushRecords;
+        return this;
     }
 
     public Duration getMaxFlushDuration()

@@ -140,6 +140,7 @@ public class RakamJsonDeserializer implements JsonDeserializer
         }
     }
 
+    @SuppressWarnings("Duplicates")
     private void parseProperties(PageReader pageReader)
             throws IOException
     {
@@ -288,6 +289,7 @@ public class RakamJsonDeserializer implements JsonDeserializer
         return collection;
     }
 
+    @SuppressWarnings("Duplicates")
     private void getValue(BlockBuilder blockBuilder, JsonParser jp, FieldType type, ColumnMetadata field, boolean passInitialToken)
             throws IOException
     {
@@ -464,6 +466,7 @@ public class RakamJsonDeserializer implements JsonDeserializer
         }
     }
 
+    @SuppressWarnings("Duplicates")
     private static FieldType getTypeForUnknown(JsonParser jp)
             throws IOException
     {
