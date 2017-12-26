@@ -14,7 +14,7 @@
 
     <properties>
         <presto.version>0.190</presto.version>
-        <rakam.version>0.11-SNAPSHOT</rakam.version>
+        <rakam.version>0.11</rakam.version>
         <aws-java-sdk.version>1.11.115</aws-java-sdk.version>
         <dep.airlift.version>0.158</dep.airlift.version>
         <dep.slice.version>0.32</dep.slice.version>
@@ -115,6 +115,11 @@
         <dependency>
             <groupId>com.google.inject</groupId>
             <artifactId>guice</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.inject.extensions</groupId>
+            <artifactId>guice-multibindings</artifactId>
         </dependency>
 
         <dependency>
@@ -354,13 +359,6 @@
             <groupId>org.rocksdb</groupId>
             <artifactId>rocksdbjni</artifactId>
             <version>5.5.1</version>
-        </dependency>
-
-        <dependency>
-            <groupId>info.batey.kafka</groupId>
-            <artifactId>kafka-unit</artifactId>
-            <version>1.0</version>
-            <scope>test</scope>
         </dependency>
 
         <dependency>

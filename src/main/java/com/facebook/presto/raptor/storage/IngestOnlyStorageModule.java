@@ -1,3 +1,7 @@
+/*
+ * Licensed under the Rakam Incorporation
+ */
+
 package com.facebook.presto.raptor.storage;
 
 import com.facebook.presto.raptor.backup.BackupManager;
@@ -47,7 +51,7 @@ public class IngestOnlyStorageModule extends StorageModule {
 //        binder.bind(ShardCleaner.class).in(Scopes.SINGLETON);
 //        binder.bind(BucketBalancer.class).in(Scopes.SINGLETON);
         binder.bind(ReaderAttributes.class).in(Scopes.SINGLETON);
-//        binder.bind(AssignmentLimiter.class).in(Scopes.SINGLETON);
+        binder.bind(AssignmentLimiter.class).in(Scopes.SINGLETON);
 
 //        newExporter(binder).export(ShardRecoveryManager.class).as(generatedNameOf(ShardRecoveryManager.class, connectorId));
         newExporter(binder).export(BackupManager.class).as(generatedNameOf(BackupManager.class, connectorId));

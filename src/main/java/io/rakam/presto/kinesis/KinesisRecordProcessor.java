@@ -137,11 +137,12 @@ public class KinesisRecordProcessor
     public static class KinesisDecoupleMessage implements DecoupleMessage<Record> {
         private final JsonFactory factory;
         private final String timeColumn;
+        private final LoadingCache<String, Boolean> cache;
 
         public KinesisDecoupleMessage(DatabaseHandler handler, FieldNameConfig fieldNameConfig) {
             this.timeColumn = fieldNameConfig.getTimeField();
             factory = new ObjectMapper().getFactory();
-            LoadingCache<String, Boolean> build = CacheBuilder.newBuilder().expireAfterAccess(10, TimeUnit.MINUTES)
+            cache = CacheBuilder.newBuilder().expireAfterAccess(10, TimeUnit.MINUTES)
                     .maximumSize(1000)
                     .build(new CacheLoader<String, Boolean>() {
                         @Override
@@ -152,7 +153,6 @@ public class KinesisRecordProcessor
         }
 
         public boolean isRecentData(Record record) throws IOException {
-            ByteBuffer data = record.getData();
             return true;
         }
     }

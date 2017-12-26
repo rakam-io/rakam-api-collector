@@ -1,3 +1,7 @@
+/*
+ * Licensed under the Rakam Incorporation
+ */
+
 package io.rakam.presto;
 
 import com.facebook.presto.spi.Page;

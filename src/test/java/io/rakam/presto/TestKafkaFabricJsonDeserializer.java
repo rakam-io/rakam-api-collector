@@ -1,3 +1,7 @@
+/*
+ * Licensed under the Rakam Incorporation
+ */
+
 package io.rakam.presto;
 
 import com.google.common.collect.ImmutableList;
@@ -33,7 +37,7 @@ public class TestKafkaFabricJsonDeserializer extends TestKafkaJsonDeserializer {
 
     @Override
     protected ConsumerRecord<byte[], byte[]> getDuplicateFieldRecord() {
-        byte[] data = "{\"data\": {{\"_project\": \"testproject\", \"_collection\": \"testcollection\", \"testcolumn\": \"1\", \"testcolumn\": \"2\"}}".getBytes(StandardCharsets.UTF_8);
+        byte[] data = "{\"data\": {\"_project\": \"testproject\", \"_collection\": \"testcollection\", \"testcolumn\": \"1\", \"testcolumn\": \"2\"}}".getBytes(StandardCharsets.UTF_8);
         ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[]{}, data);
         return record;
     }

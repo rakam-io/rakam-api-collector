@@ -1,3 +1,7 @@
+/*
+ * Licensed under the Rakam Incorporation
+ */
+
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.execution.buffer.PagesSerde;
