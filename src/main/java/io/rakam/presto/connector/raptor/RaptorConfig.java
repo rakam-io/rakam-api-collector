@@ -16,6 +16,7 @@ public class RaptorConfig
     private String nodeIdentifier = "collector";
     private File dataDirectory;
     private URI prestoURL;
+    private int maxConnection;
 
     public String getMetadataUrl()
     {
@@ -26,6 +27,17 @@ public class RaptorConfig
     public RaptorConfig setMetadataUrl(String metadataUrl)
     {
         this.metadataUrl = metadataUrl;
+        return this;
+    }
+
+    public int getMaxConnection() {
+        return maxConnection;
+    }
+
+    @Config("raptor.metadata.max-connection")
+    public RaptorConfig setMaxConnection(int maxConnection)
+    {
+        this.maxConnection = maxConnection;
         return this;
     }
 

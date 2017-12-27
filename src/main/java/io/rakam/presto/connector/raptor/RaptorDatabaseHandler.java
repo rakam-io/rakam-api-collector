@@ -163,7 +163,7 @@ public class RaptorDatabaseHandler
                 .put("metadata.db.type", "mysql")
                 .put("metadata.db.url", config.getMetadataUrl())
                 .put("storage.data-directory", config.getDataDirectory().getAbsolutePath())
-                .put("metadata.db.connections.max", "200")
+                .put("metadata.db.connections.max", String.valueOf(config.getMaxConnection()))
                 .put("backup.timeout", "20m");
 
         if (backupStoreModule != null) {
@@ -232,6 +232,7 @@ public class RaptorDatabaseHandler
                 }
             }
             jdbcConfig.setUrl(config.getMetadataUrl());
+            jdbcConfig.setMaxConnection(config.getMaxConnection() / 3);
         } catch (URISyntaxException | UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
