@@ -100,16 +100,15 @@ public class RaptorDatabaseHandler
     private final PrestoRakamRaptorMetastore metastore;
     private final Supplier<ConnectorMetadata> writeMetadata;
 
-    public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule) {
-        this(config, new TypeRegistry(), new BlockEncodingManager(new TypeRegistry()), s3BackupConfig, fieldNameConfig, backupStoreModule);
-    }
-
     @Inject
     public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeRegistry, BlockEncodingSerde blockEncodingSerde, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig) {
         this(config, typeRegistry, blockEncodingSerde, s3BackupConfig, fieldNameConfig, null);
     }
 
-    @Inject
+    public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule) {
+        this(config, new TypeRegistry(), new BlockEncodingManager(new TypeRegistry()), s3BackupConfig, fieldNameConfig, backupStoreModule);
+    }
+
     public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeRegistry, BlockEncodingSerde blockEncodingSerde, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule) {
         DatabaseMetadataModule metadataModule = new DatabaseMetadataModule();
 

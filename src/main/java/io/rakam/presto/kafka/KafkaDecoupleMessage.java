@@ -15,6 +15,7 @@ import io.rakam.presto.deserialization.DecoupleMessage;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.rakam.util.DateTimeUtils;
 
+import javax.inject.Inject;
 import java.io.IOException;
 import java.time.temporal.ChronoUnit;
 
@@ -27,6 +28,7 @@ public class KafkaDecoupleMessage implements DecoupleMessage<ConsumerRecord<byte
     private final String timeColumn;
     private final long ingestionDuration;
 
+    @Inject
     public KafkaDecoupleMessage(FieldNameConfig fieldNameConfig, StreamConfig streamConfig) {
         this.timeColumn = fieldNameConfig.getTimeField();
         this.ingestionDuration = streamConfig.getRealtimeIngestionDuration().toMillis() * 2;

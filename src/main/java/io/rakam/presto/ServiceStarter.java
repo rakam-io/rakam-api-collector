@@ -5,14 +5,15 @@
 package io.rakam.presto;
 
 import com.facebook.presto.block.BlockEncodingManager;
+import com.facebook.presto.hadoop.$internal.com.google.common.collect.ImmutableSet;
 import com.facebook.presto.spi.block.BlockEncodingFactory;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.inject.Binder;
-import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
+import com.google.inject.TypeLiteral;
 import com.google.inject.multibindings.Multibinder;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
@@ -25,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Properties;
+import java.util.Set;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.rakam.presto.ConditionalModule.installIfPropertyEquals;
@@ -73,8 +75,7 @@ public final class ServiceStarter {
             public void configure(Binder binder) {
                 binder.bind(BlockEncodingSerde.class).to(BlockEncodingManager.class);
                 binder.bind(TypeManager.class).toInstance(new TypeRegistry());
-                Multibinder.newSetBinder(binder, BlockEncodingFactory.class);
-            }
+                binder.bind(new TypeLiteral<Set<BlockEncodingFactory<?>>>(){}).toInstance(ImmutableSet.of());            }
         });
 
         app.requireExplicitBindings(false);
