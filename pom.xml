@@ -3,9 +3,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.olacabs</groupId>
-        <artifactId>ola-libs-master-pom</artifactId>
-        <version>1.0</version>
+        <groupId>io.airlift</groupId>
+        <artifactId>airbase</artifactId>
+        <version>62</version>
     </parent>
 
     <groupId>io.rakam.presto</groupId>
@@ -432,13 +432,13 @@
     </dependencies>
 
     <build>
-        <extensions>
+       <!-- <extensions>
             <extension>
                 <groupId>org.kuali.maven.wagons</groupId>
                 <artifactId>maven-s3-wagon</artifactId>
                 <version>1.2.1</version>
             </extension>
-        </extensions>
+        </extensions>-->
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -475,6 +475,13 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
                 <version>2.10</version>
                 <executions>
@@ -497,7 +504,7 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
+            <!--<plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>wagon-maven-plugin</artifactId>
                 <version>1.0</version>
@@ -531,7 +538,7 @@
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>
+            </plugin>-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -583,7 +590,7 @@
                         <artifactId>docker-maven-plugin</artifactId>
                         <version>0.3.9</version>
                         <configuration>
-                            <imageName>artifactory.corp.olacabs.com:6001/collector:${project.version}</imageName>
+                            <imageName>artifactory.corp.olacabs.com:5002/collector:${project.version}</imageName>
                             <serverId>docker</serverId>
                             <dockerDirectory>${project.basedir}</dockerDirectory>
                             <resources>
@@ -599,6 +606,7 @@
                                 <phase>package</phase>
                                 <goals>
                                     <goal>build</goal>
+                                    <goal>push</goal>
                                 </goals>
                             </execution>
                         </executions>
@@ -607,4 +615,14 @@
             </build>
         </profile>
     </profiles>
+    <repositories>
+        <repository>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <id>bintray-buremba-maven</id>
+            <name>bintray</name>
+            <url>http://dl.bintray.com/buremba/maven</url>
+        </repository>
+    </repositories>
 </project>

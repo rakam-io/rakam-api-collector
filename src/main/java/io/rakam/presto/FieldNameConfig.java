@@ -9,6 +9,7 @@ import com.facebook.presto.spi.type.DoubleType;
 import com.facebook.presto.spi.type.IntegerType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.VarcharType;
+import com.google.common.base.Strings;
 import io.airlift.configuration.Config;
 
 import java.util.Arrays;
@@ -65,9 +66,11 @@ public class FieldNameConfig
     @Config("database.whitelisted.collections")
     public FieldNameConfig setWhitelistedCollections(String collections)
     {
-        if (collections != null) {
+        if (!Strings.isNullOrEmpty(collections)) {
             collections = collections.replaceAll("\\s+", "");
-            this.whitelistedCollections = new HashSet<>(Arrays.asList(collections.split(",")));
+            if (collections.length() > 1 && collections.matches(".*[a-zA-Z]+.*")) {
+                whitelistedCollections = new HashSet<>(Arrays.asList(collections.split(",")));
+            }
         }
         return this;
     }

@@ -166,6 +166,11 @@ public class RaptorDatabaseHandler
                 .put("storage.compaction-enabled", "false")
                 .put("storage.max-recovery-threads", "1")
                 .put("storage.missing-shard-discovery-interval", "999999d")
+                .put("raptor.backup-cleaner-interval", "999999d")
+                .put("raptor.backup-clean-time", "999999d")
+                .put("raptor.local-clean-time", "999999d")
+                .put("raptor.local-cleaner-interval", "999999d")
+                .put("raptor.transaction-cleaner-interval", "999999d")
                 .put("storage.organization-enabled", "false")
                 .put("backup.timeout", "20m")
                 .put("backup.threads", config.getBackupThreads());
@@ -226,6 +231,7 @@ public class RaptorDatabaseHandler
 
         pageSinkProvider = connector.getPageSinkProvider();
         JDBCConfig jdbcConfig = new JDBCConfig();
+        jdbcConfig.setConnectionMaxLifeTime(60000L);
         try {
             String uri = new URI(config.getMetadataUrl().substring(5)).getQuery();
             for (String elem : uri.split("&")) {

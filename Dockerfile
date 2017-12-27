@@ -18,25 +18,32 @@ RUN \
   && rm -rf /var/lib/apt/lists/*
 
 VOLUME /var/log/rakam_data_collector
+VOLUME /var/presto/data
+VOLUME /data/presto/var/data
+
 RUN chmod -R 777 /var/log/rakam_data_collector
+RUN chmod -R 777 /var/presto/data
 RUN useradd -ms /bin/bash rakam
 
 ARG CACHEBUST=1
-RUN pwd
-RUN find . -name '*.properties'
 
-COPY src/* /home/rakam/src/
-COPY pom.xml /home/rakam/
-COPY src/main/resources/config.properties /home/rakam/
+COPY src/main/resources/config_* /home/rakam/
+COPY jdk-8u151-linux-x64.tar.gz /usr/lib/jvm/
 COPY *.sh /home/rakam/
-WORKDIR /home/rakam
-RUN ls -lR
-RUN ls -la /home/rakam
-
-RUN mvn clean install -Dmaven.test.skip=true
 COPY target/rakam-data-collector.jar /home/rakam
 
-CMD ["/home/rakam/start.sh"]
+WORKDIR /usr/lib/jvm/
+RUN tar -xvzf /usr/lib/jvm/jdk-8u151-linux-x64.tar.gz
+RUN ls -la /usr/lib/jvm/
+RUN sudo update-alternatives --install "/usr/bin/java" "java" "/usr/lib/jvm/jdk1.8.0_151/bin/java" 0
+RUN sudo update-alternatives --install "/usr/bin/javac" "javac" "/usr/lib/jvm/jdk1.8.0_151/bin/javac" 0
+RUN sudo update-alternatives --set java /usr/lib/jvm/jdk1.8.0_151/bin/java
+RUN sudo update-alternatives --set javac /usr/lib/jvm/jdk1.8.0_151/bin/javac
+
+WORKDIR /home/rakam
+
+RUN chmod +x /home/rakam/start.sh
+CMD bash -x /home/rakam/start.sh 2>&1
 
 
 

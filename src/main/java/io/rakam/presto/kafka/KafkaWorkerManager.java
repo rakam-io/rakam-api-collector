@@ -109,9 +109,6 @@ public class KafkaWorkerManager
 
                 ConsumerRecords<byte[], byte[]> kafkaRecord = getRecords();
                 long endTime = System.currentTimeMillis();
-                if ((endTime - startTime) > 1000) {
-                    //log.info("---- poll duration: " + (endTime - startTime));
-                }
 
                 startTime = endTime;
                 recordCount += kafkaRecord.count();
