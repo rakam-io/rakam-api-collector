@@ -65,7 +65,6 @@ public class KafkaWorkerManager
     @PostConstruct
     public void start() {
         workerThread = new Thread(this::run);
-        workerThread.setDaemon(true);
         workerThread.start();
     }
 

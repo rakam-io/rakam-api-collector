@@ -101,15 +101,11 @@ public class RaptorDatabaseHandler
     private final Supplier<ConnectorMetadata> writeMetadata;
 
     @Inject
-    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeRegistry, BlockEncodingSerde blockEncodingSerde, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig) {
-        this(config, typeRegistry, blockEncodingSerde, s3BackupConfig, fieldNameConfig, null);
+    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig) {
+        this(config, typeManager, s3BackupConfig, fieldNameConfig, null);
     }
 
-    public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule) {
-        this(config, new TypeRegistry(), new BlockEncodingManager(new TypeRegistry()), s3BackupConfig, fieldNameConfig, backupStoreModule);
-    }
-
-    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeRegistry, BlockEncodingSerde blockEncodingSerde, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule) {
+    public RaptorDatabaseHandler(RaptorConfig config,  TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule) {
         DatabaseMetadataModule metadataModule = new DatabaseMetadataModule();
 
         ImmutableMap.Builder<String, Module> builder = ImmutableMap.builder();
@@ -153,7 +149,7 @@ public class RaptorDatabaseHandler
 
                     return injector.getInstance(RaptorConnector.class);
                 } catch (Exception e) {
-                    throw Throwables.propagate(e);
+                    throw new RuntimeException(e);
                 }
             }
         };
@@ -194,10 +190,9 @@ public class RaptorDatabaseHandler
         PagesIndexPageSorter pageSorter = new PagesIndexPageSorter(
                 new PagesIndex.DefaultFactory(new OrderingCompiler(), new JoinCompiler(), new FeaturesConfig()));
 
-        new FunctionRegistry(typeRegistry, blockEncodingSerde, new FeaturesConfig());
 
         Connector connector = raptorConnectorFactory.create(RAKAM_RAPTOR_CONNECTOR, properties,
-                new ProxyConnectorContext(nodeManager, typeRegistry, pageSorter));
+                new ProxyConnectorContext(nodeManager, typeManager, pageSorter));
 
         connectorTransactionHandle = connector.beginTransaction(READ_COMMITTED, false);
 

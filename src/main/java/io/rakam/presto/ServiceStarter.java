@@ -5,16 +5,15 @@
 package io.rakam.presto;
 
 import com.facebook.presto.block.BlockEncodingManager;
-import com.facebook.presto.hadoop.$internal.com.google.common.collect.ImmutableSet;
-import com.facebook.presto.spi.block.BlockEncodingFactory;
+import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.type.TypeManager;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.type.TypeRegistry;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
-import com.google.inject.TypeLiteral;
-import com.google.inject.multibindings.Multibinder;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.airlift.log.Logger;
@@ -26,7 +25,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Properties;
-import java.util.Set;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.rakam.presto.ConditionalModule.installIfPropertyEquals;
@@ -73,9 +71,15 @@ public final class ServiceStarter {
                 new RaptorModule(), new Module() {
             @Override
             public void configure(Binder binder) {
-                binder.bind(BlockEncodingSerde.class).to(BlockEncodingManager.class);
-                binder.bind(TypeManager.class).toInstance(new TypeRegistry());
-                binder.bind(new TypeLiteral<Set<BlockEncodingFactory<?>>>(){}).toInstance(ImmutableSet.of());            }
+                TypeRegistry typeRegistry = new TypeRegistry();
+                binder.bind(TypeManager.class).toInstance(typeRegistry);
+
+                BlockEncodingManager blockEncodingManager = new BlockEncodingManager(typeRegistry, ImmutableSet.of());
+                binder.bind(BlockEncodingSerde.class).toInstance(blockEncodingManager);
+
+                FunctionRegistry functionRegistry = new FunctionRegistry(typeRegistry, blockEncodingManager, new FeaturesConfig());
+                binder.bind(FunctionRegistry.class).toInstance(functionRegistry);
+            }
         });
 
         app.requireExplicitBindings(false);

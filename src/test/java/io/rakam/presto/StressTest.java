@@ -81,7 +81,7 @@ public class StressTest {
         S3BackupConfig s3BackupConfig = new S3BackupConfig();
         s3BackupConfig.setS3Bucket("test");
 
-        RaptorDatabaseHandler databaseHandler = new RaptorDatabaseHandler(raptorConfig, s3BackupConfig, fieldNameConfig, new TestBackupStoreModule((uuid, file) -> {
+        RaptorDatabaseHandler databaseHandler = new RaptorDatabaseHandler(raptorConfig, new TypeRegistry(), s3BackupConfig, fieldNameConfig, new TestBackupStoreModule((uuid, file) -> {
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
