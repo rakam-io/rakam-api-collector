@@ -6,8 +6,7 @@ package io.rakam.presto.deserialization.json;
 
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
-import com.google.common.collect.HashBasedTable;
-import com.google.common.collect.Table;
+import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
@@ -24,18 +23,18 @@ public abstract class JsonMessageEventTransformer<T>
         extends MessageEventTransformer<T, JsonDeserializer>
 {
     static final Logger LOGGER = Logger.get(JsonMessageEventTransformer.class);
-    private final JsonDeserializer jsonDecoder;
+    protected final JsonDeserializer jsonDecoder;
     private final String checkpointColumn;
 
-    public JsonMessageEventTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler database)
+    public JsonMessageEventTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler database, JsonDeserializer jsonDecoder)
     {
         super(fieldNameConfig, database);
-        jsonDecoder = new JsonDeserializer(database,fieldNameConfig);
+        this.jsonDecoder = jsonDecoder;
         this.checkpointColumn = fieldNameConfig.getCheckpointField();
     }
 
     @Override
-    public synchronized Table<String, String, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
+    public synchronized Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
             throws IOException
     {
         Map<SchemaTableName, PageReader> builderMap = new HashMap<>();
@@ -57,7 +56,12 @@ public abstract class JsonMessageEventTransformer<T>
             pageBuilder.read(jsonDecoder);
         }
 
-        return buildTable(builderMap);
+        ImmutableMap.Builder<SchemaTableName, TableData> builder = ImmutableMap.builder();
+        for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
+            builder.put(entry.getKey(), new TableData(entry.getValue().getPage(), entry.getValue().getActualSchema()));
+        }
+
+        return builder.build();
     }
 
     @Override

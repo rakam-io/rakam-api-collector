@@ -4,41 +4,44 @@
 
 package io.rakam.presto;
 
+import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.Table;
 import io.rakam.presto.deserialization.TableData;
 
-public class BatchRecords
-{
-    private final Table<String, String, TableData> table;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+public class BatchRecords {
+    private final Map<SchemaTableName, TableData> table;
+    private final Set<SchemaTableName> committed;
     private final Checkpointer checkpointer;
 
-    public BatchRecords(Table<String, String, TableData> table, Checkpointer checkpointer)
-    {
+    public BatchRecords(Map<SchemaTableName, TableData> table, Checkpointer checkpointer) {
         this.table = table;
+        this.committed = new HashSet<>();
         this.checkpointer = checkpointer;
     }
 
-    public Table<String, String, TableData> getTable()
-    {
+    public Map<SchemaTableName, TableData> getTable() {
         return table;
     }
 
-    public void checkpoint()
-            throws CheckpointException
-    {
-        checkpointer.checkpoint();
+    public void checkpoint(SchemaTableName tableName)
+            throws CheckpointException {
+        committed.add(tableName);
+        if (committed.size() == table.size()) {
+            checkpointer.checkpoint();
+        }
     }
 
-    public interface Checkpointer
-    {
+    public interface Checkpointer {
         void checkpoint() throws CheckpointException;
     }
 
     public static class CheckpointException
-            extends Exception
-    {
-        public CheckpointException(Throwable cause)
-        {
+            extends Exception {
+        public CheckpointException(Throwable cause) {
             super("Error while performing checkpoint operation.", cause);
         }
     }

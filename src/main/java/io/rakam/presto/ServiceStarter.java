@@ -4,9 +4,16 @@
 
 package io.rakam.presto;
 
+import com.facebook.presto.block.BlockEncodingManager;
+import com.facebook.presto.spi.block.BlockEncodingFactory;
+import com.facebook.presto.spi.block.BlockEncodingSerde;
+import com.facebook.presto.spi.type.TypeManager;
+import com.facebook.presto.type.TypeRegistry;
 import com.google.inject.Binder;
 import com.google.inject.Injector;
+import com.google.inject.Module;
 import com.google.inject.Scopes;
+import com.google.inject.multibindings.Multibinder;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.airlift.log.Logger;
@@ -22,8 +29,7 @@ import java.util.Properties;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.rakam.presto.ConditionalModule.installIfPropertyEquals;
 
-public final class ServiceStarter
-{
+public final class ServiceStarter {
     public static String RAKAM_VERSION;
     private final static Logger LOGGER = Logger.get(ServiceStarter.class);
 
@@ -34,32 +40,27 @@ public final class ServiceStarter
             URL resource = ServiceStarter.class.getResource("/git.properties");
             if (resource == null) {
                 LOGGER.warn("git.properties doesn't exist.");
-            }
-            else {
+            } else {
                 inputStream = resource.openStream();
                 properties.load(inputStream);
             }
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             LOGGER.warn(e, "Error while reading git.properties");
         }
         try {
             RAKAM_VERSION = properties.get("git.commit.id.describe-short").toString().split("-", 2)[0];
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             LOGGER.warn(e, "Error while parsing git.properties");
         }
     }
 
     private ServiceStarter()
-            throws InstantiationException
-    {
+            throws InstantiationException {
         throw new InstantiationException("The class is not created for instantiation");
     }
 
     public static void main(String[] args)
-            throws Throwable
-    {
+            throws Throwable {
         if (args.length > 0) {
             System.setProperty("config", args[0]);
         }
@@ -67,7 +68,14 @@ public final class ServiceStarter
         Bootstrap app = new Bootstrap(
                 new StreamSourceModule(),
                 new LogModule(),
-                new RaptorModule());
+                new RaptorModule(), new Module() {
+            @Override
+            public void configure(Binder binder) {
+                binder.bind(BlockEncodingSerde.class).to(BlockEncodingManager.class);
+                binder.bind(TypeManager.class).toInstance(new TypeRegistry());
+                Multibinder.newSetBinder(binder, BlockEncodingFactory.class);
+            }
+        });
 
         app.requireExplicitBindings(false);
         app.strictConfig().initialize();
@@ -76,11 +84,9 @@ public final class ServiceStarter
     }
 
     public static class StreamSourceModule
-            extends AbstractConfigurationAwareModule
-    {
+            extends AbstractConfigurationAwareModule {
         @Override
-        protected void setup(Binder binder)
-        {
+        protected void setup(Binder binder) {
             configBinder(binder).bindConfig(StreamConfig.class);
             configBinder(binder).bindConfig(FieldNameConfig.class);
             configBinder(binder).bindConfig(S3MiddlewareConfig.class);
@@ -91,8 +97,7 @@ public final class ServiceStarter
             bindDataSource("stream.source");
         }
 
-        private void bindDataSource(String sourceName)
-        {
+        private void bindDataSource(String sourceName) {
             install(installIfPropertyEquals(new KafkaStreamSourceModule(), sourceName, "kafka"));
             install(installIfPropertyEquals(new KinesisStreamSourceModule(), sourceName, "kinesis"));
         }

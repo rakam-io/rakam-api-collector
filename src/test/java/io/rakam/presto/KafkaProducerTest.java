@@ -1,8 +1,7 @@
 package io.rakam.presto;
 /*
- * Licensed under the Apache 2.0
+ * Licensed under the Rakam Incorporation
  */
-
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;

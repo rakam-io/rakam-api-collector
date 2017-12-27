@@ -10,7 +10,7 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Table;
+import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
 import io.rakam.presto.DatabaseHandler;
@@ -32,7 +32,7 @@ import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public abstract class AvroMessageEventTransformer<T>
-        extends MessageEventTransformer<T, BinaryDecoder>
+        extends MessageEventTransformer<T,BinaryDecoder>
 {
     private final static Logger LOGGER = Logger.get(AvroMessageEventTransformer.class);
     private final String checkpointColumn;
@@ -46,7 +46,7 @@ public abstract class AvroMessageEventTransformer<T>
     }
 
     @Override
-    public synchronized Table<String, String, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
+    public synchronized Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
             throws IOException
     {
         Map<SchemaTableName, PageReader> builderMap = new HashMap<>();
@@ -67,7 +67,7 @@ public abstract class AvroMessageEventTransformer<T>
             }
             catch (Exception e) {
                 LOGGER.error(e, "Unable to parse message in broker.");
-                return HashBasedTable.create();
+                return ImmutableMap.of();
             }
         }
 
@@ -131,7 +131,12 @@ public abstract class AvroMessageEventTransformer<T>
             }
         }
 
-        return buildTable(builderMap);
+        ImmutableMap.Builder<SchemaTableName, TableData> builder = ImmutableMap.builder();
+        for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
+            builder.put(entry.getKey(), new TableData(entry.getValue().getPage(), entry.getValue().getActualSchema()));
+        }
+
+        return builder.build();
     }
 
     @Override

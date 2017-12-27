@@ -83,7 +83,7 @@ public class KinesisWorkerManager
                 .withInitialPositionInStream(InitialPositionInStream.TRIM_HORIZON)
                 .withUserAgent("rakam-middleware-consumer")
                 .withCallProcessRecordsEvenForEmptyRecordList(true);
-        if (this.config.getKinesisEndpoint() == null & this.config.getDynamodbEndpoint() == null) {
+        if (this.config.getKinesisEndpoint() == null && this.config.getDynamodbEndpoint() == null) {
             configuration.withRegionName(this.config.getRegion());
         }
 

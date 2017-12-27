@@ -10,26 +10,30 @@ import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessor;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorCheckpointer;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.ShutdownReason;
 import com.amazonaws.services.kinesis.model.Record;
+import com.facebook.presto.spi.SchemaTableName;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Throwables;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Table;
 import io.airlift.log.Logger;
-import io.rakam.presto.BasicMemoryBuffer;
-import io.rakam.presto.BatchRecords;
-import io.rakam.presto.MiddlewareBuffer;
-import io.rakam.presto.MiddlewareConfig;
-import io.rakam.presto.StreamWorkerContext;
-import io.rakam.presto.TargetConnectorCommitter;
+import io.rakam.presto.*;
+import io.rakam.presto.deserialization.DecoupleMessage;
 import io.rakam.presto.deserialization.TableData;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.sql.DatabaseMetaData;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class KinesisRecordProcessor
-        implements IRecordProcessor
-{
+        implements IRecordProcessor {
     private static final Logger log = Logger.get(KinesisRecordProcessor.class);
 
     private final TargetConnectorCommitter committer;
@@ -39,9 +43,8 @@ public class KinesisRecordProcessor
     private String shardId;
 
     public KinesisRecordProcessor(StreamWorkerContext context,
-            MiddlewareConfig middlewareConfig,
-            TargetConnectorCommitter committer)
-    {
+                                  MiddlewareConfig middlewareConfig,
+                                  TargetConnectorCommitter committer) {
         this.committer = committer;
         this.context = context;
         this.streamBuffer = context.createBuffer();
@@ -49,15 +52,13 @@ public class KinesisRecordProcessor
     }
 
     @Override
-    public void initialize(String shardId)
-    {
+    public void initialize(String shardId) {
         this.shardId = shardId;
         log.info("Kinesis consumer shard %s initialized", shardId);
     }
 
     @Override
-    public void processRecords(List<Record> records, IRecordProcessorCheckpointer checkpointer)
-    {
+    public void processRecords(List<Record> records, IRecordProcessorCheckpointer checkpointer) {
         for (Record record : records) {
             ByteBuffer data = record.getData();
             byte type = data.get(0);
@@ -77,54 +78,83 @@ public class KinesisRecordProcessor
         }
 
         if (streamBuffer.shouldFlush()) {
-            Table<String, String, TableData> pages = flushStream();
+            Map<SchemaTableName, TableData> pages = flushStream();
 
             middlewareBuffer.add(new BatchRecords(pages, () -> {
                 try {
                     checkpointer.checkpoint();
-                }
-                catch (InvalidStateException | ShutdownException e) {
-                    throw Throwables.propagate(e);
+                } catch (InvalidStateException | ShutdownException e) {
+                    throw new RuntimeException(e);
                 }
             }));
 
-            if (middlewareBuffer.shouldFlush()) {
-                List<BatchRecords> list = middlewareBuffer.flush();
-                if (!list.isEmpty()) {
-                    committer.process(Iterables.transform(list, BatchRecords::getTable));
+            Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> list = middlewareBuffer.flush();
+            if (!list.isEmpty()) {
+                for (Map.Entry<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> entry : list.entrySet()) {
+                    List<MiddlewareBuffer.TableCheckpoint> checkpoints = entry.getValue();
+                    committer.process(entry.getKey(), checkpoints).whenComplete((aVoid, throwable) -> {
+                        if (throwable != null) {
+                            log.error(throwable, "Error while processing records");
+                        }
 
-                    list.forEach(l -> {
-                        try {
-                            l.checkpoint();
-                        }
-                        catch (BatchRecords.CheckpointException e) {
-                            log.error(e, "Error while checkpointing records");
-                        }
+                        // TODO: What should we do if we can't isRecentData the data?
+                        checkpoint(entry.getValue());
                     });
                 }
             }
         }
     }
 
+    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value) {
+        for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
+            try {
+                tableCheckpoint.checkpoint();
+            } catch (BatchRecords.CheckpointException e) {
+                log.error(e, "Error while checkpointing records");
+            }
+        }
+    }
+
     @Override
-    public void shutdown(IRecordProcessorCheckpointer iRecordProcessorCheckpointer, ShutdownReason shutdownReason)
-    {
+    public void shutdown(IRecordProcessorCheckpointer iRecordProcessorCheckpointer, ShutdownReason shutdownReason) {
         streamBuffer.clear();
         log.error("Shutdown %s, the reason is %s", shardId, shutdownReason.name());
     }
 
-    private Table<String, String, TableData> flushStream()
-    {
-        Table<String, String, TableData> pages;
+    private Map<SchemaTableName, TableData> flushStream() {
+        Map<SchemaTableName, TableData> pages;
         try {
             Map.Entry<List, List> list = streamBuffer.getRecords();
             pages = context.convert(list.getKey(), list.getValue());
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
         streamBuffer.clear();
         return pages;
     }
+
+    public static class KinesisDecoupleMessage implements DecoupleMessage<Record> {
+        private final JsonFactory factory;
+        private final String timeColumn;
+        private final LoadingCache<String, Boolean> cache;
+
+        public KinesisDecoupleMessage(DatabaseHandler handler, FieldNameConfig fieldNameConfig) {
+            this.timeColumn = fieldNameConfig.getTimeField();
+            factory = new ObjectMapper().getFactory();
+            cache = CacheBuilder.newBuilder().expireAfterAccess(10, TimeUnit.MINUTES)
+                    .maximumSize(1000)
+                    .build(new CacheLoader<String, Boolean>() {
+                        @Override
+                        public Boolean load(String id) throws Exception {
+                            return true;
+                        }
+                    });
+        }
+
+        public boolean isRecentData(Record record) throws IOException {
+            return true;
+        }
+    }
+
 }

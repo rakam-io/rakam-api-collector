@@ -8,6 +8,7 @@ import io.airlift.configuration.Config;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
 
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
@@ -17,30 +18,32 @@ public class StreamConfig
 {
     private Duration maxFlushDuration = Duration.succinctDuration(5, TimeUnit.SECONDS);
     private int maxFlushRecords = 10_000;
-    private DataSize maxSizeOfView = DataSize.succinctDataSize(1, GIGABYTE);
     private DataSize maxFlushDataSize = DataSize.succinctDataSize(100, MEGABYTE);
+    private Duration realTimeIngestionDuration = Duration.valueOf("1d");
 
     @Config("stream.max-flush-duration")
-    public void setMaxFlushDuration(Duration maxFlushDuration)
+    public StreamConfig setMaxFlushDuration(Duration maxFlushDuration)
     {
         this.maxFlushDuration = maxFlushDuration;
+        return this;
+    }
+
+    public Duration getRealtimeIngestionDuration() {
+        return realTimeIngestionDuration;
+    }
+
+    @Config("stream.real-time-ingestion-duration")
+    public StreamConfig setRealtimeIngestionDuration(Duration realTimeIngestionDuration)
+    {
+        this.realTimeIngestionDuration = realTimeIngestionDuration;
+        return this;
     }
 
     @Config("stream.max-flush-records")
-    public void setMaxFlushRecords(int maxFlushRecords)
+    public StreamConfig setMaxFlushRecords(int maxFlushRecords)
     {
         this.maxFlushRecords = maxFlushRecords;
-    }
-
-    @Config("stream.max-table-size")
-    public void setMaxSizeOfView(DataSize maxSizeOfView)
-    {
-        this.maxSizeOfView = maxSizeOfView;
-    }
-
-    public DataSize getMaxSizeOfView()
-    {
-        return maxSizeOfView;
+        return this;
     }
 
     public Duration getMaxFlushDuration()

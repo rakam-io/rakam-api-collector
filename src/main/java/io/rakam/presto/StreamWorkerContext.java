@@ -4,13 +4,14 @@
 
 package io.rakam.presto;
 
-import com.google.common.collect.Table;
+import com.facebook.presto.spi.SchemaTableName;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.TableData;
 
 import javax.inject.Inject;
 
 import java.io.IOException;
+import java.util.Map;
 
 public class StreamWorkerContext<T>
 {
@@ -28,7 +29,7 @@ public class StreamWorkerContext<T>
     {
     }
 
-    public Table<String, String, TableData> convert(Iterable<? extends T> records, Iterable<? extends T> bulkRecords)
+    public Map<SchemaTableName, TableData> convert(Iterable<? extends T> records, Iterable<? extends T> bulkRecords)
             throws IOException
     {
         return transformer.createPageTable(records, bulkRecords);

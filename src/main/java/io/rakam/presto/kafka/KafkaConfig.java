@@ -6,11 +6,13 @@ package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.HostAddress;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
 
 import javax.validation.constraints.Size;
 
+import java.util.List;
 import java.util.Set;
 
 import static com.google.common.collect.Iterables.transform;
@@ -27,9 +29,23 @@ public class KafkaConfig
     private String offset = "latest";
     private String groupId = "presto_streaming";
 
-    public String[] getTopic()
+    private String sessionTimeOut = "12000";
+    private String requestTimeOut = "15000";
+
+    public List<String> getTopic()
     {
-        return topic;
+        return ImmutableList.copyOf(topic);
+    }
+
+
+    public String getSessionTimeOut()
+    {
+        return sessionTimeOut;
+    }
+
+    public String getRequestTimeOut()
+    {
+        return requestTimeOut;
     }
 
     public String getOffset()
@@ -56,6 +72,24 @@ public class KafkaConfig
     public Set<HostAddress> getNodes()
     {
         return nodes;
+    }
+
+    @Config("kafka.session.timeout.ms")
+    public KafkaConfig setSessionTimeOut(String sessionTimeOut)
+    {
+        if (sessionTimeOut != null) {
+            this.sessionTimeOut = sessionTimeOut;
+        }
+        return this;
+    }
+
+    @Config("kafka.request.timeout.ms")
+    public KafkaConfig setRequestTimeOut(String requestTimeOut)
+    {
+        if (requestTimeOut != null) {
+            this.requestTimeOut = requestTimeOut;
+        }
+        return this;
     }
 
     @Config("kafka.nodes")

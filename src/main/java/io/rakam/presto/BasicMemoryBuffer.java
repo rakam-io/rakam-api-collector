@@ -16,8 +16,8 @@ public class BasicMemoryBuffer<T>
     private final long millisecondsToBuffer;
     private final List<T> buffer;
     private final List<T> bulkBuffer;
+    private int totalBytes;
     private long previousFlushTimeMillisecond;
-    private int consumedBytes;
     private long dataSizeToBuffer;
 
     public BasicMemoryBuffer(StreamConfig config)
@@ -28,7 +28,7 @@ public class BasicMemoryBuffer<T>
         previousFlushTimeMillisecond = System.currentTimeMillis();
         this.buffer = new ArrayList<>(1000);
         this.bulkBuffer = new ArrayList<>(1000);
-        consumedBytes = 0;
+        totalBytes = 0;
     }
 
     public long getNumRecordsToBuffer()
@@ -44,13 +44,13 @@ public class BasicMemoryBuffer<T>
     public void consumeRecord(T record, long size)
     {
         buffer.add(record);
-        consumedBytes += size;
+        totalBytes += size;
     }
 
     public void consumeBatch(T record, long size)
     {
         bulkBuffer.add(record);
-        consumedBytes += size;
+        totalBytes += size;
     }
 
     public void clear()
@@ -58,7 +58,7 @@ public class BasicMemoryBuffer<T>
         buffer.clear();
         bulkBuffer.clear();
         previousFlushTimeMillisecond = System.currentTimeMillis();
-        consumedBytes = 0;
+        totalBytes = 0;
     }
 
     public boolean shouldFlush()
@@ -69,7 +69,7 @@ public class BasicMemoryBuffer<T>
         long timelapseMillisecond = System.currentTimeMillis() - previousFlushTimeMillisecond;
         return (buffer.size() >= getNumRecordsToBuffer())
                 || (timelapseMillisecond >= getMillisecondsToBuffer())
-                || consumedBytes > dataSizeToBuffer;
+                || totalBytes > dataSizeToBuffer;
     }
 
     public Map.Entry<List<T>, List<T>> getRecords()

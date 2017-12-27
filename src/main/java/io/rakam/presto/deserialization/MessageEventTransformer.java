@@ -44,7 +44,7 @@ public abstract class MessageEventTransformer<T, C>
 
     public abstract byte[] getData(T record);
 
-    public abstract Table<String, String, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
+    public abstract Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
             throws IOException;
 
     protected PageReader generatePageBuilder(String project, String collection)
@@ -70,18 +70,6 @@ public abstract class MessageEventTransformer<T, C>
     }
 
     public abstract PageReader<C> createPageReader(List<ColumnMetadata> metadata);
-
-    protected Table<String, String, TableData> buildTable(Map<SchemaTableName, PageReader> builderMap)
-    {
-        Table<String, String, TableData> table = HashBasedTable.create();
-        for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
-            SchemaTableName key = entry.getKey();
-            table.put(key.getSchemaName(), key.getTableName(),
-                    new TableData(entry.getValue().getPage(), entry.getValue().getActualSchema()));
-        }
-
-        return table;
-    }
 
     protected PageReader getReader(Map<SchemaTableName, PageReader> builderMap, SchemaTableName table)
     {

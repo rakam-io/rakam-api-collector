@@ -9,6 +9,7 @@ import com.facebook.presto.spi.type.DoubleType;
 import com.facebook.presto.spi.type.IntegerType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.VarcharType;
+import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
 
 import java.util.Arrays;
@@ -20,7 +21,8 @@ public class FieldNameConfig
     private String checkpointField = "_shard_time";
     private String userFieldName = "_actor";
     private String timeField = "_time";
-    private Set<String> excludedColumns;
+
+    private Set<String> excludedColumns = ImmutableSet.of("_project", "_collection");
 
     private UserType userFieldType = UserType.STRING;
 

@@ -8,6 +8,7 @@ import com.facebook.presto.spi.SchemaTableName;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.deserialization.json.JsonDeserializer;
+import io.rakam.presto.deserialization.json.RakamJsonDeserializer;
 import io.rakam.presto.deserialization.json.JsonMessageEventTransformer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
@@ -20,17 +21,17 @@ public class KafkaJsonMessageTransformer
         extends JsonMessageEventTransformer<ConsumerRecord<byte[], byte[]>>
 {
     @Inject
-    public KafkaJsonMessageTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler databaseHandler)
+    public KafkaJsonMessageTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler databaseHandler, JsonDeserializer deserializer)
     {
-        super(fieldNameConfig, databaseHandler);
+        super(fieldNameConfig, databaseHandler, deserializer);
     }
 
     @Override
     public SchemaTableName extractCollection(ConsumerRecord<byte[], byte[]> message, @Nullable JsonDeserializer decoder)
             throws IOException
     {
-        decoder.setData(message.value());
-        return decoder.getTable();
+        jsonDecoder.setData(message.value());
+        return jsonDecoder.getTable();
     }
 
     @Override
