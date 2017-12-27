@@ -12,6 +12,7 @@ import io.rakam.presto.deserialization.DecoupleMessage;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.json.JsonDeserializer;
 
+import static io.airlift.configuration.ConfigBinder.configBinder;
 import static java.lang.String.format;
 
 public class KafkaStreamSourceModule
@@ -21,9 +22,9 @@ public class KafkaStreamSourceModule
     protected void setup(Binder binder)
     {
         KafkaConfig config = buildConfigObject(KafkaConfig.class);
+        configBinder(binder).bindConfig(JsonConfig.class);
 
         binder.bind(KafkaWorkerManager.class).in(Scopes.SINGLETON);
-        binder.bind(HistoricalDataHandler.class).to(KafkaHistoricalDataHandler.class).in(Scopes.SINGLETON);
 
         Class<? extends MessageEventTransformer> clazz;
         switch (config.getDataFormat()) {

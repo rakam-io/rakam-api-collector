@@ -16,7 +16,7 @@ public class RaptorConfig
     private String nodeIdentifier = "collector";
     private File dataDirectory;
     private URI prestoURL;
-    private int maxConnection;
+    private int maxConnection = 100;
 
     public String getMetadataUrl()
     {

@@ -13,6 +13,7 @@ import io.rakam.presto.HistoricalDataHandler;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
+import javax.inject.Inject;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -24,6 +25,7 @@ public class KafkaHistoricalDataHandler implements HistoricalDataHandler {
     private final PagesSerde pagesSerde;
     private final KafkaConfig kafkaTopic;
 
+    @Inject
     public KafkaHistoricalDataHandler(KafkaConfig kafkaConfig, BlockEncodingSerde blockEncodingSerde) {
         producer = new KafkaProducer<>(createConsumerConfig(kafkaConfig));
         this.kafkaTopic = kafkaConfig;
