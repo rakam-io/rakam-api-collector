@@ -11,22 +11,26 @@ import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorC
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.ShutdownReason;
 import com.amazonaws.services.kinesis.model.Record;
 import com.facebook.presto.spi.SchemaTableName;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Throwables;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Table;
 import io.airlift.log.Logger;
-import io.rakam.presto.BasicMemoryBuffer;
-import io.rakam.presto.BatchRecords;
-import io.rakam.presto.MiddlewareBuffer;
-import io.rakam.presto.MiddlewareConfig;
-import io.rakam.presto.StreamWorkerContext;
-import io.rakam.presto.TargetConnectorCommitter;
+import io.rakam.presto.*;
+import io.rakam.presto.deserialization.DecoupleMessage;
 import io.rakam.presto.deserialization.TableData;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.sql.DatabaseMetaData;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 public class KinesisRecordProcessor
         implements IRecordProcessor {
@@ -80,15 +84,33 @@ public class KinesisRecordProcessor
                 try {
                     checkpointer.checkpoint();
                 } catch (InvalidStateException | ShutdownException e) {
-                    throw Throwables.propagate(e);
+                    throw new RuntimeException(e);
                 }
             }));
 
             Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> list = middlewareBuffer.flush();
             if (!list.isEmpty()) {
                 for (Map.Entry<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> entry : list.entrySet()) {
-                    committer.process(entry.getKey(), entry.getValue());
+                    List<MiddlewareBuffer.TableCheckpoint> checkpoints = entry.getValue();
+                    committer.process(entry.getKey(), checkpoints).whenComplete((aVoid, throwable) -> {
+                        if (throwable != null) {
+                            log.error(throwable, "Error while processing records");
+                        }
+
+                        // TODO: What should we do if we can't isRecentData the data?
+                        checkpoint(entry.getValue());
+                    });
                 }
+            }
+        }
+    }
+
+    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value) {
+        for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
+            try {
+                tableCheckpoint.checkpoint();
+            } catch (BatchRecords.CheckpointException e) {
+                log.error(e, "Error while checkpointing records");
             }
         }
     }
@@ -111,4 +133,28 @@ public class KinesisRecordProcessor
         streamBuffer.clear();
         return pages;
     }
+
+    public static class KinesisDecoupleMessage implements DecoupleMessage<Record> {
+        private final JsonFactory factory;
+        private final String timeColumn;
+        private final LoadingCache<String, Boolean> cache;
+
+        public KinesisDecoupleMessage(DatabaseHandler handler, FieldNameConfig fieldNameConfig) {
+            this.timeColumn = fieldNameConfig.getTimeField();
+            factory = new ObjectMapper().getFactory();
+            cache = CacheBuilder.newBuilder().expireAfterAccess(10, TimeUnit.MINUTES)
+                    .maximumSize(1000)
+                    .build(new CacheLoader<String, Boolean>() {
+                        @Override
+                        public Boolean load(String id) throws Exception {
+                            return true;
+                        }
+                    });
+        }
+
+        public boolean isRecentData(Record record) throws IOException {
+            return true;
+        }
+    }
+
 }

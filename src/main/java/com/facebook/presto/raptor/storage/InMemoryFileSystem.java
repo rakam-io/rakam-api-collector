@@ -96,6 +96,10 @@ public final class InMemoryFileSystem
     }
 
     public Slice get(String fileName) {
-        return files.get(fileName).slice();
+        DynamicSliceOutput output = files.get(fileName);
+        if(output == null) {
+            throw new IllegalStateException();
+        }
+        return output.slice();
     }
 }

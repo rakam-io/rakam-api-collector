@@ -75,8 +75,8 @@ public class MiddlewareBuffer
                 || bufferSize.get(name).get() > config.getMaxSize().toBytes();
     }
 
-    public synchronized Map<SchemaTableName, List<TableCheckpoint>> flush()
-    {
+
+    public Map<SchemaTableName, List<TableCheckpoint>> flush() {
         long now = System.currentTimeMillis();
         Map<SchemaTableName, List<TableCheckpoint>> map = new ConcurrentHashMap<>();
 

@@ -20,6 +20,7 @@ import com.facebook.presto.raptor.backup.BackupModule;
 import com.facebook.presto.raptor.metadata.DatabaseMetadataModule;
 import com.facebook.presto.raptor.storage.InMemoryFileSystem;
 import com.facebook.presto.raptor.storage.InMemoryOrcStorageManager;
+import com.facebook.presto.raptor.storage.IngestOnlyStorageModule;
 import com.facebook.presto.raptor.storage.StorageManager;
 import com.facebook.presto.raptor.storage.StorageModule;
 import com.facebook.presto.raptor.storage.backup.RemoteBackupManager;
@@ -38,6 +39,7 @@ import com.facebook.presto.spi.PageSorter;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
+import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.connector.Connector;
 import com.facebook.presto.spi.connector.ConnectorContext;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
@@ -55,10 +57,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.EventBus;
-import com.google.inject.Injector;
-import com.google.inject.Module;
-import com.google.inject.Scopes;
-import com.google.inject.util.Modules;
+import com.google.inject.*;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.json.JsonModule;
 import io.airlift.log.Logger;
@@ -82,11 +81,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.security.Principal;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -110,11 +105,26 @@ public class RaptorDatabaseHandler
     private final PrestoRakamRaptorMetastore metastore;
     private final Supplier<ConnectorMetadata> writeMetadata;
 
+
+    public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule) {
+        this(config, new TypeRegistry(), new BlockEncodingManager(new TypeRegistry()), s3BackupConfig, fieldNameConfig, backupStoreModule);
+    }
+
     @Inject
-    public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig)
-    {
+    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeRegistry, BlockEncodingSerde blockEncodingSerde, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig) {
+        this(config, typeRegistry, blockEncodingSerde, s3BackupConfig, fieldNameConfig, null);
+    }
+
+
+    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeRegistry, BlockEncodingSerde blockEncodingSerde, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule) {
         DatabaseMetadataModule metadataModule = new DatabaseMetadataModule();
-        ImmutableMap<String, Module> backupProviders = ImmutableMap.of("s3", new S3BackupStoreModule());
+
+        ImmutableMap.Builder<String, Module> builder = ImmutableMap.builder();
+        builder.put("s3", new S3BackupStoreModule());
+        if (backupStoreModule != null) {
+            builder.put("embedded", backupStoreModule);
+        }
+        ImmutableMap<String, Module> backupProviders = builder.build();
 
         RaptorConnectorFactory raptorConnectorFactory = new RaptorConnectorFactory(
                 RAKAM_RAPTOR_CONNECTOR,
@@ -138,7 +148,7 @@ public class RaptorDatabaseHandler
                             },
                             metadataModule,
                             new BackupModule(backupProviders),
-                            Modules.override(new StorageModule(connectorId)).with((Module) binder -> binder.bind(StorageManager.class).to(InMemoryOrcStorageManager.class).in(Scopes.SINGLETON)),
+                            new IngestOnlyStorageModule(connectorId),
                             new RaptorModule(connectorId),
                             binder -> binder.bind(InMemoryFileSystem.class).asEagerSingleton(),
                             binder -> binder.bind(RemoteBackupManager.class).in(Scopes.SINGLETON)
@@ -162,20 +172,12 @@ public class RaptorDatabaseHandler
                 .put("metadata.db.type", "mysql")
                 .put("metadata.db.url", config.getMetadataUrl())
                 .put("storage.data-directory", config.getDataDirectory().getAbsolutePath())
-                .put("metadata.db.connections.max", config.getDbMaxConnections())
-                .put("storage.compaction-enabled", "false")
-                .put("storage.max-recovery-threads", "1")
-                .put("storage.missing-shard-discovery-interval", "999999d")
-                .put("raptor.backup-cleaner-interval", "999999d")
-                .put("raptor.backup-clean-time", "999999d")
-                .put("raptor.local-clean-time", "999999d")
-                .put("raptor.local-cleaner-interval", "999999d")
-                .put("raptor.transaction-cleaner-interval", "999999d")
-                .put("storage.organization-enabled", "false")
-                .put("backup.timeout", "20m")
-                .put("backup.threads", config.getBackupThreads());
+                .put("metadata.db.connections.max", String.valueOf(config.getMaxConnection()))
+                .put("backup.timeout", "20m");
 
-        if (s3BackupConfig.getS3Bucket() != null) {
+        if (backupStoreModule != null) {
+            props.put("backup.provider", "embedded");
+        } else if (s3BackupConfig.getS3Bucket() != null) {
             props.put("backup.provider", "s3");
             props.put("aws.s3-bucket", s3BackupConfig.getS3Bucket());
             props.put("aws.region", s3BackupConfig.getAWSRegion().getName());
@@ -191,9 +193,8 @@ public class RaptorDatabaseHandler
             if (s3BackupConfig.getEndpoint() != null) {
                 props.put("aws.s3-endpoint", s3BackupConfig.getEndpoint());
             }
-        }
-        else {
-            throw new RuntimeException("THE BACKUP IS NOT ENABLED!");
+        } else {
+            throw new IllegalArgumentException("The `raptor.aws.s3-bucket` must be set in order to setup the backup configuration.");
         }
 
         ImmutableMap<String, String> properties = props.build();
@@ -203,9 +204,7 @@ public class RaptorDatabaseHandler
         PagesIndexPageSorter pageSorter = new PagesIndexPageSorter(
                 new PagesIndex.DefaultFactory(new OrderingCompiler(), new JoinCompiler(), new FeaturesConfig()));
 
-        TypeRegistry typeRegistry = new TypeRegistry();
-        BlockEncodingManager blockEncodingManager = new BlockEncodingManager(typeRegistry);
-        new FunctionRegistry(typeRegistry, blockEncodingManager, new FeaturesConfig());
+        new FunctionRegistry(typeRegistry, blockEncodingSerde, new FeaturesConfig());
 
         Connector connector = raptorConnectorFactory.create(RAKAM_RAPTOR_CONNECTOR, properties,
                 new ProxyConnectorContext(nodeManager, typeRegistry, pageSorter));
@@ -244,9 +243,9 @@ public class RaptorDatabaseHandler
                 }
             }
             jdbcConfig.setUrl(config.getMetadataUrl());
-            jdbcConfig.setMaxConnection(Integer.parseInt(config.getDbMaxConnections())/2);
-        }
-        catch (URISyntaxException | UnsupportedEncodingException e) {
+
+            jdbcConfig.setMaxConnection(config.getMaxConnection() / 3);
+        } catch (URISyntaxException | UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
 
@@ -319,12 +318,12 @@ public class RaptorDatabaseHandler
             @Override
             public CompletableFuture<Void> commit()
             {
-                long startTime = System.currentTimeMillis();
                 CompletableFuture<Collection<Slice>> finish = pageSink.finish();
-                finish.join();
+
+            /*    finish.join();
                 long endTime = System.currentTimeMillis();
                 log.info("Page Sink: " + (endTime - startTime));
-                return finish.thenAccept(slices ->
+*/                return finish.thenAccept(slices ->
                         // 6 mysql insert queries
                         connectorMetadata.finishInsert(session, insertTableHandle, slices));
             }
@@ -335,13 +334,13 @@ public class RaptorDatabaseHandler
             implements ConnectorContext
     {
         private final NodeManager nodeManager;
-        private final TypeRegistry typeRegistry;
+        private final TypeManager typeManager;
         private final PagesIndexPageSorter pageSorter;
 
-        public ProxyConnectorContext(NodeManager nodeManager, TypeRegistry typeRegistry, PagesIndexPageSorter pageSorter)
-        {
+
+        public ProxyConnectorContext(NodeManager nodeManager, TypeManager typeManager, PagesIndexPageSorter pageSorter) {
             this.nodeManager = nodeManager;
-            this.typeRegistry = typeRegistry;
+            this.typeManager = typeManager;
             this.pageSorter = pageSorter;
         }
 
@@ -350,9 +349,9 @@ public class RaptorDatabaseHandler
             return nodeManager;
         }
 
-        public TypeManager getTypeManager()
-        {
-            return typeRegistry;
+
+        public TypeManager getTypeManager() {
+            return typeManager;
         }
 
         public PageSorter getPageSorter()

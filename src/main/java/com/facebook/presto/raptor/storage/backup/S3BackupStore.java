@@ -5,6 +5,7 @@
 package com.facebook.presto.raptor.storage.backup;
 
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.facebook.presto.rakam.S3BackupConfig;
@@ -40,6 +41,8 @@ public class S3BackupStore
     {
         this.config = config;
         this.s3Client = new AmazonS3Client(config.getCredentials());
+//        s3Client.setS3ClientOptions(S3ClientOptions.builder().setPathStyleAccess(true).disableChunkedEncoding().build());
+
         this.s3Client.setRegion(config.getAWSRegion());
         if (config.getEndpoint() != null) {
             this.s3Client.setEndpoint(config.getEndpoint());
@@ -71,13 +74,7 @@ public class S3BackupStore
             SafeSliceInputStream input = new SafeSliceInputStream(slice.getInput());
             this.s3Client.putObject(this.config.getS3Bucket(), uuid.toString(), input, objectMetadata);
             input.close();
-<<<<<<< HEAD
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-=======
         } catch (Exception ex) {
->>>>>>> 412112b0c0421f90e6f721ca571730777c02fa51
             throw new PrestoException(RaptorErrorCode.RAPTOR_BACKUP_ERROR, "Failed to create backup shard file on S3", ex);
         }
 
@@ -110,73 +107,6 @@ public class S3BackupStore
         }
     }
 
-<<<<<<< HEAD
-    private class SafeSliceInputStream
-            extends InputStream
-    {
-        private final BasicSliceInput sliceInput;
-
-        public SafeSliceInputStream(BasicSliceInput sliceInput)
-        {
-            this.sliceInput = sliceInput;
-        }
-
-        public int read()
-                throws IOException
-        {
-            return this.sliceInput.read();
-        }
-
-        public int read(byte[] b)
-                throws IOException
-        {
-            return this.sliceInput.read(b);
-        }
-
-        public int read(byte[] b, int off, int len)
-                throws IOException
-        {
-            return this.sliceInput.read(b, off, len);
-        }
-
-        public long skip(long n)
-                throws IOException
-        {
-            return this.sliceInput.skip(n);
-        }
-
-        public int available()
-                throws IOException
-        {
-            return this.sliceInput.available();
-        }
-
-        public void close()
-                throws IOException
-        {
-            this.sliceInput.close();
-        }
-
-        public synchronized void mark(int readlimit)
-        {
-            throw new RuntimeException("mark/reset not supported");
-        }
-
-        public synchronized void reset()
-                throws IOException
-        {
-            throw new IOException("mark/reset not supported");
-        }
-
-        public boolean markSupported()
-        {
-            return false;
-        }
-    }
-}
-
-
-=======
     private static class SafeSliceInputStream extends InputStream {
         private final BasicSliceInput sliceInput;
 
@@ -221,4 +151,3 @@ public class S3BackupStore
         }
     }
 }
->>>>>>> 412112b0c0421f90e6f721ca571730777c02fa51

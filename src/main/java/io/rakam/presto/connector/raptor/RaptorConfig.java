@@ -12,11 +12,13 @@ import java.net.URI;
 public class RaptorConfig
 {
     private String metadataUrl;
-    private String nodeIdentifier;
+    private String nodeIdentifier = "collector";
     private File dataDirectory;
     private URI prestoURL;
+
     private String backupThreads = "5";
     private String dbMaxConnections = "100";
+    private int maxConnection=100;
 
     public String getMetadataUrl()
     {
@@ -42,6 +44,17 @@ public class RaptorConfig
         if (connections != null) {
             this.dbMaxConnections = connections;
         }
+        return this;
+    }
+
+    public int getMaxConnection() {
+        return maxConnection;
+    }
+
+    @Config("raptor.metadata.max-connection")
+    public RaptorConfig setMaxConnection(int maxConnection)
+    {
+        this.maxConnection = maxConnection;
         return this;
     }
 

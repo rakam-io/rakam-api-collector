@@ -4,12 +4,14 @@
 
 package io.rakam.presto;
 
+import com.facebook.presto.hadoop.$internal.com.google.common.base.Strings;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.DoubleType;
 import com.facebook.presto.spi.type.IntegerType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.VarcharType;
-import com.google.common.base.Strings;
+
+import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
 
 import java.util.Arrays;
@@ -21,8 +23,8 @@ public class FieldNameConfig
     private String checkpointField = "_shard_time";
     private String userFieldName = "_actor";
     private String timeField = "_time";
-    private Set<String> excludedColumns = new HashSet<>();
     private Set<String> whitelistedCollections = new HashSet<>();
+    private Set<String> excludedColumns = ImmutableSet.of("_project", "_collection");
     private UserType userFieldType = UserType.STRING;
 
     @Config("database.checkpoint-field")

@@ -68,6 +68,7 @@ import static org.rakam.presto.analysis.PrestoRakamRaptorMetastore.toType;
  * }
  *
  */
+@SuppressWarnings("Duplicates")
 public class FabricJsonDeserializer implements JsonDeserializer
 {
     private static final JsonFactory READER = new ObjectMapper().getFactory();

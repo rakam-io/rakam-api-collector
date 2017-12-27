@@ -16,21 +16,24 @@ MiddlewareConfig
     private DataSize maxSize = DataSize.succinctDataSize(350, DataSize.Unit.MEGABYTE);
 
     @Config("middleware.max-flush-duration")
-    public void setMaxFlushDuration(Duration maxFlushDuration)
+    public MiddlewareConfig setMaxFlushDuration(Duration maxFlushDuration)
     {
         this.maxFlushDuration = maxFlushDuration;
+        return this;
     }
 
     @Config("middleware.max-flush-records")
-    public void setMaxFlushRecords(int maxFlushRecords)
+    public MiddlewareConfig setMaxFlushRecords(int maxFlushRecords)
     {
         this.maxFlushRecords = maxFlushRecords;
+        return this;
     }
 
     @Config("middleware.max-size")
-    public void setMaxSize(DataSize maxSize)
+    public MiddlewareConfig setMaxSize(DataSize maxSize)
     {
         this.maxSize = maxSize;
+        return this;
     }
 
     public DataSize getMaxSize()

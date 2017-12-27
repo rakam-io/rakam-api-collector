@@ -15,6 +15,7 @@ import io.rakam.presto.MiddlewareBuffer.TableCheckpoint;
 import io.rakam.presto.MiddlewareConfig;
 import io.rakam.presto.StreamWorkerContext;
 import io.rakam.presto.TargetConnectorCommitter;
+import io.rakam.presto.deserialization.DecoupleMessage;
 import io.rakam.presto.deserialization.TableData;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -30,14 +31,17 @@ import javax.inject.Inject;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public class KafkaWorkerManager
@@ -49,46 +53,45 @@ public class KafkaWorkerManager
     private final TargetConnectorCommitter committer;
     private final MiddlewareBuffer middlewareBuffer;
     private final BasicMemoryBuffer<ConsumerRecord> buffer;
+    private final DecoupleMessage<ConsumerRecord<byte[], byte[]>> decoupleMessage;
     protected KafkaConsumer<byte[], byte[]> consumer;
     protected KafkaConfig config;
     private ExecutorService executor;
+
     private boolean infiniteLoop = true;
     private int recordCount = 0;
 
+    private Thread workerThread;
+    private AtomicBoolean working;
+
     @Inject
-    public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
+    public KafkaWorkerManager(KafkaConfig config, MiddlewareConfig middlewareConfig, DecoupleMessage decoupleMessage, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
     {
+
         this.config = config;
         this.context = context;
         this.committer = committer;
+        this.decoupleMessage = decoupleMessage;
         this.middlewareBuffer = new MiddlewareBuffer(middlewareConfig);
         buffer = context.createBuffer();
-        this.executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("kafka-topic-consumer").build());
-    }
 
-    public ExecutorService getExecutor()
-    {
-        return executor;
+        this.executor = Executors.newCachedThreadPool(new ThreadFactoryBuilder()
+                .setNameFormat("kafka-topic-consumer").build());
+        working = new AtomicBoolean(true);
     }
 
     @PreDestroy
     public void shutdown()
     {
-        context.shutdown();
-        if (consumer != null) {
-            consumer.close();
-        }
-        if (executor != null) {
-            executor.shutdown();
+        working.set(false);
+    }
 
-            try {
-                if (!executor.awaitTermination(5000, TimeUnit.MILLISECONDS)) {
-                    log.warn("Timed out waiting for consumer threads to shut down, exiting uncleanly");
-                }
-            } catch (InterruptedException e) {
-                log.warn("Interrupted during shutdown, exiting uncleanly");
-            }
-        }
+    @PostConstruct
+    public void start()
+    {
+        workerThread = new Thread(this::run);
+        workerThread.setDaemon(true);
+        workerThread.start();
     }
 
     public void subscribe()
@@ -97,22 +100,30 @@ public class KafkaWorkerManager
         consumer.subscribe(config.getTopic());
     }
 
-
-
-    @PostConstruct
     public void run()
     {
         subscribe();
         long startTime = System.currentTimeMillis();
-        try {
-            while (infiniteLoop) {
+        Queue<List<TableCheckpoint>> checkpointQueue = new ConcurrentLinkedQueue<>();
 
-                ConsumerRecords<byte[], byte[]> kafkaRecord = getRecords();
+        try {
+            while (working.get()) {
+                ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
                 long endTime = System.currentTimeMillis();
 
                 startTime = endTime;
                 recordCount += kafkaRecord.count();
                 for (ConsumerRecord<byte[], byte[]> record : kafkaRecord) {
+                    try {
+                        boolean recentData = decoupleMessage.isRecentData(record);
+                        if (!recentData) {
+                            continue;
+                        }
+                    }
+                    catch (IOException e) {
+                        log.error(e, "Error while parsing data");
+                        continue;
+                    }
                     buffer.consumeRecord(record, record.value().length);
                 }
 
@@ -133,7 +144,16 @@ public class KafkaWorkerManager
                         if (!map.isEmpty()) {
                             for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
                                 log.debug("committing data for table: " + entry.getKey().getTableName());
-                                committer.process(entry.getKey(), entry.getValue());
+                                CompletableFuture<Void> dbWriteWork = committer.process(entry.getKey(), entry.getValue());
+
+                                dbWriteWork.whenComplete((aVoid, throwable) -> {
+                                    if (throwable != null) {
+                                        log.error(throwable, "Error while processing records");
+                                    }
+
+                                    // TODO: What should we do if we can't isRecentData the data?
+                                    checkpointQueue.add(entry.getValue());
+                                });
                             }
                         }
                     }
@@ -146,31 +166,44 @@ public class KafkaWorkerManager
                         commitSyncOffset(null);
                     }
                 }
+
+                List<TableCheckpoint> poll = checkpointQueue.poll();
+                while (poll != null) {
+                    checkpoint(poll);
+                    poll = checkpointQueue.poll();
+                }
             }
         }
         finally {
-            consumer.close();
+            context.shutdown();
+            if (consumer != null) {
+                consumer.close();
+            }
+            if (executor != null) {
+                executor.shutdown();
+
+                try {
+                    if (!executor.awaitTermination(5000, TimeUnit.MILLISECONDS)) {
+                        log.warn("Timed out waiting for consumer threads to shut down, exiting uncleanly");
+                    }
+                }
+                catch (InterruptedException e) {
+                    log.warn("Interrupted during shutdown, exiting uncleanly");
+                }
+            }
         }
     }
 
-    private Map<SchemaTableName, TableData> flushStream()
+    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value)
     {
-        Map<SchemaTableName, TableData> pages;
-        try {
-            Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> list = buffer.getRecords();
-
-            if (list.getValue().isEmpty() && list.getKey().isEmpty()) {
-                return null;
+        for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
+            try {
+                tableCheckpoint.checkpoint();
             }
-
-            pages = context.convert(list.getKey(), list.getValue());
+            catch (BatchRecords.CheckpointException e) {
+                log.error(e, "Error while checkpointing records");
+            }
         }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        buffer.clear();
-        return pages;
     }
 
     private synchronized ConsumerRecords<byte[], byte[]> getRecords()
@@ -190,7 +223,7 @@ public class KafkaWorkerManager
         }
     }
 
-    protected static Properties createConsumerConfig(KafkaConfig config)
+    public static Properties createConsumerConfig(KafkaConfig config)
     {
         String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
         String offset = config.getOffset();
@@ -206,6 +239,8 @@ public class KafkaWorkerManager
         props.put("session.timeout.ms", sessionTimeOut);
         props.put("heartbeat.interval.ms", "100");
         props.put("request.timeout.ms", requestTimeOut);
+        props.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
+        props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         return props;
@@ -230,10 +265,5 @@ public class KafkaWorkerManager
     @Override
     public void process(WatchedEvent event)
     {
-        switch (event.getType()) {
-            case NodeChildrenChanged:
-                break;
-        }
-        event.getPath();
     }
 }

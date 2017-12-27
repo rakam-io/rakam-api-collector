@@ -12,8 +12,6 @@ import com.google.inject.Scopes;
 import io.airlift.configuration.ConfigBinder;
 
 public class S3BackupStoreModule implements Module {
-    public S3BackupStoreModule() {
-    }
 
     public void configure(Binder binder) {
         ConfigBinder.configBinder(binder).bindConfig(S3BackupConfig.class);
