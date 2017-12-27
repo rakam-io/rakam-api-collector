@@ -15,7 +15,7 @@ public class MemoryOrcDataSource extends AbstractOrcDataSource  {
     private final BasicSliceInput input;
 
     public MemoryOrcDataSource(String id, BasicSliceInput input, DataSize maxMergeDistance, DataSize maxBufferSize, DataSize streamBufferSize) {
-        super(new OrcDataSourceId(id), input.length(), maxMergeDistance, maxBufferSize, streamBufferSize);
+        super(new OrcDataSourceId(id), input.length(), maxMergeDistance, maxBufferSize, streamBufferSize, true);
         this.input = input;
     }
 

@@ -201,7 +201,7 @@ public class RaptorDatabaseHandler
         NodeManager nodeManager = new SingleNodeManager(config.getNodeIdentifier());
 
         PagesIndexPageSorter pageSorter = new PagesIndexPageSorter(
-                new PagesIndex.DefaultFactory(new OrderingCompiler(), new JoinCompiler()));
+                new PagesIndex.DefaultFactory(new OrderingCompiler(), new JoinCompiler(), new FeaturesConfig()));
 
         TypeRegistry typeRegistry = new TypeRegistry();
         BlockEncodingManager blockEncodingManager = new BlockEncodingManager(typeRegistry);
@@ -244,6 +244,7 @@ public class RaptorDatabaseHandler
                 }
             }
             jdbcConfig.setUrl(config.getMetadataUrl());
+            jdbcConfig.setMaxConnection(Integer.parseInt(config.getDbMaxConnections())/2);
         }
         catch (URISyntaxException | UnsupportedEncodingException e) {
             throw new RuntimeException(e);

@@ -141,8 +141,7 @@ public class TestingMetadata
     }
 
     @Override
-    public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata)
-    {
+    public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting) {
         ConnectorTableMetadata existingTable = tables.putIfAbsent(tableMetadata.getTable(), tableMetadata);
         checkArgument(existingTable == null, "Table %s already exists", tableMetadata.getTable());
     }

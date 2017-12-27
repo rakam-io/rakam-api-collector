@@ -71,9 +71,13 @@ public class S3BackupStore
             SafeSliceInputStream input = new SafeSliceInputStream(slice.getInput());
             this.s3Client.putObject(this.config.getS3Bucket(), uuid.toString(), input, objectMetadata);
             input.close();
+<<<<<<< HEAD
         }
         catch (Exception ex) {
             ex.printStackTrace();
+=======
+        } catch (Exception ex) {
+>>>>>>> 412112b0c0421f90e6f721ca571730777c02fa51
             throw new PrestoException(RaptorErrorCode.RAPTOR_BACKUP_ERROR, "Failed to create backup shard file on S3", ex);
         }
 
@@ -106,6 +110,7 @@ public class S3BackupStore
         }
     }
 
+<<<<<<< HEAD
     private class SafeSliceInputStream
             extends InputStream
     {
@@ -171,3 +176,49 @@ public class S3BackupStore
 }
 
 
+=======
+    private static class SafeSliceInputStream extends InputStream {
+        private final BasicSliceInput sliceInput;
+
+        public SafeSliceInputStream(BasicSliceInput sliceInput) {
+            this.sliceInput = sliceInput;
+        }
+
+        public int read() throws IOException {
+            return this.sliceInput.read();
+        }
+
+        public int read(byte[] b) throws IOException {
+            return this.sliceInput.read(b);
+        }
+
+        public int read(byte[] b, int off, int len) throws IOException {
+            return this.sliceInput.read(b, off, len);
+        }
+
+        public long skip(long n) throws IOException {
+            return this.sliceInput.skip(n);
+        }
+
+        public int available() throws IOException {
+            return this.sliceInput.available();
+        }
+
+        public void close() throws IOException {
+            this.sliceInput.close();
+        }
+
+        public synchronized void mark(int readlimit) {
+            throw new RuntimeException("mark/reset not supported");
+        }
+
+        public synchronized void reset() throws IOException {
+            throw new IOException("mark/reset not supported");
+        }
+
+        public boolean markSupported() {
+            return false;
+        }
+    }
+}
+>>>>>>> 412112b0c0421f90e6f721ca571730777c02fa51
