@@ -135,7 +135,7 @@ public class FabricJsonDeserializer implements JsonDeserializer
 
         t = jp.nextToken();
         //Extract project and collection
-        for (t = this.jp.nextToken(); t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
+        for (t = jp.nextToken(); t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
             if (project != null && collection != null) {
                 break;
             }

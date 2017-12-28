@@ -3,8 +3,10 @@ package io.rakam.presto;
  * Licensed under the Rakam Incorporation
  */
 
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -49,10 +51,10 @@ public class KafkaProducerTest
                 "      \"city\": \"bangalore\",\n" +
                 "      \"device_model\": \"Vivo V3\",\n" +
                 "      \"telecom_provider\": \"Vodafone IN\",\n" +
-                "      \"timestamp\": \"2017-10-31T11:28:59.032\",\n" +
+                "      \"timestamp\": \"2017-12-27T11:28:59.032\",\n" +
                 "      \"os_version\": \"22\",\n" +
                 "      \"payload\": \"dapp#summaryUpdate#1509429539556#a8d00ad7dd694854a962c89515ede983#dapi_tracker#upmbC1yVlAAIrJrUtP2ZKQ==\",\n" +
-                "      \"_time\": \"2017-10-31T05:58:59.32Z\",\n" +
+                "      \"_time\": \"2017-12-27T11:28:59.032\",\n" +
                 "      \"_shard_time\": \"2017-10-31T05:59:25.487Z\"\n" +
                 "   }\n" +
                 "}";
@@ -65,7 +67,7 @@ public class KafkaProducerTest
         ObjectNode data = (ObjectNode) node.get("data");
 
         //Assign topicName to string variable
-        String topicName = "presto_test_1";
+        String topicName = "presto_test_4";
 
         // create instance for properties to access producer configs
         Properties props = new Properties();

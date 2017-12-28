@@ -21,7 +21,7 @@
         <skip.deploy.s3>false</skip.deploy.s3>
         <air.check.skip-duplicate-finder>true</air.check.skip-duplicate-finder>
         <air.check.skip-jacoco>true</air.check.skip-jacoco>
-        <kafka.client.version>0.11.0.0</kafka.client.version>
+        <kafka.client.version>0.10.0.0</kafka.client.version>
     </properties>
 
     <dependencies>
@@ -116,11 +116,6 @@
         <dependency>
             <groupId>com.google.inject</groupId>
             <artifactId>guice</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.google.inject.extensions</groupId>
-            <artifactId>guice-multibindings</artifactId>
         </dependency>
 
         <dependency>

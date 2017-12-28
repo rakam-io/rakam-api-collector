@@ -21,22 +21,25 @@ import java.util.concurrent.CompletableFuture;
 
 import static io.rakam.presto.kafka.KafkaWorkerManager.createConsumerConfig;
 
-public class KafkaHistoricalDataHandler implements HistoricalDataHandler {
+public class KafkaHistoricalDataHandler
+        implements HistoricalDataHandler
+{
     private final KafkaProducer<String, byte[]> producer;
     private final PagesSerde pagesSerde;
     private final KafkaConfig kafkaTopic;
 
     @Inject
-    public KafkaHistoricalDataHandler(KafkaConfig kafkaConfig, BlockEncodingSerde blockEncodingSerde) {
+    public KafkaHistoricalDataHandler(KafkaConfig kafkaConfig, BlockEncodingSerde blockEncodingSerde)
+    {
         producer = new KafkaProducer<>(createConsumerConfig(kafkaConfig));
         this.kafkaTopic = kafkaConfig;
         pagesSerde = new PagesSerde(blockEncodingSerde, Optional.empty(), Optional.empty());
     }
 
     @Override
-    public CompletableFuture<Void> handle(SchemaTableName table, List<Page> pages) {
-        producer.beginTransaction();
-
+    public CompletableFuture<Void> handle(SchemaTableName table, List<Page> pages)
+    {
+        //producer.beginTransaction();
 
         for (Page page : pages) {
             SerializedPage value = pagesSerde.serialize(page);
@@ -44,7 +47,7 @@ public class KafkaHistoricalDataHandler implements HistoricalDataHandler {
             byte[] bytes = value.getSlice().getBytes();
             producer.send(new ProducerRecord<>(null, table.toString(), bytes));
         }
-        producer.commitTransaction();
+        //producer.commitTransaction();
         return null;
     }
 }

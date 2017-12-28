@@ -5,6 +5,7 @@
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.HostAddress;
+
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.log.Logger;
@@ -30,17 +31,11 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.IOException;
+
 import java.io.UncheckedIOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Queue;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -90,13 +85,16 @@ public class KafkaWorkerManager
     public void start()
     {
         workerThread = new Thread(this::run);
-        workerThread.setDaemon(true);
         workerThread.start();
     }
 
-    public void subscribe()
-    {
-        consumer = new KafkaConsumer(createConsumerConfig(config));
+    public void subscribe() {
+        Properties kafkaProperties = createConsumerConfig(config);
+        try {
+            consumer = new KafkaConsumer(kafkaProperties);
+        } catch (Exception e){
+            e.printStackTrace();
+        }
         consumer.subscribe(config.getTopic());
     }
 
@@ -206,13 +204,10 @@ public class KafkaWorkerManager
         }
     }
 
-    private synchronized ConsumerRecords<byte[], byte[]> getRecords()
-    {
-        return consumer.poll(5);
-    }
 
-    public synchronized void commitSyncOffset(ConsumerRecord record)
-    {
+
+    public void commitSyncOffset(ConsumerRecord record) {
+
         if (record == null) {
             consumer.commitSync();
         }
@@ -223,9 +218,12 @@ public class KafkaWorkerManager
         }
     }
 
-    public static Properties createConsumerConfig(KafkaConfig config)
-    {
-        String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
+
+
+    public static Properties createConsumerConfig(KafkaConfig config) {
+
+           String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
+
         String offset = config.getOffset();
         String groupId = config.getGroupId();
         String sessionTimeOut = config.getSessionTimeOut();
@@ -234,6 +232,7 @@ public class KafkaWorkerManager
         Properties props = new Properties();
         props.put("bootstrap.servers", kafkaNodes);
         props.put("group.id", groupId);
+
         props.put("enable.auto.commit", "false");
         props.put("auto.offset.reset", offset);
         props.put("session.timeout.ms", sessionTimeOut);

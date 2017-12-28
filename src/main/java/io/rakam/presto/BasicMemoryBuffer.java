@@ -16,8 +16,8 @@ public class BasicMemoryBuffer<T>
     private final long millisecondsToBuffer;
     private final List<T> buffer;
     private final List<T> bulkBuffer;
-    private long previousFlushTimeMillisecond;
     private int totalBytes;
+    private long previousFlushTimeMillisecond;
     private long dataSizeToBuffer;
 
     public BasicMemoryBuffer(StreamConfig config)

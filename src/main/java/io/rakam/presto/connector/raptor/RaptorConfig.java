@@ -15,10 +15,10 @@ public class RaptorConfig
     private String nodeIdentifier = "collector";
     private File dataDirectory;
     private URI prestoURL;
-
     private String backupThreads = "5";
     private String dbMaxConnections = "100";
     private int maxConnection=100;
+
 
     public String getMetadataUrl()
     {

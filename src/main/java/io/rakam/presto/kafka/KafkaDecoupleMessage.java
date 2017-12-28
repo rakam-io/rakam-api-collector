@@ -16,7 +16,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.rakam.util.DateTimeUtils;
 
 import javax.inject.Inject;
-
 import java.io.IOException;
 import java.time.temporal.ChronoUnit;
 

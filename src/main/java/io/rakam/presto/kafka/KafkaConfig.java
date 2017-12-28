@@ -28,6 +28,7 @@ public class KafkaConfig
     private String[] topic;
     private String offset = "latest";
     private String groupId = "presto_streaming";
+
     private String sessionTimeOut = "12000";
     private String requestTimeOut = "15000";
 
@@ -36,15 +37,9 @@ public class KafkaConfig
         return ImmutableList.copyOf(topic);
     }
 
-    public String getOffset()
-    {
-        return offset;
-    }
+    public String getOffset() {return offset;}
 
-    public String getGroupId()
-    {
-        return groupId;
-    }
+    public String getGroupId() {return groupId;}
 
     public String getSessionTimeOut()
     {
