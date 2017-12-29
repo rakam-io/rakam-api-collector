@@ -10,10 +10,7 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.InstanceProfileCredentialsProvider;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
-import com.facebook.presto.raptor.backup.BackupConfig;
 import io.airlift.configuration.Config;
-
-import javax.validation.constraints.NotNull;
 
 import static com.amazonaws.regions.Regions.DEFAULT_REGION;
 

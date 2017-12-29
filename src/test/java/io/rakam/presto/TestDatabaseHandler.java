@@ -7,8 +7,6 @@ package io.rakam.presto;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.type.TimestampType;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 
 import java.util.ArrayList;
 import java.util.HashMap;

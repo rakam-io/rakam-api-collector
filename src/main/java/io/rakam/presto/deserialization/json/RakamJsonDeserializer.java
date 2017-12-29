@@ -42,10 +42,15 @@ import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TimeType.TIME;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
-import static com.fasterxml.jackson.core.JsonToken.*;
+import static com.fasterxml.jackson.core.JsonToken.END_ARRAY;
+import static com.fasterxml.jackson.core.JsonToken.END_OBJECT;
+import static com.fasterxml.jackson.core.JsonToken.START_OBJECT;
+import static com.fasterxml.jackson.core.JsonToken.VALUE_NULL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.String.format;
-import static org.rakam.collection.FieldType.*;
+import static org.rakam.collection.FieldType.ARRAY_STRING;
+import static org.rakam.collection.FieldType.MAP_STRING;
+import static org.rakam.collection.FieldType.STRING;
 import static org.rakam.presto.analysis.PrestoRakamRaptorMetastore.toType;
 
 public class RakamJsonDeserializer implements JsonDeserializer

@@ -5,6 +5,7 @@
 package io.rakam.presto;
 
 import com.facebook.presto.spi.SchemaTableName;
+import io.airlift.log.Logger;
 import io.rakam.presto.deserialization.TableData;
 
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class MiddlewareBuffer
 {
+    private static final Logger log = Logger.get(MiddlewareBuffer.class);
     private final Map<SchemaTableName, List<TableCheckpoint>> batches;
     private final MiddlewareConfig config;
     private Map<SchemaTableName, AtomicLong> bufferRecordCount = new ConcurrentHashMap<>();
@@ -75,17 +77,17 @@ public class MiddlewareBuffer
                 || bufferSize.get(name).get() > config.getMaxSize().toBytes();
     }
 
-
-    public Map<SchemaTableName, List<TableCheckpoint>> flush() {
-        long now = System.currentTimeMillis();
+    public Map<SchemaTableName, List<TableCheckpoint>> flush()
+    {
         Map<SchemaTableName, List<TableCheckpoint>> map = new ConcurrentHashMap<>();
-
         Iterator<Map.Entry<SchemaTableName, List<TableCheckpoint>>> iterator = batches.entrySet().iterator();
+        long now = System.currentTimeMillis();
+
         while (iterator.hasNext()) {
             Map.Entry<SchemaTableName, List<TableCheckpoint>> entry = iterator.next();
             if (shouldFlush(now, entry.getKey())) {
                 SchemaTableName tableName = entry.getKey();
-                System.out.println("table_name: " + tableName + " record_count: "+ bufferRecordCount.get(tableName).get() + " size: "+ bufferSize.get(tableName).get());
+                log.debug("table_name: " + tableName + " record_count: " + bufferRecordCount.get(tableName).get() + " size: " + bufferSize.get(tableName).get() + " bytes");
                 List<TableCheckpoint> value = entry.getValue();
                 map.computeIfAbsent(entry.getKey(), k -> new ArrayList<>()).addAll(value);
                 iterator.remove();

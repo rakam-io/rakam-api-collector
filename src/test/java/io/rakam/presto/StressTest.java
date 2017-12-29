@@ -13,7 +13,6 @@ import io.rakam.presto.connector.raptor.RaptorDatabaseHandler;
 import io.rakam.presto.connector.raptor.S3BackupConfig;
 import io.rakam.presto.deserialization.json.FabricJsonDeserializer;
 import io.rakam.presto.deserialization.json.JsonDeserializer;
-import io.rakam.presto.deserialization.json.RakamJsonDeserializer;
 import io.rakam.presto.kafka.KafkaConfig;
 import io.rakam.presto.kafka.KafkaDecoupleMessage;
 import io.rakam.presto.kafka.KafkaJsonMessageTransformer;
@@ -28,9 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -108,7 +105,7 @@ public class StressTest {
         AtomicLong lastPoll = new AtomicLong(System.currentTimeMillis());
 
         KafkaWorkerManager kafkaWorkerManager = new KafkaWorkerManager(kafkaConfig, middlewareConfig,
-                new KafkaDecoupleMessage(fieldNameConfig, streamConfig), context, targetConnectorCommitter) {
+                new KafkaDecoupleMessage(fieldNameConfig), context, targetConnectorCommitter) {
             @Override
             public void subscribe() {
                 consumer = new KafkaConsumer(createConsumerConfig(config)) {

@@ -13,7 +13,6 @@ import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import java.io.IOException;
 import java.util.HashMap;

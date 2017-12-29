@@ -10,7 +10,6 @@ import com.facebook.presto.spi.type.DoubleType;
 import com.facebook.presto.spi.type.IntegerType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.VarcharType;
-
 import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
 

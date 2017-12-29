@@ -5,7 +5,6 @@
 package com.facebook.presto.raptor.storage.backup;
 
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.S3ClientOptions;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.facebook.presto.rakam.S3BackupConfig;

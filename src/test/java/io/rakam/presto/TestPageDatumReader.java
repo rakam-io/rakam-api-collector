@@ -4,15 +4,17 @@
 
 package io.rakam.presto;
 
-import com.facebook.presto.block.BlockEncodingManager;
-import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
-import com.facebook.presto.spi.type.*;
-import com.facebook.presto.sql.analyzer.FeaturesConfig;
-import com.facebook.presto.type.TypeRegistry;
+import com.facebook.presto.spi.type.AbstractType;
+import com.facebook.presto.spi.type.ArrayType;
+import com.facebook.presto.spi.type.Decimals;
+import com.facebook.presto.spi.type.MapType;
+import com.facebook.presto.spi.type.SqlDecimal;
+import com.facebook.presto.spi.type.StandardTypes;
+import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slice;
@@ -23,10 +25,10 @@ import org.apache.avro.Schema.Field;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.AvroPageDatumReader;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.EncoderFactory;
-import org.apache.avro.io.AvroPageDatumReader;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;

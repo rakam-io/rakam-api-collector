@@ -8,10 +8,8 @@ import io.airlift.configuration.Config;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 
-import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
 
-import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
 public class StreamConfig

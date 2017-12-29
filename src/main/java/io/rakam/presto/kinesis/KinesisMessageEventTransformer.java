@@ -10,8 +10,8 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.SchemaTableName;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
-import io.rakam.presto.deserialization.avro.AvroMessageEventTransformer;
 import io.rakam.presto.S3MiddlewareConfig;
+import io.rakam.presto.deserialization.avro.AvroMessageEventTransformer;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DecoderFactory;
 

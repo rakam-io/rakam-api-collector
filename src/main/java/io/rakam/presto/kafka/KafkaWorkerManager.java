@@ -5,7 +5,6 @@
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.HostAddress;
-
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.log.Logger;
@@ -31,11 +30,17 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.io.IOException;
-
 import java.io.UncheckedIOException;
-import java.util.*;
-import java.util.concurrent.*;
-
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -43,7 +48,7 @@ public class KafkaWorkerManager
         implements Watcher
 {
     private static final Logger log = Logger.get(KafkaWorkerManager.class);
-
+    private static final long MILLS_IN_A_DAY = 86400000l;
     private final StreamWorkerContext<ConsumerRecord> context;
     private final TargetConnectorCommitter committer;
     private final MiddlewareBuffer middlewareBuffer;
@@ -52,9 +57,6 @@ public class KafkaWorkerManager
     protected KafkaConsumer<byte[], byte[]> consumer;
     protected KafkaConfig config;
     private ExecutorService executor;
-
-    private boolean infiniteLoop = true;
-    private int recordCount = 0;
 
     private Thread workerThread;
     private AtomicBoolean working;
@@ -88,33 +90,29 @@ public class KafkaWorkerManager
         workerThread.start();
     }
 
-    public void subscribe() {
-        Properties kafkaProperties = createConsumerConfig(config);
-        try {
-            consumer = new KafkaConsumer(kafkaProperties);
-        } catch (Exception e){
-            e.printStackTrace();
-        }
+    public void subscribe()
+    {
+        consumer = new KafkaConsumer(createConsumerConfig(config));
         consumer.subscribe(config.getTopic());
     }
 
     public void run()
     {
         subscribe();
-        long startTime = System.currentTimeMillis();
         Queue<List<TableCheckpoint>> checkpointQueue = new ConcurrentLinkedQueue<>();
-
+        int recordCount = 0;
+        int outdatedRecordCount = 0;
         try {
             while (working.get()) {
                 ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
-                long endTime = System.currentTimeMillis();
-
-                startTime = endTime;
+                long startTime = System.currentTimeMillis();
+                long todayInDate = startTime / MILLS_IN_A_DAY;
                 recordCount += kafkaRecord.count();
                 for (ConsumerRecord<byte[], byte[]> record : kafkaRecord) {
                     try {
-                        boolean recentData = decoupleMessage.isRecentData(record);
+                        boolean recentData = decoupleMessage.isRecentData(record, todayInDate);
                         if (!recentData) {
+                            outdatedRecordCount++;
                             continue;
                         }
                     }
@@ -133,8 +131,8 @@ public class KafkaWorkerManager
                             Map<SchemaTableName, TableData> convert = context.convert(records.getKey(), records.getValue());
                             long conversionEndTime = System.currentTimeMillis();
                             middlewareBuffer.add(new BatchRecords(convert, () -> commitSyncOffset(findLatestRecord(records))));
-                            log.debug("----Conversion time: " + (conversionEndTime - startTime) + " for records: " + recordCount);
-                            recordCount = 0;
+                            log.info("records: " + recordCount + " outdated_records: " + outdatedRecordCount + " record_conversion_time: " + (conversionEndTime - startTime));
+                            recordCount = outdatedRecordCount = 0;
                         }
 
                         buffer.clear();
@@ -143,12 +141,10 @@ public class KafkaWorkerManager
                             for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
                                 log.debug("committing data for table: " + entry.getKey().getTableName());
                                 CompletableFuture<Void> dbWriteWork = committer.process(entry.getKey(), entry.getValue());
-
                                 dbWriteWork.whenComplete((aVoid, throwable) -> {
                                     if (throwable != null) {
                                         log.error(throwable, "Error while processing records");
                                     }
-
                                     // TODO: What should we do if we can't isRecentData the data?
                                     checkpointQueue.add(entry.getValue());
                                 });
@@ -157,7 +153,7 @@ public class KafkaWorkerManager
                     }
                     catch (UncheckedIOException e) {
                         log.error("Unchecked Exception: " + e.getMessage());
-                        infiniteLoop = false;
+                        working.set(false);
                     }
                     catch (Throwable e) {
                         log.error(e, "Error processing Kafka records, passing record to latest offset.");
@@ -204,10 +200,8 @@ public class KafkaWorkerManager
         }
     }
 
-
-
-    public void commitSyncOffset(ConsumerRecord record) {
-
+    public void commitSyncOffset(ConsumerRecord record)
+    {
         if (record == null) {
             consumer.commitSync();
         }
@@ -218,11 +212,10 @@ public class KafkaWorkerManager
         }
     }
 
+    public static Properties createConsumerConfig(KafkaConfig config)
+    {
 
-
-    public static Properties createConsumerConfig(KafkaConfig config) {
-
-           String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
+        String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
 
         String offset = config.getOffset();
         String groupId = config.getGroupId();

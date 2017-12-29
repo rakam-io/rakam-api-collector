@@ -5,7 +5,6 @@
 package io.rakam.presto;
 
 import com.facebook.presto.spi.SchemaTableName;
-import com.google.common.collect.Table;
 import io.rakam.presto.deserialization.TableData;
 
 import java.util.HashSet;

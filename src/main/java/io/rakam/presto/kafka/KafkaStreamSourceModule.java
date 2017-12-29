@@ -7,7 +7,6 @@ package io.rakam.presto.kafka;
 import com.google.inject.Binder;
 import com.google.inject.Scopes;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
-import io.rakam.presto.HistoricalDataHandler;
 import io.rakam.presto.deserialization.DecoupleMessage;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.json.JsonDeserializer;
