@@ -41,6 +41,6 @@ public class KafkaStreamSourceModule
 
         binder.bind(DecoupleMessage.class).to(KafkaDecoupleMessage.class).in(Scopes.SINGLETON);
         binder.bind(MessageEventTransformer.class).to(clazz).in(Scopes.SINGLETON);
-    }
 
+    }
 }

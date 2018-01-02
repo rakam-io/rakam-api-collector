@@ -36,7 +36,6 @@ import static io.rakam.presto.kafka.KafkaConfig.DataFormat.JSON;
 public class StressTest {
     private static final Logger log = Logger.get(StressTest.class);
 
-
     public static void main1(String[] args) throws IOException {
         TestDatabaseHandler databaseHandler = new TestDatabaseHandler();
         FieldNameConfig fieldNameConfig = new FieldNameConfig();
@@ -78,7 +77,6 @@ public class StressTest {
         FieldNameConfig fieldNameConfig = new FieldNameConfig();
         S3BackupConfig s3BackupConfig = new S3BackupConfig();
         s3BackupConfig.setS3Bucket("test");
-
         RaptorDatabaseHandler databaseHandler = new RaptorDatabaseHandler(raptorConfig, new TypeRegistry(), s3BackupConfig, fieldNameConfig, new TestBackupStoreModule((uuid, file) -> {
             try {
                 Thread.sleep(1000);
@@ -99,7 +97,6 @@ public class StressTest {
         JsonDeserializer deserializer = new FabricJsonDeserializer(databaseHandler, fieldNameConfig);
         StreamWorkerContext context = new StreamWorkerContext(new KafkaJsonMessageTransformer(fieldNameConfig, databaseHandler, deserializer), streamConfig);
         TargetConnectorCommitter targetConnectorCommitter = new TargetConnectorCommitter(databaseHandler);
-
 
         AtomicLong totalRecord = new AtomicLong(-1);
         AtomicLong lastPoll = new AtomicLong(System.currentTimeMillis());

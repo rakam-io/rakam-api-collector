@@ -75,7 +75,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
-import java.security.Principal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +82,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-
 import static com.facebook.presto.spi.transaction.IsolationLevel.READ_COMMITTED;
 import static com.facebook.presto.spi.type.ParameterKind.TYPE;
 import static com.facebook.presto.spi.type.TimeZoneKey.UTC_KEY;
@@ -104,13 +102,14 @@ public class RaptorDatabaseHandler
     private final PrestoRakamRaptorMetastore metastore;
     private final Supplier<ConnectorMetadata> writeMetadata;
 
-
     @Inject
-    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig) {
+    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig)
+    {
         this(config, typeManager, s3BackupConfig, fieldNameConfig, null);
     }
 
-    public RaptorDatabaseHandler(RaptorConfig config,  TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule) {
+    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule)
+    {
         DatabaseMetadataModule metadataModule = new DatabaseMetadataModule();
 
         ImmutableMap.Builder<String, Module> builder = ImmutableMap.builder();
@@ -166,12 +165,13 @@ public class RaptorDatabaseHandler
                 .put("metadata.db.type", "mysql")
                 .put("metadata.db.url", config.getMetadataUrl())
                 .put("storage.data-directory", config.getDataDirectory().getAbsolutePath())
-                .put("metadata.db.connections.max", String.valueOf(config.getMaxConnection()))
+                //.put("metadata.db.connections.max", String.valueOf(config))
                 .put("backup.timeout", "20m");
 
         if (backupStoreModule != null) {
             props.put("backup.provider", "embedded");
-        } else if (s3BackupConfig.getS3Bucket() != null) {
+        }
+        else if (s3BackupConfig.getS3Bucket() != null) {
             props.put("backup.provider", "s3");
             props.put("aws.s3-bucket", s3BackupConfig.getS3Bucket());
             props.put("aws.region", s3BackupConfig.getAWSRegion().getName());
@@ -187,7 +187,8 @@ public class RaptorDatabaseHandler
             if (s3BackupConfig.getEndpoint() != null) {
                 props.put("aws.s3-endpoint", s3BackupConfig.getEndpoint());
             }
-        } else {
+        }
+        else {
             throw new IllegalArgumentException("The `raptor.aws.s3-bucket` must be set in order to setup the backup configuration.");
         }
 
@@ -208,7 +209,7 @@ public class RaptorDatabaseHandler
         sessionPropertyManager.addConnectorSessionProperties(connectorId, connector.getSessionProperties());
 
         session = Session.builder(sessionPropertyManager)
-                .setIdentity(new Identity("rakam", Optional.<Principal>empty()))
+                .setIdentity(new Identity("rakam", Optional.empty()))
                 .setTimeZoneKey(UTC_KEY)
                 .setLocale(ENGLISH)
                 .setQueryId(QueryId.valueOf("streaming_batch"))
@@ -235,9 +236,9 @@ public class RaptorDatabaseHandler
                 }
             }
             jdbcConfig.setUrl(config.getMetadataUrl());
-
             jdbcConfig.setMaxConnection(config.getMaxConnection() / 3);
-        } catch (URISyntaxException | UnsupportedEncodingException e) {
+        }
+        catch (URISyntaxException | UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
 
@@ -311,11 +312,11 @@ public class RaptorDatabaseHandler
             public CompletableFuture<Void> commit()
             {
                 CompletableFuture<Collection<Slice>> finish = pageSink.finish();
-
             /*    finish.join();
                 long endTime = System.currentTimeMillis();
                 log.info("Page Sink: " + (endTime - startTime));
-*/                return finish.thenAccept(slices ->
+*/
+                return finish.thenAccept(slices ->
                         // 6 mysql insert queries
                         connectorMetadata.finishInsert(session, insertTableHandle, slices));
             }
@@ -329,8 +330,8 @@ public class RaptorDatabaseHandler
         private final TypeManager typeManager;
         private final PagesIndexPageSorter pageSorter;
 
-
-        public ProxyConnectorContext(NodeManager nodeManager, TypeManager typeManager, PagesIndexPageSorter pageSorter) {
+        public ProxyConnectorContext(NodeManager nodeManager, TypeManager typeManager, PagesIndexPageSorter pageSorter)
+        {
             this.nodeManager = nodeManager;
             this.typeManager = typeManager;
             this.pageSorter = pageSorter;
@@ -341,8 +342,8 @@ public class RaptorDatabaseHandler
             return nodeManager;
         }
 
-
-        public TypeManager getTypeManager() {
+        public TypeManager getTypeManager()
+        {
             return typeManager;
         }
 

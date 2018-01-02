@@ -45,8 +45,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public class KafkaWorkerManager
-        implements Watcher
-{
+        implements Watcher {
     private static final Logger log = Logger.get(KafkaWorkerManager.class);
     private static final long MILLS_IN_A_DAY = 86400000l;
     private final StreamWorkerContext<ConsumerRecord> context;
@@ -57,7 +56,6 @@ public class KafkaWorkerManager
     protected KafkaConsumer<byte[], byte[]> consumer;
     protected KafkaConfig config;
     private ExecutorService executor;
-
     private Thread workerThread;
     private AtomicBoolean working;
 
@@ -90,8 +88,7 @@ public class KafkaWorkerManager
         workerThread.start();
     }
 
-    public void subscribe()
-    {
+    public void subscribe() {
         consumer = new KafkaConsumer(createConsumerConfig(config));
         consumer.subscribe(config.getTopic());
     }
@@ -200,12 +197,10 @@ public class KafkaWorkerManager
         }
     }
 
-    public void commitSyncOffset(ConsumerRecord record)
-    {
+    public void commitSyncOffset(ConsumerRecord record) {
         if (record == null) {
             consumer.commitSync();
-        }
-        else {
+        } else {
             Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
             offsets.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1));
             consumer.commitSync(offsets);
@@ -225,7 +220,6 @@ public class KafkaWorkerManager
         Properties props = new Properties();
         props.put("bootstrap.servers", kafkaNodes);
         props.put("group.id", groupId);
-
         props.put("enable.auto.commit", "false");
         props.put("auto.offset.reset", offset);
         props.put("session.timeout.ms", sessionTimeOut);
@@ -238,16 +232,14 @@ public class KafkaWorkerManager
         return props;
     }
 
-    private ConsumerRecord findLatestRecord(Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> records)
-    {
+    private ConsumerRecord findLatestRecord(Map.Entry<List<ConsumerRecord>, List<ConsumerRecord>> records) {
         ConsumerRecord lastSingleRecord = records.getKey().isEmpty() ? null : records.getKey().get(records.getKey().size() - 1);
         ConsumerRecord lastBatchRecord = records.getValue().isEmpty() ? null : records.getValue().get(records.getValue().size() - 1);
 
         ConsumerRecord lastRecord;
         if (lastBatchRecord != null && lastSingleRecord != null) {
             lastRecord = lastBatchRecord.offset() > lastBatchRecord.offset() ? lastBatchRecord : lastSingleRecord;
-        }
-        else {
+        } else {
             lastRecord = lastBatchRecord != null ? lastBatchRecord : lastSingleRecord;
         }
 

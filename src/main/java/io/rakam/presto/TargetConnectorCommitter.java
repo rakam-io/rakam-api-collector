@@ -15,15 +15,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
-public class TargetConnectorCommitter
-{
+public class TargetConnectorCommitter {
     private static final Logger log = Logger.get(TargetConnectorCommitter.class);
     private final DatabaseHandler databaseHandler;
     private final AsyncRetryExecutor executor;
 
     @Inject
-    public TargetConnectorCommitter(DatabaseHandler databaseHandler)
-    {
+    public TargetConnectorCommitter(DatabaseHandler databaseHandler) {
         this.databaseHandler = databaseHandler;
         //ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors());

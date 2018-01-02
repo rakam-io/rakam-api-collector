@@ -22,7 +22,6 @@ public class FieldNameConfig
     private String checkpointField = "_shard_time";
     private String userFieldName = "_actor";
     private String timeField = "_time";
-
     private Set<String> whitelistedCollections = new HashSet<>();
     private Set<String> excludedColumns = ImmutableSet.of("_project", "_collection");
     private UserType userFieldType = UserType.STRING;

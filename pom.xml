@@ -439,7 +439,6 @@
             <artifactId>presto-spi</artifactId>
             <version>${presto.version}</version>
         </dependency>
-
     </dependencies>
 
     <build>

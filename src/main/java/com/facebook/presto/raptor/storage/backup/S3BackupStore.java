@@ -80,6 +80,7 @@ public class S3BackupStore
         inMemoryFileSystem.remove(source.getName());
     }
 
+
     public void restoreShard(UUID uuid, File target)
     {
         // no-op
@@ -149,4 +150,5 @@ public class S3BackupStore
             return false;
         }
     }
+
 }

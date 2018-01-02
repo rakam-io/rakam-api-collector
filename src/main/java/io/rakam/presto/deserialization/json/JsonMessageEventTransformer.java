@@ -8,8 +8,8 @@ import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
-import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
@@ -71,7 +71,6 @@ public abstract class JsonMessageEventTransformer<T>
         for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
             builder.put(entry.getKey(), new TableData(entry.getValue().getPage(), entry.getValue().getActualSchema()));
         }
-
         return builder.build();
     }
 
