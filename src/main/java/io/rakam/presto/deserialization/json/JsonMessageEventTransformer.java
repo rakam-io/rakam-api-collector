@@ -8,8 +8,8 @@ import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
-import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public abstract class JsonMessageEventTransformer<T>
         extends MessageEventTransformer<T, JsonDeserializer>
@@ -25,12 +26,14 @@ public abstract class JsonMessageEventTransformer<T>
     static final Logger LOGGER = Logger.get(JsonMessageEventTransformer.class);
     protected final JsonDeserializer jsonDecoder;
     private final String checkpointColumn;
+    private Set<String> whitelistedCollections;
 
     public JsonMessageEventTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler database, JsonDeserializer jsonDecoder)
     {
         super(fieldNameConfig, database);
         this.jsonDecoder = jsonDecoder;
         this.checkpointColumn = fieldNameConfig.getCheckpointField();
+        this.whitelistedCollections = fieldNameConfig.getWhitelistedCollections();
     }
 
     @Override
@@ -42,25 +45,32 @@ public abstract class JsonMessageEventTransformer<T>
             SchemaTableName collection;
             try {
                 collection = extractCollection(record, jsonDecoder);
+                if (whitelistedCollections.size() > 0 && !whitelistedCollections.contains(collection.getTableName())) {
+                    continue;
+                }
             }
             catch (Throwable e) {
                 LOGGER.error(e, "Unable to parse collection from message in Kafka topic.");
                 continue;
             }
 
-            PageReader pageBuilder = getReader(builderMap, collection);
-            if (pageBuilder == null) {
+            try {
+                PageReader pageBuilder = getReader(builderMap, collection);
+                if (pageBuilder == null) {
+                    continue;
+                }
+                pageBuilder.read(jsonDecoder);
+            }
+            catch (Exception e) {
+                LOGGER.error(e, "Unable to parse message skipping it");
                 continue;
             }
-
-            pageBuilder.read(jsonDecoder);
         }
 
         ImmutableMap.Builder<SchemaTableName, TableData> builder = ImmutableMap.builder();
         for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
             builder.put(entry.getKey(), new TableData(entry.getValue().getPage(), entry.getValue().getActualSchema()));
         }
-
         return builder.build();
     }
 

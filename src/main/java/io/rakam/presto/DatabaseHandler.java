@@ -18,7 +18,8 @@ public interface DatabaseHandler
 
     Inserter insert(String schema, String table);
 
-    interface Inserter {
+    interface Inserter
+    {
 
         void addPage(Page page);
 

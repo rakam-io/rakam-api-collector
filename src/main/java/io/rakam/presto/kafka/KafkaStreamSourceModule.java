@@ -44,5 +44,4 @@ public class KafkaStreamSourceModule
         binder.bind(HistoricalDataHandler.class).to(KafkaHistoricalDataHandler.class).in(Scopes.SINGLETON);
         binder.bind(MessageEventTransformer.class).to(clazz).in(Scopes.SINGLETON);
     }
-
 }

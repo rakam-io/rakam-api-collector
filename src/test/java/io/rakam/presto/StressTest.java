@@ -9,7 +9,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
-import io.airlift.units.Duration;
 import io.rakam.presto.connector.raptor.RaptorConfig;
 import io.rakam.presto.connector.raptor.RaptorDatabaseHandler;
 import io.rakam.presto.connector.raptor.S3BackupConfig;
@@ -39,10 +38,13 @@ import java.util.stream.IntStream;
 import static io.rakam.presto.kafka.KafkaConfig.DataFormat.JSON;
 import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
 
-public class StressTest {
+public class StressTest
+{
     private static final Logger log = Logger.get(StressTest.class);
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args)
+            throws Exception
+    {
         final List<byte[]> consumerRecords = getDataForFabric();
 
         KafkaConfig kafkaConfig = new KafkaConfig()
@@ -62,7 +64,8 @@ public class StressTest {
         TestBackupStoreModule backupStoreModule = new TestBackupStoreModule((uuid, file) -> {
             try {
                 Thread.sleep(1000);
-            } catch (InterruptedException e) {
+            }
+            catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
         });
@@ -86,12 +89,17 @@ public class StressTest {
         AtomicLong totalRecord = new AtomicLong(-1);
         AtomicLong lastPoll = new AtomicLong(System.currentTimeMillis());
 
-        KafkaRealTimeWorker kafkaWorker = new KafkaRealTimeWorker(kafkaConfig, memoryTracker, middlewareConfig, context, targetConnectorCommitter) {
+        KafkaRealTimeWorker kafkaWorker = new KafkaRealTimeWorker(kafkaConfig, memoryTracker, middlewareConfig, context, targetConnectorCommitter)
+        {
             @Override
-            public void subscribe() {
-                consumer = new KafkaConsumer(createConsumerConfig(config)) {
+            public void subscribe()
+            {
+                consumer = new KafkaConsumer(createConsumerConfig(config))
+                {
+
                     @Override
-                    public ConsumerRecords poll(long timeout) {
+                    public ConsumerRecords poll(long timeout)
+                    {
 
                         long currentTotalRecord = totalRecord.get();
                         log.info("poll started. since last poll: " + ((System.currentTimeMillis() - lastPoll.get())) + "ms. total records:" + currentTotalRecord +
@@ -100,18 +108,20 @@ public class StressTest {
 
                         try {
                             Thread.sleep(timeout);
-                        } catch (InterruptedException e) {
+                        }
+                        catch (InterruptedException e) {
                             throw new RuntimeException(e);
                         }
                         lastPoll.set(System.currentTimeMillis());
 
                         List<ConsumerRecord<byte[], byte[]>> records = IntStream.range(0, consumerRecords.size())
-                                .mapToObj(i -> new ConsumerRecord<>("test", -1, currentTotalRecord + i, new byte[]{}, consumerRecords.get(i)))
+                                .mapToObj(i -> new ConsumerRecord<>("test", -1, currentTotalRecord + i, new byte[] {}, consumerRecords.get(i)))
                                 .collect(Collectors.toList());
 
                         if (currentTotalRecord == -1) {
                             totalRecord.set(0);
-                        } else {
+                        }
+                        else {
                             totalRecord.addAndGet(consumerRecords.size());
                         }
 
@@ -121,10 +131,12 @@ public class StressTest {
             }
 
             @Override
-            public void commitSyncOffset(KafkaConsumer<byte[], byte[]> consumer, ConsumerRecord record) {
+            public void commitSyncOffset(KafkaConsumer<byte[], byte[]> consumer, ConsumerRecord record)
+            {
                 if (record == null) {
                     committedRecords.set(totalRecord.get());
-                } else {
+                }
+                else {
                     committedRecords.set(record.offset());
                 }
             }
@@ -133,7 +145,8 @@ public class StressTest {
         kafkaWorker.execute();
     }
 
-    private static List<byte[]> getDataForFabric() {
+    private static List<byte[]> getDataForFabric()
+    {
         return IntStream.range(0, 30000).mapToObj(i -> JsonHelper.encodeAsBytes(ImmutableMap.of(
                 "id", "test",
                 "metadata", ImmutableMap.builder().build(),
@@ -161,7 +174,8 @@ public class StressTest {
                         .put("is_positive", false).build()))).collect(Collectors.toList());
     }
 
-    private static List<byte[]> getDataForRakam() {
+    private static List<byte[]> getDataForRakam()
+    {
         return IntStream.range(0, 30000).mapToObj(i -> JsonHelper.encodeAsBytes(ImmutableMap.of(
                 "project", "demo",
                 "collection", "tweet3",
@@ -187,7 +201,9 @@ public class StressTest {
                         .put("is_positive", false).build()))).collect(Collectors.toList());
     }
 
-    public static void producer() throws IOException {
+    public static void producer()
+            throws IOException
+    {
         KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(createConsumerConfig(new KafkaConfig().setNodes("127.0.0.1:9092").setTopic("sample")));
 
         long now = Instant.now().toEpochMilli();
@@ -232,7 +248,6 @@ public class StressTest {
             if (i % 10000 == 0) {
                 System.out.println(i);
             }
-
         }
     }
 }

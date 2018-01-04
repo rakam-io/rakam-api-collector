@@ -14,7 +14,8 @@ import java.util.List;
 
 import static io.rakam.presto.deserialization.avro.AvroUtil.convertAvroSchema;
 
-public class AvroPageReader extends PageReader<BinaryDecoder>
+public class AvroPageReader
+        extends PageReader<BinaryDecoder>
 {
     public AvroPageReader(String checkpointColumn, List<ColumnMetadata> rakamSchema)
     {

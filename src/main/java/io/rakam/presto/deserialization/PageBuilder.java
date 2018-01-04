@@ -14,7 +14,6 @@ import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -77,7 +76,7 @@ public class PageBuilder
         pageBuilderStatus = new PageBuilderStatus(DEFAULT_MAX_PAGE_SIZE_IN_BYTES, maxBlockSizeInBytes);
         blockBuilders = new BlockBuilder[types.size()];
 
-        if(declaredPositions != null) {
+        if (declaredPositions != null) {
             this.declaredPositions = declaredPositions;
         }
 

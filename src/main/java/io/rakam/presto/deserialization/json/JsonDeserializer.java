@@ -3,7 +3,9 @@
  */
 
 package io.rakam.presto.deserialization.json;
-
+/*
+ * Licensed under the Rakam Incorporation
+ */
 import com.facebook.presto.spi.SchemaTableName;
 
 import java.io.IOException;

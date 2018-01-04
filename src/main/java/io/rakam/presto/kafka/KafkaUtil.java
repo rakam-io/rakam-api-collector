@@ -1,3 +1,7 @@
+/*
+ * Licensed under the Rakam Incorporation
+ */
+
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.HostAddress;
@@ -19,9 +23,11 @@ import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
-public class KafkaUtil {
+public class KafkaUtil
+{
 
-    public static Properties createConsumerConfig(KafkaConfig config) {
+    public static Properties createConsumerConfig(KafkaConfig config)
+    {
         String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
         String offset = config.getOffset();
         String groupId = config.getGroupId();
@@ -44,21 +50,24 @@ public class KafkaUtil {
         return props;
     }
 
-    public static ConsumerRecord findLatestRecord(BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records) {
+    public static ConsumerRecord findLatestRecord(BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records)
+    {
         ConsumerRecord lastSingleRecord = records.buffer.isEmpty() ? null : records.buffer.get(records.buffer.size() - 1);
         ConsumerRecord lastBatchRecord = records.bulkBuffer.isEmpty() ? null : records.bulkBuffer.get(records.bulkBuffer.size() - 1);
 
         ConsumerRecord lastRecord;
         if (lastBatchRecord != null && lastSingleRecord != null) {
             lastRecord = lastBatchRecord.offset() > lastBatchRecord.offset() ? lastBatchRecord : lastSingleRecord;
-        } else {
+        }
+        else {
             lastRecord = lastBatchRecord != null ? lastBatchRecord : lastSingleRecord;
         }
 
         return lastRecord;
     }
 
-    public static void close(StreamWorkerContext context, KafkaConsumer consumer, ExecutorService executor, Logger log) {
+    public static void close(StreamWorkerContext context, KafkaConsumer consumer, ExecutorService executor, Logger log)
+    {
         context.shutdown();
         if (consumer != null) {
             consumer.close();
@@ -70,13 +79,15 @@ public class KafkaUtil {
                 if (!executor.awaitTermination(5000, MILLISECONDS)) {
                     log.warn("Timed out waiting for consumer threads to shut down, exiting uncleanly");
                 }
-            } catch (InterruptedException e) {
+            }
+            catch (InterruptedException e) {
                 log.warn("Interrupted during shutdown, exiting uncleanly");
             }
         }
     }
 
-    public static void flushIfNeeded(MiddlewareBuffer middlewareBuffer, TargetConnectorCommitter committer, Queue<List<TableCheckpoint>> checkpointQueue, MemoryTracker memoryTracker, Logger log) {
+    public static void flushIfNeeded(MiddlewareBuffer middlewareBuffer, TargetConnectorCommitter committer, Queue<List<TableCheckpoint>> checkpointQueue, MemoryTracker memoryTracker, Logger log)
+    {
         Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();
 
         if (!map.isEmpty()) {

@@ -4,6 +4,7 @@
 
 package io.rakam.presto;
 
+import com.facebook.presto.hadoop.$internal.com.google.common.base.Strings;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.DoubleType;
 import com.facebook.presto.spi.type.IntegerType;
@@ -21,8 +22,8 @@ public class FieldNameConfig
     private String checkpointField = "_shard_time";
     private String userFieldName = "_user";
     private String timeField = "_time";
+    private Set<String> whitelistedCollections = new HashSet<>();
     private Set<String> excludedColumns = ImmutableSet.of("_project", "_collection");
-
     private UserType userFieldType = UserType.STRING;
 
     @Config("database.checkpoint-field")
@@ -63,6 +64,18 @@ public class FieldNameConfig
         return this;
     }
 
+    @Config("database.whitelisted.collections")
+    public FieldNameConfig setWhitelistedCollections(String collections)
+    {
+        if (!Strings.isNullOrEmpty(collections)) {
+            collections = collections.replaceAll("\\s+", "");
+            if (collections.length() > 1 && collections.matches(".*[a-zA-Z]+.*")) {
+                whitelistedCollections = new HashSet<>(Arrays.asList(collections.split(",")));
+            }
+        }
+        return this;
+    }
+
     public String getCheckpointField()
     {
         return checkpointField;
@@ -87,6 +100,8 @@ public class FieldNameConfig
     {
         return excludedColumns;
     }
+
+    public Set<String> getWhitelistedCollections() {return whitelistedCollections;}
 
     public enum UserType
     {

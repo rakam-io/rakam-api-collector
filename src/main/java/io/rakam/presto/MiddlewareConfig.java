@@ -8,8 +8,7 @@ import io.airlift.configuration.Config;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 
-public class
-MiddlewareConfig
+public class MiddlewareConfig
 {
     private Duration maxFlushDuration = Duration.valueOf("60s");
 

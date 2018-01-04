@@ -1,3 +1,7 @@
+/*
+ * Licensed under the Rakam Incorporation
+ */
+
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.SchemaTableName;
@@ -14,6 +18,7 @@ import org.apache.kafka.common.TopicPartition;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
+
 import java.io.IOException;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -27,7 +32,8 @@ import static io.rakam.presto.kafka.KafkaHistoricalDataHandler.KAFKA_KEY_FOR_HIS
 import static io.rakam.presto.kafka.KafkaUtil.*;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-public class KafkaHistoricalWorker {
+public class KafkaHistoricalWorker
+{
     private static final Logger log = Logger.get(KafkaHistoricalWorker.class);
     private final MemoryTracker memoryTracker;
     private final BasicMemoryBuffer<ConsumerRecord> buffer;
@@ -49,7 +55,8 @@ public class KafkaHistoricalWorker {
     private AtomicBoolean working;
 
     @Inject
-    public KafkaHistoricalWorker(KafkaConfig config, MemoryTracker memoryTracker, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer) {
+    public KafkaHistoricalWorker(KafkaConfig config, MemoryTracker memoryTracker, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
+    {
         this.config = config;
         this.context = context;
         this.committer = committer;
@@ -64,22 +71,26 @@ public class KafkaHistoricalWorker {
     }
 
     @PreDestroy
-    public void shutdown() {
+    public void shutdown()
+    {
         working.set(false);
     }
 
     @PostConstruct
-    public void start() {
+    public void start()
+    {
         workerThread = new Thread(this::execute);
         workerThread.start();
     }
 
-    public void subscribe() {
+    public void subscribe()
+    {
         consumer = new KafkaConsumer(createConsumerConfig(config));
         consumer.subscribe(config.getTopic());
     }
 
-    public void execute() {
+    public void execute()
+    {
         subscribe();
 
         try {
@@ -88,7 +99,8 @@ public class KafkaHistoricalWorker {
                 if (now - lastRunTimestamp < sleepDurationInMillis) {
                     try {
                         SECONDS.sleep(100);
-                    } catch (InterruptedException e) {
+                    }
+                    catch (InterruptedException e) {
                         break;
                     }
                     continue;
@@ -98,7 +110,8 @@ public class KafkaHistoricalWorker {
                 for (ConsumerRecord<byte[], byte[]> record : records) {
                     if (KAFKA_KEY_FOR_HISTORICAL_DATA.equals(record.key())) {
                         buffer.consumePage(record, record.value().length);
-                    } else {
+                    }
+                    else {
                         buffer.consumeRecord(record, record.value().length);
                     }
                 }
@@ -110,7 +123,8 @@ public class KafkaHistoricalWorker {
                     Map<SchemaTableName, TableData> convert;
                     try {
                         convert = context.convert(recordList.buffer, recordList.bulkBuffer, recordList.pageBuffer);
-                    } catch (IOException e) {
+                    }
+                    catch (IOException e) {
                         log.error(e, "Error processing Kafka records, passing record to latest offset.");
                         commitSyncOffset(consumer, null);
                         continue;
@@ -121,7 +135,8 @@ public class KafkaHistoricalWorker {
                     if (memoryTracker.availableMemory() == -1) {
                         try {
                             KafkaUtil.flushIfNeeded(middlewareBuffer, committer, checkpointQueue, memoryTracker, log);
-                        } catch (Throwable e) {
+                        }
+                        catch (Throwable e) {
                             log.error(e, "Error processing Kafka records, passing record to latest offset.");
                             commitSyncOffset(consumer, null);
                         }
@@ -135,27 +150,31 @@ public class KafkaHistoricalWorker {
                 }
                 lastRunTimestamp = now;
             }
-        } finally {
+        }
+        finally {
             KafkaUtil.close(context, consumer, executor, log);
         }
     }
 
-
-    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value) {
+    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value)
+    {
         for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
             try {
                 tableCheckpoint.checkpoint();
-            } catch (BatchRecords.CheckpointException e) {
+            }
+            catch (BatchRecords.CheckpointException e) {
                 log.error(e, "Error while checkpointing records");
             }
         }
     }
 
     @SuppressWarnings("Duplicates")
-    public void commitSyncOffset(KafkaConsumer<byte[], byte[]> consumer, ConsumerRecord record) {
+    public void commitSyncOffset(KafkaConsumer<byte[], byte[]> consumer, ConsumerRecord record)
+    {
         if (record == null) {
             consumer.commitSync();
-        } else {
+        }
+        else {
             Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
             offsets.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1));
             consumer.commitSync(offsets);

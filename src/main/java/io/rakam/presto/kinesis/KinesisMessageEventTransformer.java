@@ -8,10 +8,10 @@ import com.amazonaws.services.kinesis.model.Record;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.SchemaTableName;
-import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
-import io.rakam.presto.deserialization.avro.AvroMessageEventTransformer;
 import io.rakam.presto.S3MiddlewareConfig;
+import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.deserialization.avro.AvroMessageEventTransformer;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DecoderFactory;
 
@@ -54,8 +54,8 @@ public class KinesisMessageEventTransformer
         byte dataFormatType = array[0];
         if (dataFormatType == 0 || dataFormatType == 1) {
             collection = partitionKey.substring(splitterIndex + 1);
-        } else
-        if (dataFormatType == 2) {
+        }
+        else if (dataFormatType == 2) {
             if (decoder == null) {
                 decoder = DecoderFactory.get().binaryDecoder(array, null);
             }

@@ -17,6 +17,7 @@ import org.apache.kafka.common.TopicPartition;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
+
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
@@ -26,7 +27,8 @@ import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
 import static io.rakam.presto.kafka.KafkaUtil.findLatestRecord;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
-public class KafkaRealTimeWorker {
+public class KafkaRealTimeWorker
+{
     private static final Logger log = Logger.get(KafkaRealTimeWorker.class);
 
     protected KafkaConsumer<byte[], byte[]> consumer;
@@ -46,7 +48,8 @@ public class KafkaRealTimeWorker {
     private AtomicBoolean working;
 
     @Inject
-    public KafkaRealTimeWorker(KafkaConfig config, MemoryTracker memoryTracker, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer) {
+    public KafkaRealTimeWorker(KafkaConfig config, MemoryTracker memoryTracker, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
+    {
         this.config = config;
         this.context = context;
         this.committer = committer;
@@ -60,22 +63,26 @@ public class KafkaRealTimeWorker {
     }
 
     @PreDestroy
-    public void shutdown() {
+    public void shutdown()
+    {
         working.set(false);
     }
 
     @PostConstruct
-    public void start() {
+    public void start()
+    {
         workerThread = new Thread(this::execute);
         workerThread.start();
     }
 
-    public void subscribe() {
+    public void subscribe()
+    {
         consumer = new KafkaConsumer(createConsumerConfig(config));
         consumer.subscribe(config.getTopic());
     }
 
-    public void execute() {
+    public void execute()
+    {
         subscribe();
 
         try {
@@ -87,7 +94,8 @@ public class KafkaRealTimeWorker {
                 if (buffer.shouldFlush()) {
                     try {
                         flushData();
-                    } catch (Throwable e) {
+                    }
+                    catch (Throwable e) {
                         log.error(e, "Error processing Kafka records, passing record to latest offset.");
                         commitSyncOffset(consumer, null);
                     }
@@ -102,17 +110,21 @@ public class KafkaRealTimeWorker {
                 while (memoryTracker.availableMemory() == -1) {
                     try {
                         MILLISECONDS.sleep(200);
-                    } catch (InterruptedException e) {
+                    }
+                    catch (InterruptedException e) {
                         break;
                     }
                 }
             }
-        } finally {
+        }
+        finally {
             KafkaUtil.close(context, consumer, executor, log);
         }
     }
 
-    private void flushData() throws IOException {
+    private void flushData()
+            throws IOException
+    {
         BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records = buffer.getRecords();
 
         if (!records.bulkBuffer.isEmpty() || !records.buffer.isEmpty()) {
@@ -125,23 +137,26 @@ public class KafkaRealTimeWorker {
         KafkaUtil.flushIfNeeded(middlewareBuffer, committer, checkpointQueue, memoryTracker, log);
     }
 
-
     @SuppressWarnings("Duplicates")
-    public void commitSyncOffset(KafkaConsumer<byte[], byte[]> consumer, ConsumerRecord record) {
+    public void commitSyncOffset(KafkaConsumer<byte[], byte[]> consumer, ConsumerRecord record)
+    {
         if (record == null) {
             consumer.commitSync();
-        } else {
+        }
+        else {
             Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
             offsets.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1));
             consumer.commitSync(offsets);
         }
     }
 
-    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value) {
+    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value)
+    {
         for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
             try {
                 tableCheckpoint.checkpoint();
-            } catch (BatchRecords.CheckpointException e) {
+            }
+            catch (BatchRecords.CheckpointException e) {
                 log.error(e, "Error while checkpointing records");
             }
         }

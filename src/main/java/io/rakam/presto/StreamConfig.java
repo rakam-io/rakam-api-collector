@@ -9,28 +9,30 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.airlift.units.MinDataSize;
 
-import java.time.temporal.ChronoUnit;
 import java.util.concurrent.TimeUnit;
 
-import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
-public class StreamConfig {
+public class StreamConfig
+{
     private Duration maxFlushDuration = Duration.succinctDuration(5, TimeUnit.SECONDS);
     private int realTimeFlushDays = 1;
 
     @Config("stream.max-flush-duration")
-    public StreamConfig setMaxFlushDuration(Duration maxFlushDuration) {
+    public StreamConfig setMaxFlushDuration(Duration maxFlushDuration)
+    {
         this.maxFlushDuration = maxFlushDuration;
         return this;
     }
 
-    public Duration getMaxFlushDuration() {
+    public Duration getMaxFlushDuration()
+    {
         return maxFlushDuration;
     }
 
     @Config("stream.real-time-flush-duration")
-    public StreamConfig setRealTimeFlushDays(int realTimeFlushDays) {
+    public StreamConfig setRealTimeFlushDays(int realTimeFlushDays)
+    {
         if (realTimeFlushDays < 1) {
             throw new IllegalStateException("`stream.real-time-flush-duration` must be greater than 1");
         }
@@ -38,7 +40,8 @@ public class StreamConfig {
         return this;
     }
 
-    public int getRealTimeFlushDays() {
+    public int getRealTimeFlushDays()
+    {
         return realTimeFlushDays;
     }
 }

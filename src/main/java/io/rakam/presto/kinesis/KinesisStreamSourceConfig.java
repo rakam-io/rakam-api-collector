@@ -119,13 +119,14 @@ public class KinesisStreamSourceConfig
 
     public AWSCredentialsProvider getCredentials()
     {
-        if(accessKey == null && secretAccessKey == null) {
+        if (accessKey == null && secretAccessKey == null) {
             return new InstanceProfileCredentialsProvider();
         }
         return new StaticCredentialsProvider(new BasicAWSCredentials(getAccessKey(), getSecretAccessKey()));
     }
 
-    public Region getAWSRegion() {
+    public Region getAWSRegion()
+    {
         return Region.getRegion(region == null ? Regions.DEFAULT_REGION : Regions.fromName(region));
     }
 }

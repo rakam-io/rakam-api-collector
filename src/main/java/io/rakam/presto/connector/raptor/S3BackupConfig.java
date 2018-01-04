@@ -53,7 +53,6 @@ public class S3BackupConfig
     {
         this.region = region;
         return this;
-
     }
 
     @NotNull

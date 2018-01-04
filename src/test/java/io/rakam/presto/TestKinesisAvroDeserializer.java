@@ -6,8 +6,8 @@ package io.rakam.presto;
 
 import com.amazonaws.services.kinesis.model.Record;
 import com.google.common.collect.ImmutableList;
-import io.rakam.presto.deserialization.avro.AvroUtil;
 import io.rakam.presto.deserialization.MessageEventTransformer;
+import io.rakam.presto.deserialization.avro.AvroUtil;
 import io.rakam.presto.kinesis.KinesisMessageEventTransformer;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;

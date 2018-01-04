@@ -19,6 +19,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import javax.inject.Inject;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -27,8 +28,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.facebook.presto.execution.buffer.PageCompression.UNCOMPRESSED;
 import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
 
-public class KafkaHistoricalDataHandler implements HistoricalDataHandler {
-    public final static byte[] KAFKA_KEY_FOR_HISTORICAL_DATA = new byte[]{0};
+public class KafkaHistoricalDataHandler
+        implements HistoricalDataHandler
+{
+    final static byte[] KAFKA_KEY_FOR_HISTORICAL_DATA = new byte[] {0};
     private final static Logger LOGGER = Logger.get(KafkaHistoricalDataHandler.class);
 
     private final KafkaProducer<byte[], byte[]> producer;
@@ -36,14 +39,16 @@ public class KafkaHistoricalDataHandler implements HistoricalDataHandler {
     private final String kafkaTopic;
 
     @Inject
-    public KafkaHistoricalDataHandler(KafkaConfig kafkaConfig, BlockEncodingSerde blockEncodingSerde) {
+    public KafkaHistoricalDataHandler(KafkaConfig kafkaConfig, BlockEncodingSerde blockEncodingSerde)
+    {
         producer = new KafkaProducer<>(createConsumerConfig(kafkaConfig));
         this.kafkaTopic = kafkaConfig.getHistoricalDataTopic();
         pagesSerde = new PagesSerde(blockEncodingSerde, Optional.empty(), Optional.empty());
     }
 
     @Override
-    public CompletableFuture<Void> handle(SchemaTableName table, List<Int2ObjectMap<Page>> pages) {
+    public CompletableFuture<Void> handle(SchemaTableName table, List<Int2ObjectMap<Page>> pages)
+    {
         CompletableFuture<Void> future = new CompletableFuture<>();
         AtomicInteger latch = new AtomicInteger(pages.stream().mapToInt(e -> e.entrySet().size()).sum());
 
@@ -74,7 +79,6 @@ public class KafkaHistoricalDataHandler implements HistoricalDataHandler {
                 });
             }
         }
-
         producer.commitTransaction();
 
         return future;

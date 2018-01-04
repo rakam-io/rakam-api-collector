@@ -9,13 +9,11 @@ import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.DictionaryBlock;
 import com.google.common.primitives.Ints;
-import io.airlift.slice.SizeOf;
 import io.rakam.presto.MemoryTracker;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -24,18 +22,20 @@ import java.util.Map;
 
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 
-public class TableData {
+public class TableData
+{
     public final Page page;
     public final List<ColumnMetadata> metadata;
     private static final long MILLIS_IN_DAY = ChronoUnit.DAYS.getDuration().toMillis();
 
-    public TableData(Page page, List<ColumnMetadata> metadata) {
+    public TableData(Page page, List<ColumnMetadata> metadata)
+    {
         this.page = page;
         this.metadata = metadata;
-
     }
 
-    public ExtractedPages extract(LocalDate today, MemoryTracker memoryTracker) {
+    public ExtractedPages extract(LocalDate today, MemoryTracker memoryTracker)
+    {
         Map<Integer, IntArrayList> previousDays = new HashMap<>();
         IntArrayList currentDay = new IntArrayList(page.getPositionCount());
 
@@ -53,13 +53,14 @@ public class TableData {
             int eventDate = Ints.checkedCast(TIMESTAMP.getLong(block, i) / MILLIS_IN_DAY);
             if (currentDate != eventDate) {
                 IntArrayList integers = previousDays.get(eventDate);
-                if(integers == null) {
+                if (integers == null) {
                     integers = new IntArrayList(8);
                     previousDays.put(eventDate, integers);
                 }
 
                 integers.add(i);
-            } else {
+            }
+            else {
                 currentDay.add(i);
             }
         }
@@ -96,11 +97,13 @@ public class TableData {
         return new ExtractedPages(now, previousDayPages);
     }
 
-    public static class ExtractedPages {
+    public static class ExtractedPages
+    {
         public final Page now;
         public final Int2ObjectMap<Page> prev;
 
-        public ExtractedPages(Page now, Int2ObjectMap<Page> prev) {
+        public ExtractedPages(Page now, Int2ObjectMap<Page> prev)
+        {
             this.now = now;
             this.prev = prev;
         }

@@ -131,13 +131,13 @@ public class FabricJsonDeserializer implements JsonDeserializer
                 if (t != START_OBJECT) {
                     throw new IllegalArgumentException("data must be an object");
                 }
-//                propertiesBuffer = jp.readValueAs(TokenBuffer.class);
+                propertiesBuffer = jp.readValueAs(TokenBuffer.class);
                 break;
             }
         }
-//        jp = propertiesBuffer.asParser(jp);
+        jp = propertiesBuffer.asParser(jp);
 
-//        t = jp.nextToken();
+        t = jp.nextToken();
         //Extract project and collection
         for (t = jp.nextToken(); t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
             if (project != null && collection != null) {
@@ -172,11 +172,10 @@ public class FabricJsonDeserializer implements JsonDeserializer
         PageBuilder pageBuilder = pageReader.getPageBuilder();
         pageBuilder.declarePosition();
         int currentPosition = pageBuilder.getPositionCount();
-//        JsonParser jp = propertiesBuffer.asParser(this.jp);
+        JsonParser jp = propertiesBuffer.asParser(this.jp);
 
-//        JsonToken t = jp.nextToken();
-        JsonToken t = jp.currentToken();
-        for (; t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
+        JsonToken t = jp.nextToken();
+        for (t = jp.nextToken(); t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
             String fieldName = jp.getCurrentName();
 
             int idx = -1;
@@ -270,11 +269,11 @@ public class FabricJsonDeserializer implements JsonDeserializer
 
                 for (int i = 0; i < blockBuilders.length; i++) {
                     if (blockBuilders[i] == null) {
-                        BlockBuilder blockBuilder = newColumns.get(i).getType()
-                                .createBlockBuilder(new BlockBuilderStatus(), pageBuilder.getPositionCount());
+                        BlockBuilder blockBuilder = newColumns.get(i).getType().createBlockBuilder(new BlockBuilderStatus(), pageBuilder.getPositionCount());
                         for (int i1 = 0; i1 < pageBuilder.getPositionCount(); i1++) {
                             blockBuilder.appendNull();
                         }
+                        blockBuilders[i] = blockBuilder;
                     }
                 }
 

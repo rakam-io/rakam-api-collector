@@ -4,42 +4,32 @@
 
 package io.rakam.presto;
 
-import com.facebook.presto.block.BlockEncodingManager;
-import com.facebook.presto.execution.buffer.PagesSerde;
-import com.facebook.presto.execution.buffer.SerializedPage;
-import com.facebook.presto.metadata.FunctionRegistry;
-import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.*;
-import com.facebook.presto.sql.analyzer.FeaturesConfig;
-import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.rakam.presto.deserialization.PageBuilder;
-import io.rakam.presto.deserialization.TableData;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.AvroPageDatumReader;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.EncoderFactory;
-import org.apache.avro.io.AvroPageDatumReader;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -55,12 +45,14 @@ import static java.lang.Float.floatToRawIntBits;
 import static org.apache.avro.Schema.createRecord;
 import static org.apache.avro.Schema.createUnion;
 
-public class TestPageDatumReader {
+public class TestPageDatumReader
+{
     private static final int ITERATION = 1000;
 
     @Test
     public void testComplexTypeReader()
-            throws Exception {
+            throws Exception
+    {
         ImmutableList<AbstractType> types = of(VARCHAR, BIGINT, DATE, BOOLEAN);
         PageBuilder page = new PageBuilder(types);
 
@@ -91,7 +83,8 @@ public class TestPageDatumReader {
 
     @Test
     public void testSchemaChange()
-            throws Exception {
+            throws Exception
+    {
         Schema schema = createRecord(
                 of(new Field("test1", createUnion(of(Schema.create(Schema.Type.STRING))), null, null)));
 
@@ -135,7 +128,8 @@ public class TestPageDatumReader {
 
     @Test
     public void testStringReader()
-            throws Exception {
+            throws Exception
+    {
         PageBuilder page = new PageBuilder(of(VARCHAR));
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.STRING))), null, null)));
@@ -149,7 +143,8 @@ public class TestPageDatumReader {
 
     @Test(expectedExceptions = UnsupportedOperationException.class)
     public void testInvalidSchemaReader()
-            throws Exception {
+            throws Exception
+    {
         PageBuilder page = new PageBuilder(of(BIGINT));
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.STRING))), null, null)));
@@ -160,7 +155,8 @@ public class TestPageDatumReader {
     }
 
     private void readData(Schema schema, AvroPageDatumReader reader)
-            throws IOException {
+            throws IOException
+    {
         for (int i = 0; i < ITERATION; i++) {
             GenericData.Record record = new GenericData.Record(schema);
             record.put("test", String.valueOf(i));
@@ -171,7 +167,8 @@ public class TestPageDatumReader {
 
     @Test
     public void testBigintReader()
-            throws Exception {
+            throws Exception
+    {
         PageBuilder page = new PageBuilder(of(BIGINT));
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.LONG))), null, null)));
@@ -190,7 +187,8 @@ public class TestPageDatumReader {
 
     @Test
     public void testBooleanReader()
-            throws Exception {
+            throws Exception
+    {
         PageBuilder page = new PageBuilder(of(BOOLEAN));
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.BOOLEAN))), null, null)));
@@ -209,7 +207,8 @@ public class TestPageDatumReader {
 
     @Test
     public void testDoubleReader()
-            throws Exception {
+            throws Exception
+    {
         PageBuilder page = new PageBuilder(of(DOUBLE));
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.DOUBLE))), null, null)));
@@ -228,7 +227,8 @@ public class TestPageDatumReader {
 
     @Test
     public void testDateReader()
-            throws Exception {
+            throws Exception
+    {
         PageBuilder page = new PageBuilder(of(DATE));
 
         Schema schema = createRecord(of(new Field("test", createUnion(of(Schema.create(Schema.Type.INT))), null, null)));
@@ -247,7 +247,8 @@ public class TestPageDatumReader {
 
     @Test
     public void testArrayReader()
-            throws Exception {
+            throws Exception
+    {
         PageBuilder page = new PageBuilder(of(new ArrayType(VARCHAR)));
 
         Schema array = Schema.createArray(Schema.create(Schema.Type.STRING));
@@ -272,7 +273,8 @@ public class TestPageDatumReader {
 
     @Test
     public void testMapReader()
-            throws Exception {
+            throws Exception
+    {
         MapType mapType = mapType(VARCHAR, VARCHAR);
         PageBuilder page = new PageBuilder(of(mapType));
 
@@ -299,7 +301,8 @@ public class TestPageDatumReader {
     }
 
     private static byte[] get(GenericRecord record)
-            throws IOException {
+            throws IOException
+    {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         BinaryEncoder binaryEncoder = EncoderFactory.get().directBinaryEncoder(out, null);
 
@@ -309,7 +312,8 @@ public class TestPageDatumReader {
         return out.toByteArray();
     }
 
-    public static Block mapBlockOf(Type keyType, Type valueType, Map<?, ?> value) {
+    public static Block mapBlockOf(Type keyType, Type valueType, Map<?, ?> value)
+    {
         MapType mapType = mapType(keyType, valueType);
         BlockBuilder mapArrayBuilder = mapType.createBlockBuilder(new BlockBuilderStatus(), 1);
         BlockBuilder singleMapWriter = mapArrayBuilder.beginBlockEntry();
@@ -321,17 +325,20 @@ public class TestPageDatumReader {
         return mapType.getObject(mapArrayBuilder, 0);
     }
 
-    public static void appendToBlockBuilder(Type type, Object element, BlockBuilder blockBuilder) {
+    public static void appendToBlockBuilder(Type type, Object element, BlockBuilder blockBuilder)
+    {
         Class<?> javaType = type.getJavaType();
         if (element == null) {
             blockBuilder.appendNull();
-        } else if (type.getTypeSignature().getBase().equals(StandardTypes.ARRAY) && element instanceof Iterable<?>) {
+        }
+        else if (type.getTypeSignature().getBase().equals(StandardTypes.ARRAY) && element instanceof Iterable<?>) {
             BlockBuilder subBlockBuilder = blockBuilder.beginBlockEntry();
             for (Object subElement : (Iterable<?>) element) {
                 appendToBlockBuilder(type.getTypeParameters().get(0), subElement, subBlockBuilder);
             }
             blockBuilder.closeEntry();
-        } else if (type.getTypeSignature().getBase().equals(StandardTypes.ROW) && element instanceof Iterable<?>) {
+        }
+        else if (type.getTypeSignature().getBase().equals(StandardTypes.ROW) && element instanceof Iterable<?>) {
             BlockBuilder subBlockBuilder = blockBuilder.beginBlockEntry();
             int field = 0;
             for (Object subElement : (Iterable<?>) element) {
@@ -339,36 +346,47 @@ public class TestPageDatumReader {
                 field++;
             }
             blockBuilder.closeEntry();
-        } else if (type.getTypeSignature().getBase().equals(StandardTypes.MAP) && element instanceof Map<?, ?>) {
+        }
+        else if (type.getTypeSignature().getBase().equals(StandardTypes.MAP) && element instanceof Map<?, ?>) {
             BlockBuilder subBlockBuilder = blockBuilder.beginBlockEntry();
             for (Map.Entry<?, ?> entry : ((Map<?, ?>) element).entrySet()) {
                 appendToBlockBuilder(type.getTypeParameters().get(0), entry.getKey(), subBlockBuilder);
                 appendToBlockBuilder(type.getTypeParameters().get(1), entry.getValue(), subBlockBuilder);
             }
             blockBuilder.closeEntry();
-        } else if (javaType == boolean.class) {
+        }
+        else if (javaType == boolean.class) {
             type.writeBoolean(blockBuilder, (Boolean) element);
-        } else if (javaType == long.class) {
+        }
+        else if (javaType == long.class) {
             if (element instanceof SqlDecimal) {
                 type.writeLong(blockBuilder, ((SqlDecimal) element).getUnscaledValue().longValue());
-            } else if (REAL.equals(type)) {
+            }
+            else if (REAL.equals(type)) {
                 type.writeLong(blockBuilder, floatToRawIntBits(((Number) element).floatValue()));
-            } else {
+            }
+            else {
                 type.writeLong(blockBuilder, ((Number) element).longValue());
             }
-        } else if (javaType == double.class) {
+        }
+        else if (javaType == double.class) {
             type.writeDouble(blockBuilder, ((Number) element).doubleValue());
-        } else if (javaType == Slice.class) {
+        }
+        else if (javaType == Slice.class) {
             if (element instanceof String) {
                 type.writeSlice(blockBuilder, Slices.utf8Slice(element.toString()));
-            } else if (element instanceof byte[]) {
+            }
+            else if (element instanceof byte[]) {
                 type.writeSlice(blockBuilder, Slices.wrappedBuffer((byte[]) element));
-            } else if (element instanceof SqlDecimal) {
+            }
+            else if (element instanceof SqlDecimal) {
                 type.writeSlice(blockBuilder, Decimals.encodeUnscaledValue(((SqlDecimal) element).getUnscaledValue()));
-            } else {
+            }
+            else {
                 type.writeSlice(blockBuilder, (Slice) element);
             }
-        } else {
+        }
+        else {
             type.writeObject(blockBuilder, element);
         }
     }

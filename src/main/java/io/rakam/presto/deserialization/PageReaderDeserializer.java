@@ -8,5 +8,6 @@ import java.io.IOException;
 
 public interface PageReaderDeserializer<T>
 {
-    void read(T in) throws IOException;
+    void read(T in)
+            throws IOException;
 }

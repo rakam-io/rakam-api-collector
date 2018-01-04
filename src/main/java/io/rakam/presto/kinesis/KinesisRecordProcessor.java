@@ -28,7 +28,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class KinesisRecordProcessor
-        implements IRecordProcessor {
+        implements IRecordProcessor
+{
     private static final Logger log = Logger.get(KinesisRecordProcessor.class);
 
     private final TargetConnectorCommitter committer;
@@ -38,9 +39,10 @@ public class KinesisRecordProcessor
     private String shardId;
 
     public KinesisRecordProcessor(StreamWorkerContext context,
-                                  MiddlewareConfig middlewareConfig,
-                                  MemoryTracker memoryTracker,
-                                  TargetConnectorCommitter committer) {
+            MiddlewareConfig middlewareConfig,
+            MemoryTracker memoryTracker,
+            TargetConnectorCommitter committer)
+    {
         this.committer = committer;
         this.context = context;
         this.streamBuffer = context.createBuffer();
@@ -48,13 +50,15 @@ public class KinesisRecordProcessor
     }
 
     @Override
-    public void initialize(String shardId) {
+    public void initialize(String shardId)
+    {
         this.shardId = shardId;
         log.info("Kinesis consumer shard %s initialized", shardId);
     }
 
     @Override
-    public void processRecords(List<Record> records, IRecordProcessorCheckpointer checkpointer) {
+    public void processRecords(List<Record> records, IRecordProcessorCheckpointer checkpointer)
+    {
         for (Record record : records) {
             ByteBuffer data = record.getData();
             byte type = data.get(0);
@@ -79,7 +83,8 @@ public class KinesisRecordProcessor
             middlewareBuffer.add(new BatchRecords(pages, () -> {
                 try {
                     checkpointer.checkpoint();
-                } catch (InvalidStateException | ShutdownException e) {
+                }
+                catch (InvalidStateException | ShutdownException e) {
                     throw new RuntimeException(e);
                 }
             }));
@@ -101,28 +106,33 @@ public class KinesisRecordProcessor
         }
     }
 
-    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value) {
+    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value)
+    {
         for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
             try {
                 tableCheckpoint.checkpoint();
-            } catch (BatchRecords.CheckpointException e) {
+            }
+            catch (BatchRecords.CheckpointException e) {
                 log.error(e, "Error while checkpointing records");
             }
         }
     }
 
     @Override
-    public void shutdown(IRecordProcessorCheckpointer iRecordProcessorCheckpointer, ShutdownReason shutdownReason) {
+    public void shutdown(IRecordProcessorCheckpointer iRecordProcessorCheckpointer, ShutdownReason shutdownReason)
+    {
         streamBuffer.clear();
         log.error("Shutdown %s, the reason is %s", shardId, shutdownReason.name());
     }
 
-    private Map<SchemaTableName, TableData> flushStream() {
+    private Map<SchemaTableName, TableData> flushStream()
+    {
         Map<SchemaTableName, TableData> pages;
         try {
             BasicMemoryBuffer.Records list = streamBuffer.getRecords();
             pages = context.convert(list.buffer, list.bulkBuffer, list.pageBuffer);
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             throw new RuntimeException(e);
         }
 
@@ -130,27 +140,34 @@ public class KinesisRecordProcessor
         return pages;
     }
 
-    public static class KinesisDecoupleMessage implements DecoupleMessage<Record> {
+    public static class KinesisDecoupleMessage
+            implements DecoupleMessage<Record>
+    {
         private final JsonFactory factory;
         private final String timeColumn;
         private final LoadingCache<String, Boolean> cache;
 
-        public KinesisDecoupleMessage(DatabaseHandler handler, FieldNameConfig fieldNameConfig) {
+        public KinesisDecoupleMessage(DatabaseHandler handler, FieldNameConfig fieldNameConfig)
+        {
             this.timeColumn = fieldNameConfig.getTimeField();
             factory = new ObjectMapper().getFactory();
             cache = CacheBuilder.newBuilder().expireAfterAccess(10, TimeUnit.MINUTES)
                     .maximumSize(1000)
-                    .build(new CacheLoader<String, Boolean>() {
+                    .build(new CacheLoader<String, Boolean>()
+                    {
                         @Override
-                        public Boolean load(String id) throws Exception {
+                        public Boolean load(String id)
+                                throws Exception
+                        {
                             return true;
                         }
                     });
         }
 
-        public boolean isRecentData(Record record, int todayInDate) throws IOException {
+        public boolean isRecentData(Record record, int todayInDate)
+                throws IOException
+        {
             return true;
         }
     }
-
 }

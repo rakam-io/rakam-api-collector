@@ -11,9 +11,12 @@ import com.google.inject.Module;
 import com.google.inject.Scopes;
 import io.airlift.configuration.ConfigBinder;
 
-public class S3BackupStoreModule implements Module {
+public class S3BackupStoreModule
+        implements Module
+{
 
-    public void configure(Binder binder) {
+    public void configure(Binder binder)
+    {
         ConfigBinder.configBinder(binder).bindConfig(S3BackupConfig.class);
         binder.bind(BackupStore.class).to(S3BackupStore.class).in(Scopes.SINGLETON);
     }

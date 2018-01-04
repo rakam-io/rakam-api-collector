@@ -5,7 +5,12 @@
 package com.facebook.presto.raptor.storage;
 
 import com.facebook.presto.raptor.backup.BackupManager;
-import com.facebook.presto.raptor.metadata.*;
+import com.facebook.presto.raptor.metadata.AssignmentLimiter;
+import com.facebook.presto.raptor.metadata.DatabaseShardManager;
+import com.facebook.presto.raptor.metadata.DatabaseShardRecorder;
+import com.facebook.presto.raptor.metadata.MetadataConfig;
+import com.facebook.presto.raptor.metadata.ShardManager;
+import com.facebook.presto.raptor.metadata.ShardRecorder;
 import com.google.common.base.Ticker;
 import com.google.inject.Binder;
 import com.google.inject.Scopes;
@@ -14,10 +19,13 @@ import static io.airlift.configuration.ConfigBinder.configBinder;
 import static org.weakref.jmx.ObjectNames.generatedNameOf;
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
-public class IngestOnlyStorageModule extends StorageModule {
+public class IngestOnlyStorageModule
+        extends StorageModule
+{
     private final String connectorId;
 
-    public IngestOnlyStorageModule(String connectorId) {
+    public IngestOnlyStorageModule(String connectorId)
+    {
         super(connectorId);
         this.connectorId = connectorId;
     }

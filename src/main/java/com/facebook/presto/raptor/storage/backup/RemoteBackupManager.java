@@ -15,6 +15,7 @@ import org.weakref.jmx.Managed;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
+
 import java.io.File;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,7 +31,8 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.runAsync;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
-public class RemoteBackupManager {
+public class RemoteBackupManager
+{
     private final Optional<BackupStore> backupStore;
     private final ExecutorService executorService;
 
