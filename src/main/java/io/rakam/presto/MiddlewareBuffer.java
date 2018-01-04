@@ -17,13 +17,15 @@ import java.util.concurrent.atomic.AtomicLong;
 public class MiddlewareBuffer {
     private final Map<SchemaTableName, List<TableCheckpoint>> batches;
     private final MiddlewareConfig config;
+    private final MemoryTracker memoryTracker;
     private Map<SchemaTableName, AtomicLong> bufferRecordCount = new ConcurrentHashMap<>();
     private Map<SchemaTableName, AtomicLong> bufferSize = new ConcurrentHashMap<>();
     private Map<SchemaTableName, Long> bufferLastUpdated = new ConcurrentHashMap<>();
 
-    public MiddlewareBuffer(MiddlewareConfig middlewareConfig) {
+    public MiddlewareBuffer(MiddlewareConfig middlewareConfig, MemoryTracker memoryTracker) {
         batches = new ConcurrentHashMap<>();
         this.config = middlewareConfig;
+        this.memoryTracker = memoryTracker;
     }
 
     public void add(BatchRecords records) {
@@ -37,6 +39,8 @@ public class MiddlewareBuffer {
             bufferSize.computeIfAbsent(entry.getKey(), (e) -> new AtomicLong())
                     .addAndGet(entry.getValue().page.getRetainedSizeInBytes());
             bufferLastUpdated.compute(entry.getKey(), (tableName, aLong) -> nowInMillis);
+
+            memoryTracker.reserveMemory(entry.getValue().page.getRetainedSizeInBytes());
         }
     }
 
@@ -59,21 +63,21 @@ public class MiddlewareBuffer {
     }
 
     private boolean shouldFlush(long now, SchemaTableName name) {
-        long size = bufferRecordCount.get(name).get();
         Long previousFlushTimeMillisecond = bufferLastUpdated.get(name);
         long timelapseMillisecond = now - previousFlushTimeMillisecond;
-        return ((size >= config.getMaxFlushRecords()) || (timelapseMillisecond >= config.getMaxFlushDuration().toMillis()))
-                || bufferSize.get(name).get() > config.getMaxSize().toBytes();
+        return ((timelapseMillisecond >= config.getMaxFlushDuration().toMillis()));
     }
 
-    public Map<SchemaTableName, List<TableCheckpoint>> flush() {
+    public Map<SchemaTableName, List<TableCheckpoint>> getRecordsToBeFlushed() {
         long now = System.currentTimeMillis();
         Map<SchemaTableName, List<TableCheckpoint>> map = new ConcurrentHashMap<>();
 
         Iterator<Map.Entry<SchemaTableName, List<TableCheckpoint>>> iterator = batches.entrySet().iterator();
+
+        long availableMemory = memoryTracker.availableMemory();
         while(iterator.hasNext()) {
             Map.Entry<SchemaTableName, List<TableCheckpoint>> entry = iterator.next();
-            if(shouldFlush(now, entry.getKey())) {
+            if(availableMemory == -1 || shouldFlush(now, entry.getKey())) {
                 List<TableCheckpoint> value = entry.getValue();
                 map.computeIfAbsent(entry.getKey(), k -> new ArrayList<>()).addAll(value);
                 iterator.remove();

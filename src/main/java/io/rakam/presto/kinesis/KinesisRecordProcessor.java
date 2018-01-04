@@ -13,21 +13,16 @@ import com.amazonaws.services.kinesis.model.Record;
 import com.facebook.presto.spi.SchemaTableName;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Throwables;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Table;
 import io.airlift.log.Logger;
 import io.rakam.presto.*;
 import io.rakam.presto.deserialization.DecoupleMessage;
 import io.rakam.presto.deserialization.TableData;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.sql.DatabaseMetaData;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -44,11 +39,12 @@ public class KinesisRecordProcessor
 
     public KinesisRecordProcessor(StreamWorkerContext context,
                                   MiddlewareConfig middlewareConfig,
+                                  MemoryTracker memoryTracker,
                                   TargetConnectorCommitter committer) {
         this.committer = committer;
         this.context = context;
         this.streamBuffer = context.createBuffer();
-        this.middlewareBuffer = new MiddlewareBuffer(middlewareConfig);
+        this.middlewareBuffer = new MiddlewareBuffer(middlewareConfig, memoryTracker);
     }
 
     @Override
@@ -88,7 +84,7 @@ public class KinesisRecordProcessor
                 }
             }));
 
-            Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> list = middlewareBuffer.flush();
+            Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> list = middlewareBuffer.getRecordsToBeFlushed();
             if (!list.isEmpty()) {
                 for (Map.Entry<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> entry : list.entrySet()) {
                     List<MiddlewareBuffer.TableCheckpoint> checkpoints = entry.getValue();
@@ -124,8 +120,8 @@ public class KinesisRecordProcessor
     private Map<SchemaTableName, TableData> flushStream() {
         Map<SchemaTableName, TableData> pages;
         try {
-            Map.Entry<List, List> list = streamBuffer.getRecords();
-            pages = context.convert(list.getKey(), list.getValue());
+            BasicMemoryBuffer.Records list = streamBuffer.getRecords();
+            pages = context.convert(list.buffer, list.bulkBuffer, list.pageBuffer);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -152,7 +148,7 @@ public class KinesisRecordProcessor
                     });
         }
 
-        public boolean isRecentData(Record record) throws IOException {
+        public boolean isRecentData(Record record, int todayInDate) throws IOException {
             return true;
         }
     }

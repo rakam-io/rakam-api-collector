@@ -24,7 +24,7 @@ public class KafkaStreamSourceModule
         KafkaConfig config = buildConfigObject(KafkaConfig.class);
         configBinder(binder).bindConfig(JsonConfig.class);
 
-        binder.bind(KafkaWorkerManager.class).in(Scopes.SINGLETON);
+        binder.bind(KafkaRealTimeWorker.class).in(Scopes.SINGLETON);
 
         Class<? extends MessageEventTransformer> clazz;
         switch (config.getDataFormat()) {
@@ -41,6 +41,7 @@ public class KafkaStreamSourceModule
         }
 
         binder.bind(DecoupleMessage.class).to(KafkaDecoupleMessage.class).in(Scopes.SINGLETON);
+        binder.bind(HistoricalDataHandler.class).to(KafkaHistoricalDataHandler.class).in(Scopes.SINGLETON);
         binder.bind(MessageEventTransformer.class).to(clazz).in(Scopes.SINGLETON);
     }
 

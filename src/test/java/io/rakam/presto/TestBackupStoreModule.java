@@ -5,8 +5,8 @@
 package io.rakam.presto;
 
 import com.facebook.presto.raptor.backup.BackupStore;
-import com.google.inject.Binder;
-import com.google.inject.Module;
+import com.facebook.presto.raptor.storage.InMemoryFileSystem;
+import com.google.inject.*;
 
 import java.io.File;
 import java.util.UUID;
@@ -21,13 +21,25 @@ public class TestBackupStoreModule implements Module {
 
     @Override
     public void configure(Binder binder) {
-        binder.bind(BackupStore.class).toInstance(new TestBackupStore());
+        binder.bind(new TypeLiteral<BiConsumer<UUID, File>>(){}).toInstance(function);
+        binder.bind(BackupStore.class).to(TestBackupStore.class).in(Scopes.SINGLETON);
     }
 
-    public class TestBackupStore implements BackupStore {
+    public static class TestBackupStore implements BackupStore {
+
+        private final InMemoryFileSystem inMemoryFileSystem;
+        private final BiConsumer<UUID, File> function;
+
+        @Inject
+        public TestBackupStore(BiConsumer<UUID, File> function, InMemoryFileSystem inMemoryFileSystem) {
+            this.function = function;
+            this.inMemoryFileSystem = inMemoryFileSystem;
+        }
+
         @Override
         public void backupShard(UUID uuid, File source) {
             function.accept(uuid, source);
+            inMemoryFileSystem.remove(source.getName());
         }
 
         @Override

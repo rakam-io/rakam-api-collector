@@ -64,7 +64,7 @@ public class TestTargetConnectorCommitter {
         PageSinkManager pageSinkManager = new PageSinkManager();
         pageSinkManager.addConnectorPageSinkProvider(new ConnectorId("testconnector"), new TestingConnectorPageSinkProvider(latch));
 
-        TargetConnectorCommitter committer = new TargetConnectorCommitter(new TestDatabaseHandler("test", "test", ImmutableList.of()));
+        TargetConnectorCommitter committer = new TargetConnectorCommitter(new TestDatabaseHandler("test", "test", ImmutableList.of()), new MemoryTracker());
 
         SchemaTableName table = new SchemaTableName("test", "test");
         TableData tableData = new TableData(new Page(1), ImmutableList.of());
@@ -99,7 +99,7 @@ public class TestTargetConnectorCommitter {
         PageSinkManager pageSinkManager = new PageSinkManager();
         pageSinkManager.addConnectorPageSinkProvider(new ConnectorId("testconnector"), new TestingConnectorPageSinkProvider(latch));
 
-        TargetConnectorCommitter committer = new TargetConnectorCommitter(new TestDatabaseHandler("test", "test", ImmutableList.of()));
+        TargetConnectorCommitter committer = new TargetConnectorCommitter(new TestDatabaseHandler("test", "test", ImmutableList.of()), new MemoryTracker());
 
         SchemaTableName table0 = new SchemaTableName("test", "test0");
         SchemaTableName table1 = new SchemaTableName("test", "test1");
@@ -138,7 +138,7 @@ public class TestTargetConnectorCommitter {
         PageSinkManager pageSinkManager = new PageSinkManager();
         pageSinkManager.addConnectorPageSinkProvider(new ConnectorId("testconnector"), new TestingConnectorPageSinkProvider(latch));
 
-        TargetConnectorCommitter committer = new TargetConnectorCommitter(new TestDatabaseHandler("test", "test", ImmutableList.of()));
+        TargetConnectorCommitter committer = new TargetConnectorCommitter(new TestDatabaseHandler("test", "test", ImmutableList.of()), new MemoryTracker());
 
         TableData page1 = new TableData(new Page(createStringsBlock("test")), ImmutableList.of(new ColumnMetadata("test1", VarcharType.VARCHAR)));
         TableData page2 = new TableData(new Page(createStringsBlock("test"), createLongsBlock(1)), schema);

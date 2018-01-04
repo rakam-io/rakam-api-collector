@@ -6,6 +6,7 @@ package com.facebook.presto.raptor.storage;
 
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
+import io.rakam.presto.MemoryTracker;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
@@ -16,14 +17,13 @@ import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public final class InMemoryFileSystem
-        extends FileSystem
-{
+public final class InMemoryFileSystem extends FileSystem {
+    private final MemoryTracker memoryTracker;
     Map<String, DynamicSliceOutput> files;
 
     @Inject
-    public InMemoryFileSystem()
-    {
+    public InMemoryFileSystem(MemoryTracker memoryTracker) {
+        this.memoryTracker = memoryTracker;
         files = new ConcurrentHashMap<>();
     }
 
@@ -39,10 +39,12 @@ public final class InMemoryFileSystem
 
     @Override
     public FSDataOutputStream create(Path path, boolean overwrite, int bufferSize, short replication, long blockSize, Progressable progress)
-            throws IOException
-    {
-        DynamicSliceOutput output = new DynamicSliceOutput(bufferSize);
-        files.put(path.getName(), output);
+            throws IOException {
+        TrackedDynamicSliceOutput output = new TrackedDynamicSliceOutput(memoryTracker, bufferSize);
+        DynamicSliceOutput previous = files.put(path.getName(), output);
+        if (previous != null) {
+            throw new IllegalStateException("Files are not immutable.");
+        }
         return new FSDataOutputStream(output);
     }
 
@@ -92,12 +94,15 @@ public final class InMemoryFileSystem
     }
 
     public void remove(String fileName) {
+        DynamicSliceOutput output = files.get(fileName);
+
+        memoryTracker.freeMemory(output.getRetainedSize());
         files.remove(fileName);
     }
 
     public Slice get(String fileName) {
         DynamicSliceOutput output = files.get(fileName);
-        if(output == null) {
+        if (output == null) {
             throw new IllegalStateException();
         }
         return output.slice();

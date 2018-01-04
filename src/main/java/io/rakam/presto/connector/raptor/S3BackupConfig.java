@@ -53,8 +53,10 @@ public class S3BackupConfig
     {
         this.region = region;
         return this;
+
     }
 
+    @NotNull
     public String getS3Bucket()
     {
         return s3Bucket;

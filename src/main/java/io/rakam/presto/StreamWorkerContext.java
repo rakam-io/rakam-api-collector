@@ -13,30 +13,29 @@ import javax.inject.Inject;
 import java.io.IOException;
 import java.util.Map;
 
-public class StreamWorkerContext<T>
-{
+public class StreamWorkerContext<T> {
     private final MessageEventTransformer transformer;
     private final StreamConfig streamConfig;
+    private final MemoryTracker memoryTracker;
+    private final BasicMemoryBuffer.SizeCalculator<T> sizeCalculator;
 
     @Inject
-    public StreamWorkerContext(MessageEventTransformer transformer, StreamConfig streamConfig)
-    {
+    public StreamWorkerContext(MessageEventTransformer transformer, BasicMemoryBuffer.SizeCalculator<T> sizeCalculator, MemoryTracker memoryTracker, StreamConfig streamConfig) {
         this.transformer = transformer;
         this.streamConfig = streamConfig;
+        this.memoryTracker = memoryTracker;
+        this.sizeCalculator = sizeCalculator;
     }
 
-    public void shutdown()
-    {
+    public void shutdown() {
     }
 
-    public Map<SchemaTableName, TableData> convert(Iterable<? extends T> records, Iterable<? extends T> bulkRecords)
-            throws IOException
-    {
-        return transformer.createPageTable(records, bulkRecords);
+    public Map<SchemaTableName, TableData> convert(Iterable<? extends T> records, Iterable<? extends T> bulkRecords, Iterable<? extends T> pageRecords)
+            throws IOException {
+        return transformer.createPageTable(records, bulkRecords, pageRecords);
     }
 
-    public BasicMemoryBuffer createBuffer()
-    {
-        return new BasicMemoryBuffer(streamConfig);
+    public BasicMemoryBuffer createBuffer() {
+        return new BasicMemoryBuffer(streamConfig, memoryTracker, sizeCalculator);
     }
 }

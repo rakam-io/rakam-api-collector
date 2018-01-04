@@ -60,6 +60,7 @@ import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.MemoryTracker;
 import org.rakam.analysis.JDBCPoolDataSource;
 import org.rakam.collection.FieldType;
 import org.rakam.collection.SchemaField;
@@ -105,7 +106,7 @@ public class RaptorDatabaseHandler
         this(config, typeManager, s3BackupConfig, fieldNameConfig, null);
     }
 
-    public RaptorDatabaseHandler(RaptorConfig config,  TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule) {
+    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule) {
         DatabaseMetadataModule metadataModule = new DatabaseMetadataModule();
 
         ImmutableMap.Builder<String, Module> builder = ImmutableMap.builder();
@@ -137,6 +138,7 @@ public class RaptorDatabaseHandler
                             new BackupModule(backupProviders),
                             new IngestOnlyStorageModule(connectorId),
                             new RaptorModule(connectorId),
+                            binder -> binder.bind(MemoryTracker.class).asEagerSingleton(),
                             binder -> binder.bind(InMemoryFileSystem.class).asEagerSingleton(),
                             binder -> binder.bind(RemoteBackupManager.class).in(Scopes.SINGLETON)
                     );
@@ -157,7 +159,8 @@ public class RaptorDatabaseHandler
         ImmutableMap.Builder<String, String> props = ImmutableMap.<String, String>builder()
                 .put("metadata.db.type", "mysql")
                 .put("metadata.db.url", config.getMetadataUrl())
-                .put("storage.data-directory", config.getDataDirectory().getAbsolutePath())
+                // No effect
+                .put("storage.data-directory", "./")
                 .put("metadata.db.connections.max", String.valueOf(config.getMaxConnection()))
                 .put("backup.timeout", "20m");
 
@@ -179,8 +182,6 @@ public class RaptorDatabaseHandler
             if (s3BackupConfig.getEndpoint() != null) {
                 props.put("aws.s3-endpoint", s3BackupConfig.getEndpoint());
             }
-        } else {
-            throw new IllegalArgumentException("The `raptor.aws.s3-bucket` must be set in order to setup the backup configuration.");
         }
 
         ImmutableMap<String, String> properties = props.build();

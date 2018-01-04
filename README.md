@@ -32,5 +32,4 @@
 #raptor.aws.s3-bucket=
 #raptor.metadata.url=jdbc:mysql://HOST/DATABASE?user=USERNAME&password=PASSWORD
 #raptor.node.id=PRESTO_NODEID
-#raptor.storage.data-directory=
 ```

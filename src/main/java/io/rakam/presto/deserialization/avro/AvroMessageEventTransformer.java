@@ -46,7 +46,7 @@ public abstract class AvroMessageEventTransformer<T>
     }
 
     @Override
-    public synchronized Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
+    public synchronized Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords, Iterable<T> pageRecords)
             throws IOException
     {
         Map<SchemaTableName, PageReader> builderMap = new HashMap<>();

@@ -138,7 +138,7 @@ public abstract class TestDeserializer<T>
             throws IOException
     {
         MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
-        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.empty()), ImmutableList.of());
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.empty()), ImmutableList.of(), ImmutableList.of());
         TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         assertEquals(testcollection.metadata, COLUMNS);
@@ -167,7 +167,7 @@ public abstract class TestDeserializer<T>
         MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
 
         Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.of(new int[] {
-                1})), ImmutableList.of());
+                1})), ImmutableList.of(), ImmutableList.of());
         TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         assertEquals(testcollection.metadata, COLUMNS);

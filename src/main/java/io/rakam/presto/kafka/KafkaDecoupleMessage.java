@@ -8,15 +8,18 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.StreamConfig;
 import io.rakam.presto.deserialization.DecoupleMessage;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.rakam.util.DateTimeUtils;
+import org.rakam.util.JsonHelper;
 
 import javax.inject.Inject;
 import java.io.IOException;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 import static com.fasterxml.jackson.core.JsonToken.FIELD_NAME;
@@ -26,17 +29,19 @@ import static java.lang.String.format;
 public class KafkaDecoupleMessage implements DecoupleMessage<ConsumerRecord<byte[], byte[]>> {
     private final JsonFactory factory;
     private final String timeColumn;
-    private final long ingestionDuration;
+    private final int realTimeFlushDays;
+    private long ingestionDuration;
 
     @Inject
     public KafkaDecoupleMessage(FieldNameConfig fieldNameConfig, StreamConfig streamConfig) {
-        this.timeColumn = fieldNameConfig.getTimeField();
-        this.ingestionDuration = streamConfig.getRealtimeIngestionDuration().toMillis() * 2;
+        timeColumn = fieldNameConfig.getTimeField();
+        realTimeFlushDays = streamConfig.getRealTimeFlushDays();
+        this.ingestionDuration = ChronoUnit.DAYS.getDuration().toMillis();
         factory = new ObjectMapper().getFactory();
     }
 
     @SuppressWarnings("PMD.AvoidBranchingStatementAsLastInLoop")
-    public boolean isRecentData(ConsumerRecord<byte[], byte[]> record) throws IOException {
+    public boolean isRecentData(ConsumerRecord<byte[], byte[]> record, int todayInDate) throws IOException {
         JsonParser parser = factory.createParser(record.value());
 
         JsonToken t = parser.nextToken();
@@ -65,7 +70,7 @@ public class KafkaDecoupleMessage implements DecoupleMessage<ConsumerRecord<byte
                     continue;
                 }
 
-                return findData(parser, record.timestamp());
+                return findData(parser, todayInDate);
             }
 
             throw new JsonParseException(parser, format("Event time property `%s` doesn't exist in JSON", timeColumn));
@@ -74,7 +79,7 @@ public class KafkaDecoupleMessage implements DecoupleMessage<ConsumerRecord<byte
         throw new JsonParseException(parser, "data property doesn't exist in JSON");
     }
 
-    public boolean findData(JsonParser parser, long ingestionTimestamp) throws IOException {
+    public boolean findData(JsonParser parser, long todayInDate) throws IOException {
         long eventTime;
         JsonToken t = parser.nextToken();
         switch (t) {
@@ -89,7 +94,7 @@ public class KafkaDecoupleMessage implements DecoupleMessage<ConsumerRecord<byte
                 throw new JsonParseException(parser, "Date field must be either STRING or NUMERIC");
         }
 
-        long delay = ingestionTimestamp - eventTime;
-        return delay < ingestionDuration;
+        long delayInDays = todayInDate - (eventTime / ingestionDuration);
+        return delayInDays >= 0 && delayInDays <= realTimeFlushDays;
     }
 }

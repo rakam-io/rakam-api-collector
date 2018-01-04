@@ -30,6 +30,7 @@ public class KafkaConfig
     private String groupId = "presto_streaming";
     private String sessionTimeOut = "12000";
     private String requestTimeOut = "15000";
+    private String historicalDataTopic;
 
     public List<String> getTopic()
     {
@@ -121,22 +122,14 @@ public class KafkaConfig
         return this;
     }
 
-    @Size(min = 1)
-    public Set<HostAddress> getZookeeperNodes()
-    {
-        return zkNodes;
+    public String getHistoricalDataTopic() {
+        return historicalDataTopic;
     }
 
-    @Config("zookeeper.nodes")
-    public KafkaConfig setZookeeperNodes(String nodes)
+    @Config("kafka.historical-data-topic")
+    public KafkaConfig setHistoricalDataTopic(String historicalDataTopic)
     {
-        if (nodes != null) {
-            Splitter splitter = Splitter.on(',').omitEmptyStrings().trimResults();
-            this.zkNodes = ImmutableSet.copyOf(transform(splitter.split(nodes), KafkaConfig::toZookeeperHostAddress));
-        }
-        else {
-            this.zkNodes = null;
-        }
+        this.historicalDataTopic = historicalDataTopic;
         return this;
     }
 

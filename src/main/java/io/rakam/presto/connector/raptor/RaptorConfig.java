@@ -14,7 +14,6 @@ public class RaptorConfig
 {
     private String metadataUrl;
     private String nodeIdentifier = "collector";
-    private File dataDirectory;
     private URI prestoURL;
     private int maxConnection = 100;
 
@@ -50,18 +49,6 @@ public class RaptorConfig
     public RaptorConfig setNodeIdentifier(String nodeIdentifier)
     {
         this.nodeIdentifier = nodeIdentifier;
-        return this;
-    }
-
-    public File getDataDirectory()
-    {
-        return dataDirectory;
-    }
-
-    @Config("raptor.storage.data-directory")
-    public RaptorConfig setDataDirectory(File dataDirectory)
-    {
-        this.dataDirectory = dataDirectory;
         return this;
     }
 
