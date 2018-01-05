@@ -46,7 +46,7 @@ public class KafkaUtil
         props.put("session.timeout.ms", sessionTimeOut);
         props.put("heartbeat.interval.ms", "1000");
         props.put("request.timeout.ms", requestTimeOut);
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+//        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
         props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
