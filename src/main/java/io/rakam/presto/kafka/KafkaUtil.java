@@ -7,12 +7,14 @@ package io.rakam.presto.kafka;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.SchemaTableName;
 import io.airlift.log.Logger;
+import io.airlift.units.DataSize;
 import io.rakam.presto.*;
 import io.rakam.presto.MiddlewareBuffer.TableCheckpoint;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -21,6 +23,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 
+import static io.airlift.units.DataSize.succinctBytes;
+import static io.airlift.units.Duration.*;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class KafkaUtil
@@ -91,6 +95,10 @@ public class KafkaUtil
         Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();
 
         if (!map.isEmpty()) {
+            long totalRecords = map.entrySet().stream().mapToLong(e -> e.getValue().stream().mapToLong(v -> v.getTable().page.getPositionCount()).sum()).sum();
+
+            log.debug("Flushing middleware buffer, %d collections and %d events in total.", map.size(), totalRecords);
+            long now = System.currentTimeMillis();
             for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
                 CompletableFuture<Void> dbWriteWork = committer.process(entry.getKey(), entry.getValue());
                 dbWriteWork.whenComplete((aVoid, throwable) -> {
@@ -100,10 +108,14 @@ public class KafkaUtil
 
                     // TODO: What should we do if we can't commit the data?
                     checkpointQueue.add(entry.getValue());
-
                     long totalDataSize = entry.getValue().stream()
                             .mapToLong(e -> e.getTable().page.getRetainedSizeInBytes())
                             .sum();
+
+                    log.debug("Flushed middleware buffer (%s) for collection %s in %s.",
+                            succinctBytes(totalDataSize).toString(),
+                            entry.getKey().toString(),
+                            succinctDuration(System.currentTimeMillis() - now, MILLISECONDS).toString());
                     memoryTracker.freeMemory(totalDataSize);
                 });
             }

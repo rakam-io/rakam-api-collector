@@ -7,6 +7,7 @@ package io.rakam.presto.kafka;
 import com.google.inject.Binder;
 import com.google.inject.Scopes;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
+import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.HistoricalDataHandler;
 import io.rakam.presto.deserialization.DecoupleMessage;
 import io.rakam.presto.deserialization.MessageEventTransformer;
@@ -25,6 +26,8 @@ public class KafkaStreamSourceModule
         configBinder(binder).bindConfig(JsonConfig.class);
 
         binder.bind(KafkaRealTimeWorker.class).in(Scopes.SINGLETON);
+        binder.bind(KafkaHistoricalWorker.class).in(Scopes.SINGLETON);
+        binder.bind(BasicMemoryBuffer.SizeCalculator.class).to(KafkaRecordSizeCalculator.class).in(Scopes.SINGLETON);
 
         Class<? extends MessageEventTransformer> clazz;
         switch (config.getDataFormat()) {

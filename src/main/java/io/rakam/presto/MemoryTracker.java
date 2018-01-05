@@ -8,8 +8,9 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class MemoryTracker
 {
-    private static final double heapMaxSize = Runtime.getRuntime().maxMemory() - Runtime.getRuntime().totalMemory();
-    private double dynamicMemoryRatio = .3;
+    private static final long HEAP_MAX_SIZE = (long) (Runtime.getRuntime().maxMemory() - Runtime.getRuntime().totalMemory());
+    private static final double AVAILABLE_RATIO = .3;
+    private static final long AVAILABLE_HEAP_SIZE = (long) (HEAP_MAX_SIZE * AVAILABLE_RATIO);
 
     private AtomicLong reservedMemory;
 
@@ -25,14 +26,7 @@ public class MemoryTracker
 
     public long availableMemory()
     {
-        double availableMemory = heapMaxSize - reservedMemory.get();
-        double availableRatio = availableMemory / heapMaxSize;
-        if (availableRatio > dynamicMemoryRatio) {
-            return (long) ((availableRatio - dynamicMemoryRatio) * heapMaxSize);
-        }
-        else {
-            return -1;
-        }
+        return AVAILABLE_HEAP_SIZE - reservedMemory.get();
     }
 
     public void freeMemory(long bytes)

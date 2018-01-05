@@ -88,9 +88,8 @@ public class MiddlewareBuffer
 
         while (iterator.hasNext()) {
             Map.Entry<SchemaTableName, List<TableCheckpoint>> entry = iterator.next();
-            if (availableMemory == -1 || shouldFlush(now, entry.getKey())) {
+            if (availableMemory < 0 || shouldFlush(now, entry.getKey())) {
                 SchemaTableName tableName = entry.getKey();
-                log.debug("table_name: " + tableName + " record_count: " + bufferRecordCount.get(tableName).get() + " size: " + bufferSize.get(tableName).get() + " bytes");
                 List<TableCheckpoint> value = entry.getValue();
                 map.computeIfAbsent(entry.getKey(), k -> new ArrayList<>()).addAll(value);
                 iterator.remove();

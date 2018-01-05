@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static io.rakam.presto.ServiceStarter.initializeLogging;
 import static io.rakam.presto.kafka.KafkaConfig.DataFormat.JSON;
 import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
 
@@ -45,6 +46,7 @@ public class StressTest
     public static void main(String[] args)
             throws Exception
     {
+        initializeLogging(System.getProperty("log.levels-file"));
         final List<byte[]> consumerRecords = getDataForFabric();
 
         KafkaConfig kafkaConfig = new KafkaConfig()
@@ -54,7 +56,7 @@ public class StressTest
                 .setTopic("events");
 
         RaptorConfig raptorConfig = new RaptorConfig()
-                .setMetadataUrl("jdbc:mysql://127.0.0.1/presto?user=root&password=")
+                .setMetadataUrl("jdbc:mysql://127.0.0.1/presto?user=root&password=&useSSL=false")
                 .setPrestoURL(URI.create("http://127.0.0.1:8080"));
 
         FieldNameConfig fieldNameConfig = new FieldNameConfig();
@@ -103,11 +105,11 @@ public class StressTest
 
                         long currentTotalRecord = totalRecord.get();
                         log.info("poll started. since last poll: " + ((System.currentTimeMillis() - lastPoll.get())) + "ms. total records:" + currentTotalRecord +
-                                ", lag: " + (currentTotalRecord - committedRecords.get()) + " records " +
+                                ", lag: " + (currentTotalRecord - committedRecords.get()) + " records" +
                                 ", available heap memory: " + DataSize.succinctBytes(memoryTracker.availableMemory()).toString());
 
                         try {
-                            Thread.sleep(timeout);
+                            Thread.sleep(timeout + 600);
                         }
                         catch (InterruptedException e) {
                             throw new RuntimeException(e);
@@ -166,7 +168,6 @@ public class StressTest
                         .put("user_followers", 445 + i)
                         .put("language", "ENGLISH" + i)
                         .put("user_status_count", 3434 + i)
-                        .put("_device_id", "4353454534534534534trgd")
                         .put("user_created", 432342 + i)
                         .put("longitude", 432342 + i)
                         .put("is_reply", false)
@@ -193,7 +194,6 @@ public class StressTest
                         .put("user_followers", 445 + i)
                         .put("language", "ENGLISH" + i)
                         .put("user_status_count", 3434 + i)
-                        .put("_device_id", "4353454534534534534trgd" + i)
                         .put("user_created", 432342 + i)
                         .put("longitude", 432342 + i)
                         .put("is_reply", false)

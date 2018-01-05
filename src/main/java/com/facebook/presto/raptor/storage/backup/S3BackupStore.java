@@ -29,8 +29,7 @@ import java.util.UUID;
 public class S3BackupStore
         implements BackupStore
 {
-    private static final Logger log = Logger.get(S3BackupStore.class);
-
+    private static final int TRY_COUNT = 5;
     private final AmazonS3Client s3Client;
     private final S3BackupConfig config;
     private final InMemoryFileSystem inMemoryFileSystem;
@@ -50,7 +49,7 @@ public class S3BackupStore
 
     public void backupShard(UUID uuid, File source)
     {
-        Slice slice = inMemoryFileSystem.get(source.getName());
+        Slice slice = inMemoryFileSystem.remove(source.getName());
         if (slice == null) {
             throw new IllegalStateException();
         }
@@ -65,19 +64,33 @@ public class S3BackupStore
 
         md5.update((byte[]) slice.getBase(), 0, slice.length());
 
+        ObjectMetadata objectMetadata = new ObjectMetadata();
+        objectMetadata.setContentLength(slice.length());
+        objectMetadata.setContentMD5(Base64.getEncoder().encodeToString(md5.digest()));
+
         try {
-            ObjectMetadata objectMetadata = new ObjectMetadata();
-            objectMetadata.setContentLength(slice.length());
-            objectMetadata.setContentMD5(Base64.getEncoder().encodeToString(md5.digest()));
-            SafeSliceInputStream input = new SafeSliceInputStream(slice.getInput());
-            this.s3Client.putObject(this.config.getS3Bucket(), uuid.toString(), input, objectMetadata);
-            input.close();
+            tryUpload(slice, uuid.toString(), objectMetadata, TRY_COUNT);
         }
         catch (Exception ex) {
             throw new PrestoException(RaptorErrorCode.RAPTOR_BACKUP_ERROR, "Failed to create backup shard file on S3", ex);
         }
+    }
 
-        inMemoryFileSystem.remove(source.getName());
+    private void tryUpload(Slice slice, String key, ObjectMetadata objectMetadata, int tryCount)
+    {
+        try {
+            SafeSliceInputStream input = new SafeSliceInputStream(slice.getInput());
+            s3Client.putObject(config.getS3Bucket(), key, input, objectMetadata);
+            input.close();
+        }
+        catch (Exception ex) {
+            if (tryCount > 0) {
+                tryUpload(slice, key, objectMetadata, tryCount - 1);
+            }
+            else {
+                throw new PrestoException(RaptorErrorCode.RAPTOR_BACKUP_ERROR, "Failed to create backup shard file on S3", ex);
+            }
+        }
     }
 
     public void restoreShard(UUID uuid, File target)

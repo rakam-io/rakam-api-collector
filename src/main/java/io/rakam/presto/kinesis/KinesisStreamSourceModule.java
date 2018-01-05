@@ -8,7 +8,9 @@ import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorF
 import com.google.inject.Binder;
 import com.google.inject.Scopes;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
+import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.deserialization.MessageEventTransformer;
+import io.rakam.presto.kafka.KafkaRecordSizeCalculator;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
 
@@ -22,5 +24,7 @@ public class KinesisStreamSourceModule
         binder.bind(MessageEventTransformer.class).to(KinesisMessageEventTransformer.class).in(Scopes.SINGLETON);
         binder.bind(IRecordProcessorFactory.class).to(KinesisRecordProcessorFactory.class);
         binder.bind(KinesisWorkerManager.class).asEagerSingleton();
+
+        binder.bind(BasicMemoryBuffer.SizeCalculator.class).to(KinesisRecordSizeCalculator.class).in(Scopes.SINGLETON);
     }
 }

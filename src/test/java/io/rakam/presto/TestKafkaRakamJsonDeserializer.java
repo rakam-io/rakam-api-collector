@@ -23,7 +23,7 @@ import java.util.Optional;
 public class TestKafkaRakamJsonDeserializer extends TestKafkaJsonDeserializer {
     @Override
     public JsonDeserializer getJsonDeserializer(DatabaseHandler databaseHandler) {
-        return new RakamJsonDeserializer(databaseHandler);
+        return new RakamJsonDeserializer(new FieldNameConfig(), databaseHandler);
     }
 
     @Override

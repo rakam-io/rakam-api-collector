@@ -38,8 +38,7 @@ public class TestBackupStoreModule implements Module {
 
         @Override
         public void backupShard(UUID uuid, File source) {
-            function.accept(uuid, source);
-            inMemoryFileSystem.remove(source.getName());
+            function.andThen((uuid1, file) -> inMemoryFileSystem.remove(source.getName())).accept(uuid, source);
         }
 
         @Override

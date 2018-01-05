@@ -330,12 +330,14 @@ public class InMemoryOrcStorageManager
                 shardRecorder.recordCreatedShard(transactionId, shardUuid);
 
                 File stagingFile = storageService.getStagingFile(shardUuid);
-                futures.add(backupManager.submit(shardUuid, stagingFile));
 
+                // TO IT BEFORE BACKUP
                 long rowCount = writer.getRowCount();
                 long uncompressedSize = writer.getUncompressedSize();
 
                 shards.add(createShardInfo(shardUuid, bucketNumber, stagingFile, ImmutableSet.of(), rowCount, uncompressedSize));
+
+                futures.add(backupManager.submit(shardUuid, stagingFile));
 
                 writer = null;
                 shardUuid = null;

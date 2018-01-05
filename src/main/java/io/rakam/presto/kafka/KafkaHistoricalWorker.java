@@ -5,6 +5,7 @@
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.SchemaTableName;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.log.Logger;
 import io.rakam.presto.*;
@@ -80,13 +81,14 @@ public class KafkaHistoricalWorker
     public void start()
     {
         workerThread = new Thread(this::execute);
+        workerThread.setName("kafka-historical-worker");
         workerThread.start();
     }
 
     public void subscribe()
     {
         consumer = new KafkaConsumer(createConsumerConfig(config));
-        consumer.subscribe(config.getTopic());
+        consumer.subscribe(ImmutableList.of(config.getHistoricalDataTopic()));
     }
 
     public void execute()
@@ -132,7 +134,7 @@ public class KafkaHistoricalWorker
 
                     middlewareBuffer.add(new BatchRecords(convert, () -> commitSyncOffset(consumer, findLatestRecord(null))));
 
-                    if (memoryTracker.availableMemory() == -1) {
+                    if (memoryTracker.availableMemory() < 0) {
                         try {
                             KafkaUtil.flushIfNeeded(middlewareBuffer, committer, checkpointQueue, memoryTracker, log);
                         }

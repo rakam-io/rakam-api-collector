@@ -8,6 +8,8 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.airlift.log.Logger;
+import io.airlift.units.DataSize;
+import io.airlift.units.Duration;
 import io.rakam.presto.*;
 import io.rakam.presto.MiddlewareBuffer.TableCheckpoint;
 import io.rakam.presto.deserialization.TableData;
@@ -72,6 +74,7 @@ public class KafkaRealTimeWorker
     public void start()
     {
         workerThread = new Thread(this::execute);
+        workerThread.setName("kafka-realtime-worker");
         workerThread.start();
     }
 
@@ -87,18 +90,12 @@ public class KafkaRealTimeWorker
 
         try {
             while (working.get()) {
-                ConsumerRecords<byte[], byte[]> kafkaRecord = consumer.poll(0);
+                ConsumerRecords<byte[], byte[]> records = consumer.poll(0);
 
-                buffer.consumeRecords(kafkaRecord);
+                buffer.consumeRecords(records);
 
                 if (buffer.shouldFlush()) {
-                    try {
-                        flushData();
-                    }
-                    catch (Throwable e) {
-                        log.error(e, "Error processing Kafka records, passing record to latest offset.");
-                        commitSyncOffset(consumer, null);
-                    }
+                    flushDataSafe();
                 }
 
                 List<TableCheckpoint> poll = checkpointQueue.poll();
@@ -107,7 +104,9 @@ public class KafkaRealTimeWorker
                     poll = checkpointQueue.poll();
                 }
 
-                while (memoryTracker.availableMemory() == -1) {
+                while (memoryTracker.availableMemory() < 0) {
+                    flushDataSafe();
+
                     try {
                         MILLISECONDS.sleep(200);
                     }
@@ -122,19 +121,35 @@ public class KafkaRealTimeWorker
         }
     }
 
-    private void flushData()
-            throws IOException
+    private void flushDataSafe()
     {
-        BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records = buffer.getRecords();
+        try {
+            BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records = buffer.getRecords();
 
-        if (!records.bulkBuffer.isEmpty() || !records.buffer.isEmpty()) {
-            Map<SchemaTableName, TableData> convert = context.convert(records.buffer, records.bulkBuffer, ImmutableList.of());
-            buffer.clear();
+            if (!records.bulkBuffer.isEmpty() || !records.buffer.isEmpty()) {
+                long now = System.currentTimeMillis();
+                log.debug("Flushing records (%s) from stream buffer, it's been %s since last flush.",
+                        DataSize.succinctBytes(buffer.getTotalBytes()).toString(),
+                        Duration.succinctDuration(now - buffer.getPreviousFlushTimeMillisecond(), MILLISECONDS).toString());
 
-            middlewareBuffer.add(new BatchRecords(convert, () -> commitSyncOffset(consumer, findLatestRecord(records))));
+                Map<SchemaTableName, TableData> data = context.convert(records.buffer, records.bulkBuffer, ImmutableList.of());
+
+                buffer.clear();
+
+                middlewareBuffer.add(new BatchRecords(data, () -> commitSyncOffset(consumer, findLatestRecord(records))));
+
+                long totalDataSize = data.entrySet().stream().mapToLong(e -> e.getValue().page.getRetainedSizeInBytes()).sum();
+                log.debug("Flushed records to middleware buffer in %s, the data size is %s",
+                        Duration.succinctDuration(System.currentTimeMillis() - now, MILLISECONDS).toString(),
+                        DataSize.succinctBytes(totalDataSize));
+            }
+
+            KafkaUtil.flushIfNeeded(middlewareBuffer, committer, checkpointQueue, memoryTracker, log);
         }
-
-        KafkaUtil.flushIfNeeded(middlewareBuffer, committer, checkpointQueue, memoryTracker, log);
+        catch (Throwable e) {
+            log.error(e, "Error processing Kafka records, passing record to latest offset.");
+            commitSyncOffset(consumer, null);
+        }
     }
 
     @SuppressWarnings("Duplicates")

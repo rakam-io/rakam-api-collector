@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
 import com.google.common.collect.ImmutableList;
 import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.deserialization.PageBuilder;
 import io.rakam.presto.deserialization.PageReader;
 import org.rakam.collection.FieldType;
@@ -58,6 +59,7 @@ public class RakamJsonDeserializer
 {
     private static final JsonFactory READER = new ObjectMapper().getFactory();
     private final DatabaseHandler databaseHandler;
+    private final FieldNameConfig fieldNameConfig;
 
     private Map<Type, FieldType> typeCache = new ConcurrentHashMap<>();
     private String project;
@@ -65,9 +67,10 @@ public class RakamJsonDeserializer
     private JsonParser jp;
     TokenBuffer propertiesBuffer = null;
 
-    public RakamJsonDeserializer(DatabaseHandler databaseHandler)
+    public RakamJsonDeserializer(FieldNameConfig fieldNameConfig, DatabaseHandler databaseHandler)
     {
         this.databaseHandler = databaseHandler;
+        this.fieldNameConfig = fieldNameConfig;
     }
 
     @Override
@@ -179,7 +182,7 @@ public class RakamJsonDeserializer
             jp.nextToken();
 
             if (idx == -1) {
-                FieldType type = getTypeForUnknown(jp);
+                FieldType type = getTypeForUnknown(fieldName, jp);
                 if (type != null) {
                     if (newFields == null) {
                         newFields = new ArrayList<>();
@@ -474,9 +477,13 @@ public class RakamJsonDeserializer
     }
 
     @SuppressWarnings("Duplicates")
-    private static FieldType getTypeForUnknown(JsonParser jp)
+    private FieldType getTypeForUnknown(String fieldName, JsonParser jp)
             throws IOException
     {
+        if (fieldNameConfig.getTimeField().equals(fieldName)) {
+            return FieldType.TIMESTAMP;
+        }
+
         switch (jp.getCurrentToken()) {
             case VALUE_NULL:
                 return null;
@@ -517,7 +524,7 @@ public class RakamJsonDeserializer
 
                 FieldType type;
                 if (t.isScalarValue()) {
-                    type = getTypeForUnknown(jp);
+                    type = getTypeForUnknown(fieldName, jp);
                 }
                 else {
                     type = MAP_STRING;
@@ -552,7 +559,7 @@ public class RakamJsonDeserializer
                 if (!t.isScalarValue()) {
                     return MAP_STRING;
                 }
-                type = getTypeForUnknown(jp);
+                type = getTypeForUnknown(fieldName, jp);
                 if (type == null) {
                     // TODO: what if the other values are not null?
                     while (t != END_OBJECT) {

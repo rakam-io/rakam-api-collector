@@ -18,15 +18,20 @@ import com.google.inject.Scopes;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.airlift.log.Logger;
+import io.airlift.log.Logging;
+import io.airlift.log.LoggingConfiguration;
 import io.rakam.presto.connector.raptor.RaptorModule;
 import io.rakam.presto.kafka.KafkaStreamSourceModule;
 import io.rakam.presto.kinesis.KinesisStreamSourceModule;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.net.URL;
 import java.util.Properties;
 
+import static com.google.common.io.ByteStreams.nullOutputStream;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.rakam.presto.ConditionalModule.installIfPropertyEquals;
 
@@ -71,6 +76,8 @@ public final class ServiceStarter
         if (args.length > 0) {
             System.setProperty("config", args[0]);
         }
+
+//        initializeLogging(System.getProperty("log.levels-file"));
 
         Bootstrap app = new Bootstrap(
                 new StreamSourceModule(),
@@ -118,6 +125,31 @@ public final class ServiceStarter
         {
             install(installIfPropertyEquals(new KafkaStreamSourceModule(), sourceName, "kafka"));
             install(installIfPropertyEquals(new KinesisStreamSourceModule(), sourceName, "kinesis"));
+        }
+    }
+
+    public static void initializeLogging(String logLevelsFile)
+    {
+        // unhook out and err while initializing logging or logger will print to them
+        PrintStream out = System.out;
+        PrintStream err = System.err;
+
+        try {
+            LoggingConfiguration config = new LoggingConfiguration();
+
+            if (logLevelsFile != null) {
+                config.setLevelsFile(logLevelsFile);
+            }
+
+            Logging logging = Logging.initialize();
+            logging.configure(config);
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        finally {
+            System.setOut(out);
+            System.setErr(err);
         }
     }
 }

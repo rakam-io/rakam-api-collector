@@ -11,9 +11,9 @@ public class BasicMemoryBuffer<T>
         implements MemoryBuffer<T>
 {
     private final long millisecondsToBuffer;
-    private final List<T> buffer;
-    private final List<T> bulkBuffer;
-    private final List<T> pageBuffer;
+    private final ArrayList<T> buffer;
+    private final ArrayList<T> bulkBuffer;
+    private final ArrayList<T> pageBuffer;
     private final SizeCalculator<T> sizeCalculator;
     private final MemoryTracker memoryTracker;
     private long previousFlushTimeMillisecond;
@@ -34,6 +34,16 @@ public class BasicMemoryBuffer<T>
     public long getMillisecondsToBuffer()
     {
         return millisecondsToBuffer;
+    }
+
+    public long getPreviousFlushTimeMillisecond()
+    {
+        return previousFlushTimeMillisecond;
+    }
+
+    public int getTotalBytes()
+    {
+        return totalBytes;
     }
 
     public void consumeRecord(T record, long size)
@@ -61,6 +71,7 @@ public class BasicMemoryBuffer<T>
     {
         buffer.clear();
         bulkBuffer.clear();
+        pageBuffer.clear();
         previousFlushTimeMillisecond = System.currentTimeMillis();
         memoryTracker.freeMemory(totalBytes);
         totalBytes = 0;

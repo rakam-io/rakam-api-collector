@@ -122,12 +122,13 @@ public final class InMemoryFileSystem
         throw new UnsupportedOperationException();
     }
 
-    public void remove(String fileName)
+    public Slice remove(String fileName)
     {
         DynamicSliceOutput output = files.get(fileName);
 
         memoryTracker.freeMemory(output.getRetainedSize());
         files.remove(fileName);
+        return output.slice();
     }
 
     public Slice get(String fileName)

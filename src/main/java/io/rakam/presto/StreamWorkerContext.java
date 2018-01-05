@@ -21,7 +21,7 @@ public class StreamWorkerContext<T>
     private final BasicMemoryBuffer.SizeCalculator<T> sizeCalculator;
 
     @Inject
-    public StreamWorkerContext(MessageEventTransformer transformer, BasicMemoryBuffer.SizeCalculator<T> sizeCalculator, MemoryTracker memoryTracker, StreamConfig streamConfig)
+    public StreamWorkerContext(MessageEventTransformer transformer, BasicMemoryBuffer.SizeCalculator sizeCalculator, MemoryTracker memoryTracker, StreamConfig streamConfig)
     {
         this.transformer = transformer;
         this.streamConfig = streamConfig;
