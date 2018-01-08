@@ -175,7 +175,7 @@ public class KafkaRealTimeWorker
                     double count = realTimeRecordsStats.getFiveMinute().getCount();
                     if (count > 100 && (errorStats.getFiveMinute().getCount() / count) > .4) {
                         log.error("The maximum error threshold is reached. Exiting the program...");
-                        System.exit(1);
+                        Runtime.getRuntime().exit(1);
                     }
                 }
                 catch (Throwable e) {

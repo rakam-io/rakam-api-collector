@@ -10,8 +10,11 @@ import io.airlift.log.Logger;
 import io.airlift.stats.CounterStat;
 import io.airlift.stats.DistributionStat;
 import io.airlift.units.Duration;
-import io.rakam.presto.*;
+import io.rakam.presto.MemoryTracker;
+import io.rakam.presto.MiddlewareBuffer;
 import io.rakam.presto.MiddlewareBuffer.TableCheckpoint;
+import io.rakam.presto.StreamWorkerContext;
+import io.rakam.presto.TargetConnectorCommitter;
 import it.unimi.dsi.fastutil.ints.Int2LongMap;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -19,21 +22,18 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
-import sun.misc.VM;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static io.airlift.units.DataSize.succinctBytes;
-import static io.airlift.units.Duration.*;
+import static io.airlift.units.Duration.succinctDuration;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class KafkaUtil
