@@ -10,6 +10,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.primitives.Ints;
 import io.airlift.log.Logger;
 import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.StreamConfig;
@@ -35,20 +36,18 @@ public class KafkaDecoupleMessage
 
     private final JsonFactory factory;
     private final String timeColumn;
-    private final int realTimeFlushDays;
-    private long ingestionDuration;
+    private int ingestionDuration;
 
     @Inject
-    public KafkaDecoupleMessage(FieldNameConfig fieldNameConfig, StreamConfig streamConfig)
+    public KafkaDecoupleMessage(FieldNameConfig fieldNameConfig)
     {
         timeColumn = fieldNameConfig.getTimeField();
-        realTimeFlushDays = streamConfig.getRealTimeFlushDays();
-        this.ingestionDuration = ChronoUnit.DAYS.getDuration().toMillis();
+        this.ingestionDuration = Ints.checkedCast(ChronoUnit.DAYS.getDuration().toMillis());
         factory = new ObjectMapper().getFactory();
     }
 
     @SuppressWarnings("PMD.AvoidBranchingStatementAsLastInLoop")
-    public boolean isRecentData(ConsumerRecord<byte[], byte[]> record, int todayInDate)
+    public int getDateOfRecord(ConsumerRecord<byte[], byte[]> record)
             throws IOException
     {
         JsonParser parser = factory.createParser(record.value());
@@ -74,14 +73,14 @@ public class KafkaDecoupleMessage
                     parser.skipChildren();
                     continue;
                 }
-                return findData(parser, todayInDate);
+                return findData(parser);
             }
             throw new JsonParseException(parser, format("Event time property `%s` doesn't exist in JSON", timeColumn));
         }
         throw new JsonParseException(parser, "data property doesn't exist in JSON");
     }
 
-    public boolean findData(JsonParser parser, long todayInDate)
+    public int findData(JsonParser parser)
             throws IOException
     {
         long eventTime;
@@ -97,7 +96,7 @@ public class KafkaDecoupleMessage
             default:
                 throw new JsonParseException(parser, "Date field must be either STRING or NUMERIC");
         }
-        long delayInDays = todayInDate - (eventTime / ingestionDuration);
-        return delayInDays >= 0 && delayInDays <= realTimeFlushDays;
+
+        return Ints.checkedCast(eventTime / ingestionDuration);
     }
 }

@@ -6,6 +6,7 @@ package io.rakam.presto;
 
 import com.facebook.presto.spi.SchemaTableName;
 import io.rakam.presto.deserialization.MessageEventTransformer;
+import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
 
 import javax.inject.Inject;
@@ -33,10 +34,10 @@ public class StreamWorkerContext<T>
     {
     }
 
-    public Map<SchemaTableName, TableData> convert(Iterable<? extends T> records, Iterable<? extends T> bulkRecords, Iterable<? extends T> pageRecords)
+    public Map<SchemaTableName, TableData> convert(Iterable<? extends T> records, Iterable<? extends T> bulkRecords)
             throws IOException
     {
-        return transformer.createPageTable(records, bulkRecords, pageRecords);
+        return transformer.createPageTable(records, bulkRecords);
     }
 
     public BasicMemoryBuffer createBuffer()

@@ -72,7 +72,7 @@ public class TestKafkaFabricJsonDeserializer
 
         TestDatabaseHandler databaseHandler = new TestDatabaseHandler();
         MessageEventTransformer messageEventTransformer = new KafkaJsonMessageTransformer(new FieldNameConfig(), databaseHandler, getJsonDeserializer(databaseHandler));
-        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(ImmutableList.of(record), ImmutableList.of(), ImmutableList.of());
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(ImmutableList.of(record), ImmutableList.of());
         TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         assertEquals(testcollection.metadata.size(), 4);

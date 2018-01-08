@@ -24,7 +24,6 @@ public class KafkaConfig
     private DataFormat dataFormat = DataFormat.AVRO;
 
     private Set<HostAddress> nodes;
-    private Set<HostAddress> zkNodes;
     private String[] topic;
     private String offset = "latest";
     private String groupId = "presto_streaming";

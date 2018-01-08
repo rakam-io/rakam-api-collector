@@ -13,7 +13,6 @@ public class BasicMemoryBuffer<T>
     private final long millisecondsToBuffer;
     private final ArrayList<T> buffer;
     private final ArrayList<T> bulkBuffer;
-    private final ArrayList<T> pageBuffer;
     private final SizeCalculator<T> sizeCalculator;
     private final MemoryTracker memoryTracker;
     private long previousFlushTimeMillisecond;
@@ -27,7 +26,6 @@ public class BasicMemoryBuffer<T>
         previousFlushTimeMillisecond = System.currentTimeMillis();
         buffer = new ArrayList<>(1000);
         bulkBuffer = new ArrayList<>(1000);
-        pageBuffer = new ArrayList<>(1000);
         totalBytes = 0;
     }
 
@@ -46,6 +44,11 @@ public class BasicMemoryBuffer<T>
         return totalBytes;
     }
 
+    public int getTotalRecords()
+    {
+        return buffer.size() + bulkBuffer.size();
+    }
+
     public void consumeRecord(T record, long size)
     {
         buffer.add(record);
@@ -60,18 +63,10 @@ public class BasicMemoryBuffer<T>
         totalBytes += size;
     }
 
-    public void consumePage(T record, long size)
-    {
-        pageBuffer.add(record);
-        totalBytes += size;
-        memoryTracker.reserveMemory(size);
-    }
-
     public void clear()
     {
         buffer.clear();
         bulkBuffer.clear();
-        pageBuffer.clear();
         previousFlushTimeMillisecond = System.currentTimeMillis();
         memoryTracker.freeMemory(totalBytes);
         totalBytes = 0;
@@ -79,13 +74,13 @@ public class BasicMemoryBuffer<T>
 
     public boolean shouldFlush()
     {
-        long timelapseMillisecond = System.currentTimeMillis() - previousFlushTimeMillisecond;
-        return (timelapseMillisecond >= getMillisecondsToBuffer());
+        return ((System.currentTimeMillis() - previousFlushTimeMillisecond) >= getMillisecondsToBuffer())
+                || memoryTracker.availableMemory() - (totalBytes * 2) < 0;
     }
 
     public Records getRecords()
     {
-        return new Records(buffer, bulkBuffer, pageBuffer);
+        return new Records(buffer, bulkBuffer);
     }
 
     public void consumeRecords(Iterable<T> records)
@@ -105,13 +100,11 @@ public class BasicMemoryBuffer<T>
     {
         public final List<T> buffer;
         public final List<T> bulkBuffer;
-        public final List<T> pageBuffer;
 
-        public Records(List<T> buffer, List<T> bulkBuffer, List<T> pageBuffer)
+        public Records(List<T> buffer, List<T> bulkBuffer)
         {
             this.buffer = buffer;
             this.bulkBuffer = bulkBuffer;
-            this.pageBuffer = pageBuffer;
         }
     }
 

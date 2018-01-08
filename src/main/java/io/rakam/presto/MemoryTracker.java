@@ -4,12 +4,14 @@
 
 package io.rakam.presto;
 
+import org.weakref.jmx.Managed;
+
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MemoryTracker
 {
     private static final long HEAP_MAX_SIZE = (long) (Runtime.getRuntime().maxMemory() - Runtime.getRuntime().totalMemory());
-    private static final double AVAILABLE_RATIO = .3;
+    private static final double AVAILABLE_RATIO = .4;
     private static final long AVAILABLE_HEAP_SIZE = (long) (HEAP_MAX_SIZE * AVAILABLE_RATIO);
 
     private AtomicLong reservedMemory;
@@ -24,9 +26,22 @@ public class MemoryTracker
         reservedMemory.addAndGet(bytes);
     }
 
+    @Managed
     public long availableMemory()
     {
         return AVAILABLE_HEAP_SIZE - reservedMemory.get();
+    }
+
+    @Managed
+    public double availableMemoryInPercentage()
+    {
+        return availableMemory() * 1.0 / AVAILABLE_HEAP_SIZE;
+    }
+
+    @Managed
+    public static long getAvailableHeapSize()
+    {
+        return AVAILABLE_HEAP_SIZE;
     }
 
     public void freeMemory(long bytes)

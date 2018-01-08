@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.rakam.presto.*;
 import io.rakam.presto.deserialization.DecoupleMessage;
@@ -130,7 +131,7 @@ public class KinesisRecordProcessor
         Map<SchemaTableName, TableData> pages;
         try {
             BasicMemoryBuffer.Records list = streamBuffer.getRecords();
-            pages = context.convert(list.buffer, list.bulkBuffer, list.pageBuffer);
+            pages = context.convert(list.buffer, list.bulkBuffer);
         }
         catch (IOException e) {
             throw new RuntimeException(e);
@@ -164,10 +165,10 @@ public class KinesisRecordProcessor
                     });
         }
 
-        public boolean isRecentData(Record record, int todayInDate)
+        public int getDateOfRecord(Record record)
                 throws IOException
         {
-            return true;
+            return 1;
         }
     }
 }

@@ -24,7 +24,7 @@ public class S3BackupConfig
     private String region;
     private String endpoint;
 
-    @Config("raptor.aws.access-key")
+    @Config("aws.access-key")
     public S3BackupConfig setAccessKey(String accessKey)
     {
         this.accessKey = accessKey;
@@ -66,7 +66,7 @@ public class S3BackupConfig
         return accessKey;
     }
 
-    @Config("raptor.aws.secret-access-key")
+    @Config("aws.secret-access-key")
     public S3BackupConfig setSecretAccessKey(String secretAccessKey)
     {
         this.secretAccessKey = secretAccessKey;

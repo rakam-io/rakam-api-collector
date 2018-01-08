@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Set;
 
 public abstract class JsonMessageEventTransformer<T>
-        extends MessageEventTransformer<T, JsonDeserializer>
+        extends MessageEventTransformer<T,JsonDeserializer>
 {
     static final Logger LOGGER = Logger.get(JsonMessageEventTransformer.class);
     protected final JsonDeserializer jsonDecoder;
@@ -37,7 +37,7 @@ public abstract class JsonMessageEventTransformer<T>
     }
 
     @Override
-    public synchronized Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords, Iterable<T> pageRecords)
+    public synchronized Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
             throws IOException
     {
         Map<SchemaTableName, PageReader> builderMap = new HashMap<>();
@@ -69,7 +69,7 @@ public abstract class JsonMessageEventTransformer<T>
 
         ImmutableMap.Builder<SchemaTableName, TableData> builder = ImmutableMap.builder();
         for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
-            builder.put(entry.getKey(), new TableData(entry.getValue().getPage(), entry.getValue().getActualSchema()));
+            builder.put(entry.getKey(), new TableData(entry.getValue().buildPage(), entry.getValue().getActualSchema()));
         }
         return builder.build();
     }

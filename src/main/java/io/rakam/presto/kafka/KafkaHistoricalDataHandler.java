@@ -4,83 +4,71 @@
 
 package io.rakam.presto.kafka;
 
-import com.facebook.presto.execution.buffer.PagesSerde;
-import com.facebook.presto.execution.buffer.SerializedPage;
-import com.facebook.presto.spi.Page;
-import com.facebook.presto.spi.SchemaTableName;
-import com.facebook.presto.spi.block.BlockEncodingSerde;
 import io.airlift.log.Logger;
-import io.airlift.slice.Slice;
-import io.airlift.slice.SliceOutput;
-import io.airlift.slice.Slices;
+import io.airlift.units.Duration;
 import io.rakam.presto.HistoricalDataHandler;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import javax.inject.Inject;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.facebook.presto.execution.buffer.PageCompression.UNCOMPRESSED;
-import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
+import static io.rakam.presto.kafka.KafkaUtil.createProducerConfig;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class KafkaHistoricalDataHandler
-        implements HistoricalDataHandler
+        implements HistoricalDataHandler<ConsumerRecord<byte[], byte[]>>
 {
-    final static byte[] KAFKA_KEY_FOR_HISTORICAL_DATA = new byte[] {0};
-    private final static Logger LOGGER = Logger.get(KafkaHistoricalDataHandler.class);
+    private static final Logger log = Logger.get(KafkaHistoricalDataHandler.class);
 
     private final KafkaProducer<byte[], byte[]> producer;
-    private final PagesSerde pagesSerde;
     private final String kafkaTopic;
 
     @Inject
-    public KafkaHistoricalDataHandler(KafkaConfig kafkaConfig, BlockEncodingSerde blockEncodingSerde)
+    public KafkaHistoricalDataHandler(KafkaConfig kafkaConfig)
     {
-        producer = new KafkaProducer<>(createConsumerConfig(kafkaConfig));
-        this.kafkaTopic = kafkaConfig.getHistoricalDataTopic();
-        pagesSerde = new PagesSerde(blockEncodingSerde, Optional.empty(), Optional.empty());
+        producer = new KafkaProducer<>(createProducerConfig(kafkaConfig, UUID.randomUUID().toString()));
+        kafkaTopic = kafkaConfig.getHistoricalDataTopic();
+        producer.initTransactions();
     }
 
     @Override
-    public CompletableFuture<Void> handle(SchemaTableName table, List<Int2ObjectMap<Page>> pages)
+    public CompletableFuture<Void> handle(Iterable<ConsumerRecord<byte[], byte[]>> table, int recordCount)
     {
         CompletableFuture<Void> future = new CompletableFuture<>();
-        AtomicInteger latch = new AtomicInteger(pages.stream().mapToInt(e -> e.entrySet().size()).sum());
+        AtomicInteger latch = new AtomicInteger(recordCount);
 
         producer.beginTransaction();
 
-        for (Int2ObjectMap<Page> days : pages) {
-            for (Int2ObjectMap.Entry<Page> entry : days.int2ObjectEntrySet()) {
-                int day = entry.getIntKey();
-                Page page = entry.getValue();
-                SerializedPage data = pagesSerde.serialize(page);
-
-                int size = data.getSlice().length() + Byte.BYTES + (Integer.BYTES * 2);
-                byte[] buffer = new byte[size];
-                Slice slice = Slices.wrappedBuffer(buffer);
-                SliceOutput output = slice.getOutput();
-                output.writeByte(UNCOMPRESSED.getMarker());
-                output.writeInt(data.getUncompressedSizeInBytes());
-                output.writeInt(data.getPositionCount());
-                output.writeBytes(data.getSlice());
-
-                producer.send(new ProducerRecord<>(kafkaTopic, day, KAFKA_KEY_FOR_HISTORICAL_DATA, buffer), (metadata, exception) -> {
-                    if (exception != null) {
-                        LOGGER.error(exception);
-                    }
-                    if (latch.decrementAndGet() == 0) {
-                        future.complete(null);
-                    }
-                });
-            }
+        long now = System.currentTimeMillis();
+        IntegerHolder totalRecords = new IntegerHolder();
+        for (ConsumerRecord<byte[], byte[]> record : table) {
+            producer.send(new ProducerRecord<>(kafkaTopic, record.key(), record.value()), (metadata, exception) -> {
+                if (exception != null) {
+                    log.error(exception);
+                }
+                if (latch.decrementAndGet() == 0) {
+                    log.debug("%d records are sent to Kafka historical topic in %s.", totalRecords.value,
+                            Duration.succinctDuration(System.currentTimeMillis() - now, MILLISECONDS).toString());
+                    future.complete(null);
+                }
+            });
+            totalRecords.value++;
         }
+
+        log.debug("%d records are being sent to Kafka historical topic..", totalRecords.value);
+
         producer.commitTransaction();
 
         return future;
+    }
+
+    private static class IntegerHolder
+    {
+        int value;
     }
 }

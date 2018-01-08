@@ -15,22 +15,25 @@ import io.rakam.presto.connector.raptor.S3BackupConfig;
 import io.rakam.presto.deserialization.json.FabricJsonDeserializer;
 import io.rakam.presto.deserialization.json.JsonDeserializer;
 import io.rakam.presto.kafka.KafkaConfig;
+import io.rakam.presto.kafka.KafkaDecoupleMessage;
 import io.rakam.presto.kafka.KafkaJsonMessageTransformer;
 import io.rakam.presto.kafka.KafkaRealTimeWorker;
 import io.rakam.presto.kafka.KafkaRecordSizeCalculator;
+import it.unimi.dsi.fastutil.ints.Int2LongMap;
+import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.rakam.util.JsonHelper;
 
 import java.io.IOException;
 import java.net.URI;
-import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -38,6 +41,7 @@ import java.util.stream.IntStream;
 import static io.rakam.presto.ServiceStarter.initializeLogging;
 import static io.rakam.presto.kafka.KafkaConfig.DataFormat.JSON;
 import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
+import static java.time.ZoneOffset.UTC;
 
 public class StressTest
 {
@@ -65,7 +69,7 @@ public class StressTest
 
         TestBackupStoreModule backupStoreModule = new TestBackupStoreModule((uuid, file) -> {
             try {
-                Thread.sleep(1000);
+                Thread.sleep(500);
             }
             catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -86,100 +90,55 @@ public class StressTest
         KafkaJsonMessageTransformer transformer = new KafkaJsonMessageTransformer(fieldNameConfig, databaseHandler, deserializer);
         final MemoryTracker memoryTracker = new MemoryTracker();
         StreamWorkerContext context = new StreamWorkerContext(transformer, new KafkaRecordSizeCalculator(), memoryTracker, streamConfig);
-        TargetConnectorCommitter targetConnectorCommitter = new TargetConnectorCommitter(databaseHandler, memoryTracker);
+        TargetConnectorCommitter targetConnectorCommitter = new TargetConnectorCommitter(databaseHandler);
 
         AtomicLong totalRecord = new AtomicLong(-1);
         AtomicLong lastPoll = new AtomicLong(System.currentTimeMillis());
 
-        KafkaRealTimeWorker kafkaWorker = new KafkaRealTimeWorker(kafkaConfig, memoryTracker, middlewareConfig, context, targetConnectorCommitter)
-        {
-            @Override
-            public void subscribe()
-            {
-                consumer = new KafkaConsumer(createConsumerConfig(config))
-                {
-
-                    @Override
-                    public ConsumerRecords poll(long timeout)
-                    {
-
-                        long currentTotalRecord = totalRecord.get();
-                        log.info("poll started. since last poll: " + ((System.currentTimeMillis() - lastPoll.get())) + "ms. total records:" + currentTotalRecord +
-                                ", lag: " + (currentTotalRecord - committedRecords.get()) + " records" +
-                                ", available heap memory: " + DataSize.succinctBytes(memoryTracker.availableMemory()).toString());
-
-                        try {
-                            Thread.sleep(timeout + 600);
-                        }
-                        catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                        lastPoll.set(System.currentTimeMillis());
-
-                        List<ConsumerRecord<byte[], byte[]>> records = IntStream.range(0, consumerRecords.size())
-                                .mapToObj(i -> new ConsumerRecord<>("test", -1, currentTotalRecord + i, new byte[] {}, consumerRecords.get(i)))
-                                .collect(Collectors.toList());
-
-                        if (currentTotalRecord == -1) {
-                            totalRecord.set(0);
-                        }
-                        else {
-                            totalRecord.addAndGet(consumerRecords.size());
-                        }
-
-                        return new ConsumerRecords(ImmutableMap.of(new TopicPartition("test", -1), records));
-                    }
-                };
-            }
-
-            @Override
-            public void commitSyncOffset(KafkaConsumer<byte[], byte[]> consumer, ConsumerRecord record)
-            {
-                if (record == null) {
-                    committedRecords.set(totalRecord.get());
-                }
-                else {
-                    committedRecords.set(record.offset());
-                }
-            }
-        };
+        KafkaRealTimeWorker kafkaWorker = new MockKafkaRealTimeWorker(kafkaConfig, memoryTracker, middlewareConfig, context, targetConnectorCommitter, totalRecord, lastPoll, committedRecords, consumerRecords);
 
         kafkaWorker.execute();
     }
 
     private static List<byte[]> getDataForFabric()
     {
-        return IntStream.range(0, 30000).mapToObj(i -> JsonHelper.encodeAsBytes(ImmutableMap.of(
-                "id", "test",
-                "metadata", ImmutableMap.builder().build(),
-                "data", ImmutableMap.builder()
-                        .put("_project", "demo")
-                        .put("_collection", "tweet3")
-                        .put("place", "USA")
-                        .put("id", 34235435 * i)
-                        .put("place_id", 45 * i)
-                        .put("place_type", "tefdsfsdfts" + i)
-                        .put("user_lang", "fdsfsdfen" + i)
-                        .put("has_media", false)
-                        .put("_time", 5435435)
-                        .put("user_mentions", ImmutableList.of("test", "test3", "test" + i))
-                        .put("is_retweet", true)
-                        .put("country_code", "USA" + i)
-                        .put("user_followers", 445 + i)
-                        .put("language", "ENGLISH" + i)
-                        .put("user_status_count", 3434 + i)
-                        .put("user_created", 432342 + i)
-                        .put("longitude", 432342 + i)
-                        .put("is_reply", false)
-                        .put("latitude", 432342 + i)
-                        .put("is_positive", false).build()))).collect(Collectors.toList());
+        Random random = new Random();
+
+        return IntStream.range(0, 30000).mapToObj(i -> {
+            return JsonHelper.encodeAsBytes(ImmutableMap.of(
+                    "id", "test",
+                    "metadata", ImmutableMap.builder().build(),
+                    "data", ImmutableMap.builder()
+                            .put("_project", "demo_stress")
+                            .put("_collection", "tweet" + (i % 100))
+                            .put("place", "USA")
+                            .put("id", 34235435 * i)
+                            .put("place_id", 45 * i)
+                            .put("place_type", "tefdsfsdfts" + i)
+                            .put("user_lang", "fdsfsdfen" + i)
+                            .put("has_media", false)
+                            .put("_time", i % 10 == 0 ? LocalDate.now().minusDays(random.nextInt(30)).atStartOfDay().toEpochSecond(UTC) * 1000 : (System.currentTimeMillis() - (i * 10000)))
+                            .put("user_mentions", ImmutableList.of("test", "test3", "test" + i))
+                            .put("is_retweet", true)
+                            .put("country_code", "USA" + i)
+                            .put("user_followers", 445 + i)
+                            .put("language", "ENGLISH" + i)
+                            .put("user_status_count", 3434 + i)
+                            .put("user_created", 432342 + i)
+                            .put("longitude", 432342 + i)
+                            .put("is_reply", false)
+                            .put("latitude", 432342 + i)
+                            .put("is_positive", false).build()));
+        }).collect(Collectors.toList());
     }
 
     private static List<byte[]> getDataForRakam()
     {
+        Random random = new Random();
+
         return IntStream.range(0, 30000).mapToObj(i -> JsonHelper.encodeAsBytes(ImmutableMap.of(
-                "project", "demo",
-                "collection", "tweet3",
+                "project", "demo_stress",
+                "collection", "tweet" + (i % 100),
                 "properties", ImmutableMap.builder()
                         .put("place", "USA")
                         .put("id", 34235435 * i)
@@ -187,12 +146,13 @@ public class StressTest
                         .put("place_type", "tefdsfsdfts" + i)
                         .put("user_lang", "fdsfsdfen" + i)
                         .put("has_media", false)
-                        .put("_time", 5435435 + 1)
+                        .put("_time", i % 10 == 0 ? LocalDate.now().minusDays(random.nextInt(30)).atStartOfDay().toEpochSecond(UTC) * 1000 : (System.currentTimeMillis() - (i * 10000)))
                         .put("user_mentions", ImmutableList.of("test", "test3", "test" + i))
                         .put("is_retweet", true)
                         .put("country_code", "USA" + i)
                         .put("user_followers", 445 + i)
                         .put("language", "ENGLISH" + i)
+                        .put("_device_id", "4353454534534534534trgd" + i)
                         .put("user_status_count", 3434 + i)
                         .put("user_created", 432342 + i)
                         .put("longitude", 432342 + i)
@@ -201,52 +161,97 @@ public class StressTest
                         .put("is_positive", false).build()))).collect(Collectors.toList());
     }
 
-    public static void producer()
-            throws IOException
+    private static class MockKafkaHistoricalDataHandler
+            implements HistoricalDataHandler<ConsumerRecord<byte[], byte[]>>
     {
-        KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(createConsumerConfig(new KafkaConfig().setNodes("127.0.0.1:9092").setTopic("sample")));
 
-        long now = Instant.now().toEpochMilli();
-        Random random1 = new Random();
-        int i = 0;
-        while (true) {
-            int random = random1.nextInt(1000 * 60);
+        @Override
+        public CompletableFuture<Void> handle(Iterable<ConsumerRecord<byte[], byte[]>> table, int count)
+        {
+//            for (ConsumerRecord<byte[], byte[]> record : table) {
+//                int result = 0;
+//                for (byte val : record.value()) {
+//                    result += val;
+//                }
+//
+//                int i = result ^ 3;
+//            }
 
-            long value = now - random;
+            return CompletableFuture.completedFuture(null);
+        }
+    }
 
-            if (i % 100 == 0) {
-                value -= random1.nextInt(1000 * 60 * 60 * 24 * 60);
+    private static class MockKafkaRealTimeWorker
+            extends KafkaRealTimeWorker
+    {
+        private final MemoryTracker memoryTracker;
+        private final AtomicLong totalRecord;
+        private final AtomicLong lastPoll;
+        private final AtomicLong committedRecords;
+        private final List<byte[]> consumerRecords;
+
+        public MockKafkaRealTimeWorker(KafkaConfig kafkaConfig, MemoryTracker memoryTracker, MiddlewareConfig middlewareConfig, StreamWorkerContext context, TargetConnectorCommitter targetConnectorCommitter, AtomicLong totalRecord, AtomicLong lastPoll, AtomicLong committedRecords, List<byte[]> consumerRecords)
+        {
+            super(kafkaConfig, memoryTracker, new MockKafkaHistoricalDataHandler(), new KafkaDecoupleMessage(new FieldNameConfig()), middlewareConfig, context, targetConnectorCommitter);
+            this.memoryTracker = memoryTracker;
+            this.totalRecord = totalRecord;
+            this.lastPoll = lastPoll;
+            this.committedRecords = committedRecords;
+            this.consumerRecords = consumerRecords;
+        }
+
+        @Override
+        public void subscribe()
+        {
+            consumer = new KafkaConsumer(createConsumerConfig(config))
+            {
+
+                @Override
+                public ConsumerRecords poll(long timeout)
+                {
+
+                    long currentTotalRecord = totalRecord.get();
+                    log.info("poll started. since last poll: " + ((System.currentTimeMillis() - lastPoll.get())) + "ms. total records:" + currentTotalRecord +
+                            ", lag: " + (currentTotalRecord - committedRecords.get()) + " records" +
+                            ", available heap memory: " + DataSize.succinctBytes(memoryTracker.availableMemory()).toString());
+
+                    try {
+                        Thread.sleep(timeout + 600);
+                    }
+                    catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    lastPoll.set(System.currentTimeMillis());
+
+                    List<ConsumerRecord<byte[], byte[]>> records = IntStream.range(0, consumerRecords.size())
+                            .mapToObj(i -> new ConsumerRecord<>("test", -1, currentTotalRecord + i, new byte[] {}, consumerRecords.get(i)))
+                            .collect(Collectors.toList());
+
+                    if (currentTotalRecord == -1) {
+                        totalRecord.set(0);
+                    }
+                    else {
+                        totalRecord.addAndGet(consumerRecords.size());
+                    }
+
+                    return new ConsumerRecords(ImmutableMap.of(new TopicPartition("test", -1), records));
+                }
+            };
+        }
+
+        @Override
+        public void commitSyncOffset(KafkaConsumer<byte[], byte[]> consumer, Map<String, Int2LongOpenHashMap> offsets)
+        {
+            if (offsets == null) {
+                committedRecords.set(totalRecord.get());
             }
-
-            i++;
-            producer.send(new ProducerRecord<>("sample", JsonHelper.encodeAsBytes(ImmutableMap.of(
-                    "id", "test",
-                    "metadata", ImmutableMap.builder().build(),
-                    "data", ImmutableMap.builder()
-                            .put("_project", "demo")
-                            .put("_collection", "tweet3")
-                            .put("place", "USA")
-                            .put("id", 34235435 * i)
-                            .put("place_id", 45 * i)
-                            .put("place_type", "tefdsfsdfts" + i)
-                            .put("user_lang", "fdsfsdfen" + i)
-                            .put("has_media", false)
-                            .put("_time", value)
-                            .put("user_mentions", ImmutableList.of("test", "test3", "test" + i))
-                            .put("is_retweet", true)
-                            .put("country_code", "USA" + i)
-                            .put("user_followers", 445 + i)
-                            .put("language", "ENGLISH" + i)
-                            .put("user_status_count", 3434 + i)
-                            .put("_device_id", "4353454534534534534trgd" + i)
-                            .put("user_created", 432342 + i)
-                            .put("longitude", 432342 + i)
-                            .put("is_reply", false)
-                            .put("latitude", 432342 + i)
-                            .put("is_positive", false).build()))));
-
-            if (i % 10000 == 0) {
-                System.out.println(i);
+            else {
+                for (Map.Entry<String, Int2LongOpenHashMap> entry : offsets.entrySet()) {
+                    for (Int2LongMap.Entry offsetLists : entry.getValue().int2LongEntrySet()) {
+                        long offset = offsetLists.getLongValue();
+                        committedRecords.set(offset);
+                    }
+                }
             }
         }
     }

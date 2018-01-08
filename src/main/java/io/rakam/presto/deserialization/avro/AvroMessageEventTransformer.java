@@ -45,7 +45,7 @@ public abstract class AvroMessageEventTransformer<T>
     }
 
     @Override
-    public synchronized Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords, Iterable<T> pageRecords)
+    public synchronized Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
             throws IOException
     {
         Map<SchemaTableName, PageReader> builderMap = new HashMap<>();
@@ -94,14 +94,7 @@ public abstract class AvroMessageEventTransformer<T>
                 for (int i = 0; i < countOfColumns; i++) {
                     String columnName = decoder.readString();
                     Optional<ColumnMetadata> column = pageBuilder.getExpectedSchema().stream()
-                            .filter(new Predicate<ColumnMetadata>()
-                            {
-                                @Override
-                                public boolean test(ColumnMetadata o)
-                                {
-                                    return o.getName().equals(columnName);
-                                }
-                            })
+                            .filter((Predicate<ColumnMetadata>) o -> o.getName().equals(columnName))
                             .findAny();
                     if (!column.isPresent()) {
                         throw new PrestoException(GENERIC_INTERNAL_ERROR, "Unknown column: " + columnName);
@@ -134,7 +127,7 @@ public abstract class AvroMessageEventTransformer<T>
 
         ImmutableMap.Builder<SchemaTableName, TableData> builder = ImmutableMap.builder();
         for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
-            builder.put(entry.getKey(), new TableData(entry.getValue().getPage(), entry.getValue().getActualSchema()));
+            builder.put(entry.getKey(), new TableData(entry.getValue().buildPage(), entry.getValue().getActualSchema()));
         }
 
         return builder.build();

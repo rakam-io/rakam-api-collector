@@ -40,7 +40,7 @@ public abstract class MessageEventTransformer<T, C>
 
     public abstract byte[] getData(T record);
 
-    public abstract Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords, Iterable<T> pageRecords)
+    public abstract Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
             throws IOException;
 
     protected PageReader generatePageBuilder(String project, String collection)
@@ -50,11 +50,10 @@ public abstract class MessageEventTransformer<T, C>
             rakamSchema = databaseHandler.getColumns(project, collection);
         }
         catch (IllegalArgumentException e) {
-            databaseHandler.addColumns(project, collection,
+            rakamSchema = databaseHandler.addColumns(project, collection,
                     ImmutableList.of(
                             new ColumnMetadata(fieldNameConfig.getTimeField(), TimestampType.TIMESTAMP),
                             new ColumnMetadata(fieldNameConfig.getUserFieldName(), fieldNameConfig.getUserFieldType().getType())));
-            rakamSchema = databaseHandler.getColumns(project, collection);
         }
 
         if (rakamSchema == null) {

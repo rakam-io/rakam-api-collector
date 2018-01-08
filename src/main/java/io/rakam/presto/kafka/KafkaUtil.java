@@ -7,20 +7,29 @@ package io.rakam.presto.kafka;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.SchemaTableName;
 import io.airlift.log.Logger;
-import io.airlift.units.DataSize;
+import io.airlift.stats.CounterStat;
+import io.airlift.stats.DistributionStat;
+import io.airlift.units.Duration;
 import io.rakam.presto.*;
 import io.rakam.presto.MiddlewareBuffer.TableCheckpoint;
+import it.unimi.dsi.fastutil.ints.Int2LongMap;
+import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
+import sun.misc.VM;
 
-import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static io.airlift.units.DataSize.succinctBytes;
@@ -31,6 +40,25 @@ public class KafkaUtil
 {
 
     public static Properties createConsumerConfig(KafkaConfig config)
+    {
+        Properties props = createConfig(config);
+        props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+        props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+        return props;
+    }
+
+    public static Properties createProducerConfig(KafkaConfig config, String transactionId)
+    {
+        Properties props = createConfig(config);
+        props.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
+        props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
+        if (transactionId != null) {
+            props.put("transactional.id", transactionId);
+        }
+        return props;
+    }
+
+    public static Properties createConfig(KafkaConfig config)
     {
         String kafkaNodes = config.getNodes().stream().map(HostAddress::toString).collect(Collectors.joining(","));
         String offset = config.getOffset();
@@ -46,79 +74,106 @@ public class KafkaUtil
         props.put("session.timeout.ms", sessionTimeOut);
         props.put("heartbeat.interval.ms", "1000");
         props.put("request.timeout.ms", requestTimeOut);
-//        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put("key.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
-        props.put("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
-        props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
-        props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         return props;
     }
 
-    public static ConsumerRecord findLatestRecord(BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records)
+    public static Map<String, Int2LongOpenHashMap> findLatestOffsets(Iterable<ConsumerRecord<byte[], byte[]>> streamRecords, Iterable<ConsumerRecord<byte[], byte[]>> bulkRecords)
     {
-        ConsumerRecord lastSingleRecord = records.buffer.isEmpty() ? null : records.buffer.get(records.buffer.size() - 1);
-        ConsumerRecord lastBatchRecord = records.bulkBuffer.isEmpty() ? null : records.bulkBuffer.get(records.bulkBuffer.size() - 1);
+        HashMap<String, Int2LongOpenHashMap> topicMap = new HashMap<>();
 
-        ConsumerRecord lastRecord;
-        if (lastBatchRecord != null && lastSingleRecord != null) {
-            lastRecord = lastBatchRecord.offset() > lastBatchRecord.offset() ? lastBatchRecord : lastSingleRecord;
-        }
-        else {
-            lastRecord = lastBatchRecord != null ? lastBatchRecord : lastSingleRecord;
-        }
+        internalProcessRecords(topicMap, streamRecords);
+        internalProcessRecords(topicMap, bulkRecords);
 
-        return lastRecord;
+        return topicMap;
     }
 
-    public static void close(StreamWorkerContext context, KafkaConsumer consumer, ExecutorService executor, Logger log)
+    private static void internalProcessRecords(HashMap<String, Int2LongOpenHashMap> topicMap, Iterable<ConsumerRecord<byte[], byte[]>> records)
+    {
+        for (ConsumerRecord<byte[], byte[]> record : records) {
+            Int2LongOpenHashMap map = topicMap.get(record.topic());
+            if (map == null) {
+                map = new Int2LongOpenHashMap();
+                map.defaultReturnValue(-1);
+                topicMap.put(record.topic(), map);
+            }
+
+            long value = map.get(record.partition());
+            if (value == -1 || value < record.offset()) {
+                map.put(record.partition(), record.offset());
+            }
+        }
+    }
+
+    public static void commitSyncOffset(KafkaConsumer<byte[], byte[]> consumer, Map<String, Int2LongOpenHashMap> offsets)
+    {
+        if (offsets == null) {
+            consumer.commitSync();
+        }
+        else {
+            Map<TopicPartition, OffsetAndMetadata> offsetsForKafka = new HashMap<>();
+            for (Map.Entry<String, Int2LongOpenHashMap> entry : offsets.entrySet()) {
+                String topic = entry.getKey();
+                for (Int2LongMap.Entry offsetList : entry.getValue().int2LongEntrySet()) {
+                    offsetsForKafka.put(new TopicPartition(topic, offsetList.getIntKey()), new OffsetAndMetadata(offsetList.getLongValue()));
+                }
+            }
+
+            consumer.commitSync(offsetsForKafka);
+        }
+    }
+
+    public static void close(StreamWorkerContext context, KafkaConsumer consumer)
     {
         context.shutdown();
         if (consumer != null) {
             consumer.close();
         }
-        if (executor != null) {
-            executor.shutdown();
-
-            try {
-                if (!executor.awaitTermination(5000, MILLISECONDS)) {
-                    log.warn("Timed out waiting for consumer threads to shut down, exiting uncleanly");
-                }
-            }
-            catch (InterruptedException e) {
-                log.warn("Interrupted during shutdown, exiting uncleanly");
-            }
-        }
     }
 
-    public static void flushIfNeeded(MiddlewareBuffer middlewareBuffer, TargetConnectorCommitter committer, Queue<List<TableCheckpoint>> checkpointQueue, MemoryTracker memoryTracker, Logger log)
+    public static void flush(
+            Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> map, TargetConnectorCommitter committer,
+            Queue<List<TableCheckpoint>> checkpointQueue, MemoryTracker memoryTracker, Logger log,
+            CounterStat databaseFlushStats, DistributionStat databaseFlushDistribution,
+            CounterStat errorStats, AtomicInteger activeFlushCount)
     {
-        Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();
+        long totalRecords = map.entrySet().stream().mapToLong(e -> e.getValue().stream()
+                .mapToLong(v -> v.getTable().page.getPositionCount()).sum()).sum();
 
-        if (!map.isEmpty()) {
-            long totalRecords = map.entrySet().stream().mapToLong(e -> e.getValue().stream().mapToLong(v -> v.getTable().page.getPositionCount()).sum()).sum();
+        activeFlushCount.addAndGet(map.size());
 
-            log.debug("Flushing middleware buffer, %d collections and %d events in total.", map.size(), totalRecords);
-            long now = System.currentTimeMillis();
-            for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
-                CompletableFuture<Void> dbWriteWork = committer.process(entry.getKey(), entry.getValue());
-                dbWriteWork.whenComplete((aVoid, throwable) -> {
-                    if (throwable != null) {
-                        log.error(throwable, "Error while processing records");
-                    }
+        log.debug("Saving data, %d collections and %d events in total.", map.size(), totalRecords);
+        long now = System.currentTimeMillis();
 
-                    // TODO: What should we do if we can't commit the data?
-                    checkpointQueue.add(entry.getValue());
-                    long totalDataSize = entry.getValue().stream()
-                            .mapToLong(e -> e.getTable().page.getRetainedSizeInBytes())
-                            .sum();
+        for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
+            CompletableFuture<Void> dbWriteWork = committer.process(entry.getKey(), entry.getValue());
+            dbWriteWork.whenComplete((aVoid, throwable) -> {
+                long totalRecordCount = entry.getValue().stream()
+                        .mapToLong(e -> e.getTable().page.getPositionCount())
+                        .sum();
 
-                    log.debug("Flushed middleware buffer (%s) for collection %s in %s.",
-                            succinctBytes(totalDataSize).toString(),
-                            entry.getKey().toString(),
-                            succinctDuration(System.currentTimeMillis() - now, MILLISECONDS).toString());
-                    memoryTracker.freeMemory(totalDataSize);
-                });
-            }
+                if (throwable != null) {
+                    errorStats.update(totalRecordCount);
+                    log.error(throwable, "Error while processing records");
+                }
+
+                // TODO: What should we do if we can't commit the data?
+                checkpointQueue.add(entry.getValue());
+                long totalDataSize = entry.getValue().stream()
+                        .mapToLong(e -> e.getTable().page.getRetainedSizeInBytes())
+                        .sum();
+                Duration totalDuration = succinctDuration(System.currentTimeMillis() - now, MILLISECONDS);
+
+                databaseFlushStats.update(totalRecordCount);
+                databaseFlushDistribution.add(totalDuration.toMillis());
+                activeFlushCount.decrementAndGet();
+
+                log.debug("Saved data in buffer (%s - %d records) for collection %s in %s.",
+                        succinctBytes(totalDataSize).toString(), totalRecordCount,
+                        entry.getKey().toString(),
+                        totalDuration.toString());
+                memoryTracker.freeMemory(totalDataSize);
+            });
         }
     }
 }

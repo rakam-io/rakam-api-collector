@@ -4,7 +4,12 @@
 
 package com.facebook.presto.raptor.storage.backup;
 
+import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
+import com.amazonaws.regions.Regions;
+import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.facebook.presto.rakam.S3BackupConfig;
@@ -30,7 +35,7 @@ public class S3BackupStore
         implements BackupStore
 {
     private static final int TRY_COUNT = 5;
-    private final AmazonS3Client s3Client;
+    private final AmazonS3 s3Client;
     private final S3BackupConfig config;
     private final InMemoryFileSystem inMemoryFileSystem;
 
@@ -38,12 +43,18 @@ public class S3BackupStore
     public S3BackupStore(S3BackupConfig config, InMemoryFileSystem inMemoryFileSystem)
     {
         this.config = config;
-        this.s3Client = new AmazonS3Client(config.getCredentials());
+        AmazonS3ClientBuilder amazonS3ClientBuilder = AmazonS3ClientBuilder.standard()
+                .withCredentials(config.getCredentials());
 
-        this.s3Client.setRegion(config.getAWSRegion());
         if (config.getEndpoint() != null) {
-            this.s3Client.setEndpoint(config.getEndpoint());
+            amazonS3ClientBuilder.setEndpointConfiguration(new EndpointConfiguration(config.getEndpoint(), config.getAWSRegion().getName()));
+            amazonS3ClientBuilder.disableChunkedEncoding().enablePathStyleAccess();
         }
+        else {
+            amazonS3ClientBuilder.setRegion(Regions.fromName(config.getAWSRegion().getName()).getName());
+        }
+
+        s3Client = amazonS3ClientBuilder.build();
         this.inMemoryFileSystem = inMemoryFileSystem;
     }
 

@@ -45,7 +45,7 @@ public abstract class TestKafkaJsonDeserializer
 
         ImmutableList<ConsumerRecord<byte[], byte[]>> build = getSampleData();
 
-        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(build, ImmutableList.of(), ImmutableList.of());
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(build, ImmutableList.of());
         TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         ImmutableList<ColumnMetadata> columns = ImmutableList.<ColumnMetadata>builder()
@@ -76,7 +76,7 @@ public abstract class TestKafkaJsonDeserializer
         ConsumerRecord<byte[], byte[]> record = getDuplicateFieldRecord();
         TestDatabaseHandler databaseHandler = new TestDatabaseHandler();
         MessageEventTransformer messageEventTransformer = new KafkaJsonMessageTransformer(new FieldNameConfig(), databaseHandler, getJsonDeserializer(databaseHandler));
-        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(ImmutableList.of(record), ImmutableList.of(), ImmutableList.of());
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(ImmutableList.of(record), ImmutableList.of());
         TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         assertEquals(testcollection.metadata.size(), 4);
@@ -98,7 +98,7 @@ public abstract class TestKafkaJsonDeserializer
         TestDatabaseHandler databaseHandler = new TestDatabaseHandler();
         MessageEventTransformer messageEventTransformer = new KafkaJsonMessageTransformer(new FieldNameConfig(), databaseHandler, getJsonDeserializer(databaseHandler));
         Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection2", Optional.of(new int[] {
-                1})), ImmutableList.of(), ImmutableList.of());
+                1})), ImmutableList.of());
         TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection2"));
 
         assertEquals(testcollection.metadata.size(), 4);
@@ -132,7 +132,7 @@ public abstract class TestKafkaJsonDeserializer
         };
         MessageEventTransformer messageEventTransformer = new KafkaJsonMessageTransformer(new FieldNameConfig(), databaseHandler, getJsonDeserializer(databaseHandler));
 
-        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getSampleData(), ImmutableList.of(), ImmutableList.of());
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getSampleData(), ImmutableList.of());
         TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
 
         assertEquals(testcollection.metadata, latestColumns);

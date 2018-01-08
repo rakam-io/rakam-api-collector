@@ -8,6 +8,6 @@ import java.io.IOException;
 
 public interface DecoupleMessage<T>
 {
-    boolean isRecentData(T record, int todayInDate)
+    int getDateOfRecord(T record)
             throws IOException;
 }

@@ -15,6 +15,8 @@ import io.rakam.presto.deserialization.json.JsonDeserializer;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static java.lang.String.format;
+import static org.weakref.jmx.ObjectNames.generatedNameOf;
+import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
 public class KafkaStreamSourceModule
         extends AbstractConfigurationAwareModule
@@ -25,10 +27,13 @@ public class KafkaStreamSourceModule
         KafkaConfig config = buildConfigObject(KafkaConfig.class);
         configBinder(binder).bindConfig(JsonConfig.class);
 
-        binder.bind(KafkaRealTimeWorker.class).in(Scopes.SINGLETON);
-        binder.bind(KafkaHistoricalWorker.class).in(Scopes.SINGLETON);
-        binder.bind(BasicMemoryBuffer.SizeCalculator.class).to(KafkaRecordSizeCalculator.class).in(Scopes.SINGLETON);
+        binder.bind(KafkaRealTimeWorker.class).asEagerSingleton();
+        newExporter(binder).export(KafkaRealTimeWorker.class).as(generatedNameOf(KafkaRealTimeWorker.class));
 
+        binder.bind(KafkaHistoricalWorker.class).asEagerSingleton();
+        newExporter(binder).export(KafkaHistoricalWorker.class).as(generatedNameOf(KafkaHistoricalWorker.class));
+
+        binder.bind(BasicMemoryBuffer.SizeCalculator.class).to(KafkaRecordSizeCalculator.class).in(Scopes.SINGLETON);
         Class<? extends MessageEventTransformer> clazz;
         switch (config.getDataFormat()) {
             case AVRO:

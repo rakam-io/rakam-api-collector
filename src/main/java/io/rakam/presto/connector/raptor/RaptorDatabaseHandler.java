@@ -46,7 +46,6 @@ import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.gen.JoinCompiler;
 import com.facebook.presto.sql.gen.OrderingCompiler;
 import com.google.common.base.Supplier;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.EventBus;
@@ -56,7 +55,6 @@ import com.google.inject.Module;
 import com.google.inject.Scopes;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.json.JsonModule;
-import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
@@ -95,8 +93,6 @@ import static org.rakam.presto.analysis.PrestoQueryExecution.fromPrestoType;
 public class RaptorDatabaseHandler
         implements DatabaseHandler
 {
-    private static final Logger log = Logger.get(RaptorDatabaseHandler.class);
-
     private static final String RAKAM_RAPTOR_CONNECTOR = "RAKAM_RAPTOR_CONNECTOR";
     private final ConnectorMetadata metadata;
     private final ConnectorSession session;
@@ -168,6 +164,7 @@ public class RaptorDatabaseHandler
         ImmutableMap.Builder<String, String> props = ImmutableMap.<String, String>builder()
                 .put("metadata.db.type", "mysql")
                 .put("metadata.db.url", config.getMetadataUrl())
+                .put("backup.threads", String.valueOf(Runtime.getRuntime().availableProcessors() * 3))
                 // No effect
                 .put("storage.data-directory", Files.createTempDir().getAbsolutePath())
                 .put("metadata.db.connections.max", String.valueOf(config.getMaxConnection()))
@@ -314,10 +311,6 @@ public class RaptorDatabaseHandler
             public CompletableFuture<Void> commit()
             {
                 CompletableFuture<Collection<Slice>> finish = pageSink.finish();
-            /*    finish.join();
-                long endTime = System.currentTimeMillis();
-                log.info("Page Sink: " + (endTime - startTime));
-*/
                 return finish.thenAccept(slices ->
                         // 6 mysql insert queries
                         connectorMetadata.finishInsert(session, insertTableHandle, slices));
