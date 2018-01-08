@@ -1,3 +1,7 @@
+/*
+ * Licensed under the Rakam Incorporation
+ */
+
 package com.facebook.presto.raptor.storage;
 
 import io.airlift.configuration.Config;
@@ -8,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 public class HistoricalDataConfig
 {
     private Duration maxFlushDuration = Duration.succinctDuration(30, TimeUnit.MINUTES);
-    private int maxFlushRecords = 500;
+    private int maxFlushRecords = 500_000;
 
     @Config("historical.max-flush-duration")
     public HistoricalDataConfig setMaxFlushDuration(Duration maxFlushDuration)
