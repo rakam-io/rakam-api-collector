@@ -127,10 +127,25 @@ public class KafkaHistoricalWorker
         lastPollInMillis = System.currentTimeMillis();
     }
 
+    private Map<TopicPartition, Long> endOffsets()
+    {
+        Map<TopicPartition, Long> map = new HashMap<>();
+        for (TopicPartition partition : consumer.assignment()) {
+            map.put(partition, consumer.position(partition));
+        }
+        return map;
+    }
+
+    private Map<TopicPartition, Long> endOffsetsKafka10()
+    {
+//        return consumer.endOffsets(consumer.assignment());
+        return null;
+    }
+
     private int getRecordsToBeProcessed()
     {
         int recordsToBeProcessed = 0;
-        Map<TopicPartition, Long> endOffsets = consumer.endOffsets(consumer.assignment());
+        Map<TopicPartition, Long> endOffsets = endOffsets();
         for (Map.Entry<TopicPartition, Long> entry : endOffsets.entrySet()) {
             Long currentOffset = currentKafkaOffsets.get(entry.getKey().partition());
             Long lastOffset = entry.getValue();
@@ -168,10 +183,11 @@ public class KafkaHistoricalWorker
                         do {
                             records = consumer.poll(0);
                             buffer.consumeRecords(records);
-                            if(records.count() == 0 && numberOfEmptyResult++ > 10) {
+                            if (records.count() == 0 && numberOfEmptyResult++ > 10) {
                                 break;
                             }
-                        } while (memoryTracker.availableMemory() - (buffer.getTotalBytes() * 2) > 0);
+                        }
+                        while (memoryTracker.availableMemory() - (buffer.getTotalBytes() * 2) > 0);
 
                         Optional<Queue<List<MiddlewareBuffer.TableCheckpoint>>> tableCheckpoints = flushDataSafe();
                         if (tableCheckpoints.isPresent()) {
@@ -208,7 +224,7 @@ public class KafkaHistoricalWorker
     {
         return memoryTracker.availableMemoryInPercentage() > .3 &&
                 ((System.currentTimeMillis() - lastPollInMillis) > historicalDataConfig.getMaxFlushDuration().toMillis()
-                    || recordsToBeProcessed > historicalDataConfig.getMaxFlushRecords());
+                        || recordsToBeProcessed > historicalDataConfig.getMaxFlushRecords());
     }
 
     private Optional<Queue<List<MiddlewareBuffer.TableCheckpoint>>> flushDataSafe()

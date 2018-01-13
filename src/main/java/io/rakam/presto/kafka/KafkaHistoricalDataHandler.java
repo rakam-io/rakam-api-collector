@@ -33,7 +33,7 @@ public class KafkaHistoricalDataHandler
     {
         producer = new KafkaProducer<>(createProducerConfig(kafkaConfig, UUID.randomUUID().toString()));
         kafkaTopic = kafkaConfig.getHistoricalDataTopic();
-        producer.initTransactions();
+//        producer.initTransactions();
     }
 
     @Override
@@ -42,7 +42,7 @@ public class KafkaHistoricalDataHandler
         CompletableFuture<Void> future = new CompletableFuture<>();
         AtomicInteger latch = new AtomicInteger(recordCount);
 
-        producer.beginTransaction();
+//        producer.beginTransaction();
 
         long now = System.currentTimeMillis();
         IntegerHolder totalRecords = new IntegerHolder();
@@ -62,7 +62,7 @@ public class KafkaHistoricalDataHandler
 
         log.debug("%d records are being sent to Kafka historical topic..", totalRecords.value);
 
-        producer.commitTransaction();
+//        producer.commitTransaction();
 
         return future;
     }
