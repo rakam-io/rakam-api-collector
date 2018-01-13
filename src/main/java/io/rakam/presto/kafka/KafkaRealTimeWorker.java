@@ -5,6 +5,7 @@
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.SchemaTableName;
+import com.google.common.base.Optional;
 import com.google.common.collect.Iterators;
 import com.google.common.primitives.Ints;
 import io.airlift.log.Logger;
@@ -90,12 +91,12 @@ public class KafkaRealTimeWorker
     private Status currentStatus;
 
     @Inject
-    public KafkaRealTimeWorker(KafkaConfig config, MemoryTracker memoryTracker, HistoricalDataHandler historicalDataHandler, DecoupleMessage decoupleMessage, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord<byte[], byte[]>> context, TargetConnectorCommitter committer)
+    public KafkaRealTimeWorker(KafkaConfig config, MemoryTracker memoryTracker, Optional<HistoricalDataHandler> historicalDataHandler, DecoupleMessage decoupleMessage, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord<byte[], byte[]>> context, TargetConnectorCommitter committer)
     {
         this.config = config;
         this.context = context;
         this.decoupleMessage = decoupleMessage;
-        this.historicalDataHandler = historicalDataHandler;
+        this.historicalDataHandler = historicalDataHandler.orNull();
         this.committer = committer;
         this.memoryTracker = memoryTracker;
         this.middlewareBuffer = new MiddlewareBuffer(middlewareConfig, memoryTracker);
@@ -253,7 +254,7 @@ public class KafkaRealTimeWorker
 
     private Map.Entry<Iterable<ConsumerRecord<byte[], byte[]>>, CompletableFuture<Void>> extract(BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records)
     {
-        if (config.getHistoricalDataTopic() == null) {
+        if (historicalDataHandler == null) {
             return new SimpleImmutableEntry<>(records.buffer, BatchRecords.COMPLETED_FUTURE);
         }
 

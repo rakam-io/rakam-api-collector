@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
+import com.google.inject.multibindings.OptionalBinder;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.airlift.jmx.JmxModule;
@@ -25,6 +26,7 @@ import io.airlift.log.Logger;
 import io.airlift.log.Logging;
 import io.airlift.log.LoggingConfiguration;
 import io.rakam.presto.connector.raptor.RaptorModule;
+import io.rakam.presto.kafka.KafkaHistoricalDataHandler;
 import io.rakam.presto.kafka.KafkaStreamSourceModule;
 import io.rakam.presto.kinesis.KinesisStreamSourceModule;
 import org.weakref.jmx.guice.MBeanModule;
@@ -133,6 +135,8 @@ public final class ServiceStarter
             configBinder(binder).bindConfig(MiddlewareConfig.class);
             binder.bind(StreamWorkerContext.class).in(Scopes.SINGLETON);
             binder.bind(TargetConnectorCommitter.class).in(Scopes.SINGLETON);
+
+            OptionalBinder.newOptionalBinder(binder, HistoricalDataHandler.class);
 
             bindDataSource("stream.source");
         }

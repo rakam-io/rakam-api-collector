@@ -6,6 +6,7 @@ package io.rakam.presto.kafka;
 
 import com.google.inject.Binder;
 import com.google.inject.Scopes;
+import com.google.inject.multibindings.OptionalBinder;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.HistoricalDataHandler;
@@ -49,7 +50,11 @@ public class KafkaStreamSourceModule
         }
 
         binder.bind(DecoupleMessage.class).to(KafkaDecoupleMessage.class).in(Scopes.SINGLETON);
-        binder.bind(HistoricalDataHandler.class).to(KafkaHistoricalDataHandler.class).in(Scopes.SINGLETON);
+        OptionalBinder<HistoricalDataHandler> historical = OptionalBinder.newOptionalBinder(binder, HistoricalDataHandler.class);
+        if(config.getHistoricalDataTopic() != null) {
+            historical.setBinding().to(KafkaHistoricalDataHandler.class).in(Scopes.SINGLETON);
+        }
+
         binder.bind(MessageEventTransformer.class).to(clazz).in(Scopes.SINGLETON);
     }
 }

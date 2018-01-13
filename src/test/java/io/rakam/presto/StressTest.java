@@ -5,6 +5,7 @@
 package io.rakam.presto;
 
 import com.facebook.presto.type.TypeRegistry;
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
@@ -192,7 +193,7 @@ public class StressTest
 
         public MockKafkaRealTimeWorker(KafkaConfig kafkaConfig, MemoryTracker memoryTracker, MiddlewareConfig middlewareConfig, StreamWorkerContext context, TargetConnectorCommitter targetConnectorCommitter, AtomicLong totalRecord, AtomicLong lastPoll, AtomicLong committedRecords, List<byte[]> consumerRecords)
         {
-            super(kafkaConfig, memoryTracker, new MockKafkaHistoricalDataHandler(), new KafkaDecoupleMessage(new FieldNameConfig()), middlewareConfig, context, targetConnectorCommitter);
+            super(kafkaConfig, memoryTracker, Optional.fromNullable(new MockKafkaHistoricalDataHandler()), new KafkaDecoupleMessage(new FieldNameConfig()), middlewareConfig, context, targetConnectorCommitter);
             this.memoryTracker = memoryTracker;
             this.totalRecord = totalRecord;
             this.lastPoll = lastPoll;

@@ -1,7 +1,7 @@
-package io.rakam.presto;
 /*
  * Licensed under the Rakam Incorporation
  */
+package io.rakam.presto;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
