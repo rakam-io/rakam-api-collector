@@ -9,7 +9,6 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.DateType;
-import com.facebook.presto.spi.type.DoubleType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -19,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -72,6 +73,7 @@ import static org.rakam.presto.analysis.PrestoRakamRaptorMetastore.toType;
 public class FabricJsonDeserializer
         implements JsonDeserializer
 {
+    private static final Set<String> EXCLUDED_COLUMNS = ImmutableSet.of("_project", "_collection");
     private static final JsonFactory READER = new ObjectMapper().getFactory();
     private final DatabaseHandler databaseHandler;
     private final FieldNameConfig fieldNameConfig;
@@ -190,7 +192,7 @@ public class FabricJsonDeserializer
             jp.nextToken();
 
             if (idx == -1) {
-                if (!fieldNameConfig.getExcludedColumns().contains(fieldName)) {
+                if (!EXCLUDED_COLUMNS.contains(fieldName)) {
                     FieldType type = getTypeForUnknown(fieldName, jp);
                     if (type != null) {
                         if (newFields == null) {

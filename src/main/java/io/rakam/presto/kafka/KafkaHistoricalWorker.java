@@ -39,7 +39,6 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
@@ -68,7 +67,6 @@ public class KafkaHistoricalWorker
     private final CounterStat databaseFlushStats = new CounterStat();
     private final CounterStat recordStats = new CounterStat();
     private final CounterStat errorStats = new CounterStat();
-    private final AtomicInteger activeFlushCount = new AtomicInteger();
     private final DistributionStat databaseFlushDistribution = new DistributionStat();
 
     private Map<Status, LongHolder> statusSpentTime = new HashMap<>();
@@ -261,7 +259,7 @@ public class KafkaHistoricalWorker
             Queue<List<MiddlewareBuffer.TableCheckpoint>> checkpointQueue = new ArrayBlockingQueue<>(map.size());
 
             KafkaUtil.flush(map, committer, checkpointQueue, memoryTracker,
-                    log, databaseFlushStats, databaseFlushDistribution, errorStats, activeFlushCount);
+                    log, databaseFlushStats, databaseFlushDistribution, recordStats, errorStats);
 
             return Optional.of(checkpointQueue);
         }
@@ -317,7 +315,7 @@ public class KafkaHistoricalWorker
     @Managed
     public int getActiveFlushCount()
     {
-        return activeFlushCount.get();
+        return committer.getActiveFlushCount();
     }
 
     @Managed

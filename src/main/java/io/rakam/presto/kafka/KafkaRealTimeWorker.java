@@ -6,6 +6,7 @@ package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.base.Optional;
+import com.google.common.base.Predicate;
 import com.google.common.collect.Iterators;
 import com.google.common.primitives.Ints;
 import io.airlift.log.Logger;
@@ -15,6 +16,7 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.BatchRecords;
+import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.HistoricalDataHandler;
 import io.rakam.presto.MemoryTracker;
 import io.rakam.presto.MiddlewareBuffer;
@@ -47,10 +49,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
@@ -65,6 +67,7 @@ public class KafkaRealTimeWorker
     private static final Logger log = Logger.get(KafkaRealTimeWorker.class);
     private final DecoupleMessage<ConsumerRecord<byte[], byte[]>> decoupleMessage;
     private final HistoricalDataHandler historicalDataHandler;
+    private final Predicate<String> whiteListCollections;
 
     protected KafkaConsumer<byte[], byte[]> consumer;
 
@@ -84,18 +87,20 @@ public class KafkaRealTimeWorker
     private CounterStat historicalRecordsStats = new CounterStat();
     private CounterStat databaseFlushStats = new CounterStat();
     private CounterStat errorStats = new CounterStat();
-    private AtomicInteger activeFlushCount = new AtomicInteger();
     private DistributionStat databaseFlushDistribution = new DistributionStat();
     private Map<Status, LongHolder> statusSpentTime = new HashMap<>();
     private long lastStatusChangeTime;
     private Status currentStatus;
 
     @Inject
-    public KafkaRealTimeWorker(KafkaConfig config, MemoryTracker memoryTracker, Optional<HistoricalDataHandler> historicalDataHandler, DecoupleMessage decoupleMessage, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord<byte[], byte[]>> context, TargetConnectorCommitter committer)
+    public KafkaRealTimeWorker(KafkaConfig config, MemoryTracker memoryTracker, FieldNameConfig fieldNameConfig, Optional<HistoricalDataHandler> historicalDataHandler, DecoupleMessage decoupleMessage, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord<byte[], byte[]>> context, TargetConnectorCommitter committer)
     {
         this.config = config;
         this.context = context;
         this.decoupleMessage = decoupleMessage;
+        Set<String> whitelistedCollections = fieldNameConfig.getWhitelistedCollections();
+        this.whiteListCollections = whitelistedCollections == null ? input -> true : input -> whitelistedCollections.contains(input);
+
         this.historicalDataHandler = historicalDataHandler.orNull();
         this.committer = committer;
         this.memoryTracker = memoryTracker;
@@ -172,12 +177,6 @@ public class KafkaRealTimeWorker
                             checkpoint();
                         }
                     }
-
-                    double count = realTimeRecordsStats.getFiveMinute().getCount();
-                    if (count > 100 && (errorStats.getFiveMinute().getCount() / count) > .4) {
-                        log.error("The maximum error threshold is reached. Exiting the program...");
-                        Runtime.getRuntime().exit(1);
-                    }
                 }
                 catch (Throwable e) {
                     log.error(e, "Unexpected exception in Kafka real-time records consumer thread.");
@@ -239,11 +238,13 @@ public class KafkaRealTimeWorker
                         DataSize.succinctBytes(totalDataSize));
             }
 
-            Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();
-            if (!map.isEmpty()) {
-                changeType(Status.FLUSHING_MIDDLEWARE);
-                KafkaUtil.flush(map, committer, checkpointQueue, memoryTracker,
-                        log, databaseFlushStats, databaseFlushDistribution, errorStats, activeFlushCount);
+            if (!committer.isFull()) {
+                Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();
+                if (!map.isEmpty()) {
+                    changeType(Status.FLUSHING_MIDDLEWARE);
+                    KafkaUtil.flush(map, committer, checkpointQueue, memoryTracker,
+                            log, databaseFlushStats, databaseFlushDistribution, realTimeRecordsStats, errorStats);
+                }
             }
         }
         catch (Throwable e) {
@@ -307,6 +308,7 @@ public class KafkaRealTimeWorker
         Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay = new Int2ObjectArrayMap<>();
         int todayInDate = Ints.checkedCast(LocalDate.now().toEpochDay());
         int previousDay = todayInDate - 1;
+        DecoupleMessage.RecordData recordData = new DecoupleMessage.RecordData();
 
         int realtimeRecordCount = 0;
         boolean[] bitmapForRecords = new boolean[records.buffer.size()];
@@ -314,11 +316,18 @@ public class KafkaRealTimeWorker
             ConsumerRecord<byte[], byte[]> record = records.buffer.get(i);
 
             int dayOfRecord;
+            String collection;
             try {
-                dayOfRecord = decoupleMessage.getDateOfRecord(record);
+                decoupleMessage.read(record, recordData);
+                dayOfRecord = recordData.date;
+                collection = recordData.collection;
             }
             catch (Throwable e) {
                 log.error(e, "Error while parsing record");
+                continue;
+            }
+
+            if (!whiteListCollections.apply(collection)) {
                 continue;
             }
 
@@ -393,7 +402,7 @@ public class KafkaRealTimeWorker
     @Managed
     public int getActiveFlushCount()
     {
-        return activeFlushCount.get();
+        return committer.getActiveFlushCount();
     }
 
     @Managed

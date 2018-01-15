@@ -88,7 +88,6 @@ public class InMemoryOrcStorageManager
     private final DataSize minAvailableSpace;
     private final TypeManager typeManager;
     private final ExecutorService deletionExecutor;
-    private final ExecutorService commitExecutor;
     private final InMemoryFileSystem inMemoryFileSystem;
 
     @Inject
@@ -143,14 +142,12 @@ public class InMemoryOrcStorageManager
         this.shardRecorder = requireNonNull(shardRecorder, "shardRecorder is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.deletionExecutor = newFixedThreadPool(deletionThreads, daemonThreadsNamed("raptor-delete-" + connectorId + "-%s"));
-        this.commitExecutor = newCachedThreadPool(daemonThreadsNamed("raptor-commit-" + connectorId + "-%s"));
         this.inMemoryFileSystem = requireNonNull(inMemoryFileSystem, "inMemoryFileSystem is null");
     }
 
     @PreDestroy
     public void shutdown() {
         deletionExecutor.shutdownNow();
-        commitExecutor.shutdown();
     }
 
     @Override
@@ -351,12 +348,12 @@ public class InMemoryOrcStorageManager
 
             flush();
 
-            return allAsList(futures).thenApplyAsync(ignored -> {
+            return allAsList(futures).thenApply(ignored -> {
 //                for (ShardInfo shard : shards) {
 //                    writeShard(shard.getShardUuid());
 //                }
                 return ImmutableList.copyOf(shards);
-            }, commitExecutor);
+            });
         }
 
         @Override

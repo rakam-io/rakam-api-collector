@@ -8,6 +8,11 @@ import java.io.IOException;
 
 public interface DecoupleMessage<T>
 {
-    int getDateOfRecord(T record)
+    void read(T record, RecordData recordData)
             throws IOException;
+
+    class RecordData {
+        public String collection;
+        public int date;
+    }
 }

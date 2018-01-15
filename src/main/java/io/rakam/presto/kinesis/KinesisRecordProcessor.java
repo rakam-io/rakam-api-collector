@@ -165,10 +165,11 @@ public class KinesisRecordProcessor
                     });
         }
 
-        public int getDateOfRecord(Record record)
+        @Override
+        public void read(Record record, RecordData recordData)
                 throws IOException
         {
-            return 1;
+
         }
     }
 }

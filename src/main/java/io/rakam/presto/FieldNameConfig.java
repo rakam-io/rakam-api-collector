@@ -22,8 +22,7 @@ public class FieldNameConfig
     private String checkpointField = "_shard_time";
     private String userFieldName = "_user";
     private String timeField = "_time";
-    private Set<String> whitelistedCollections = new HashSet<>();
-    private Set<String> excludedColumns = ImmutableSet.of("_project", "_collection");
+    private Set<String> whitelistedCollections;
     private UserType userFieldType = UserType.STRING;
 
     @Config("database.checkpoint-field")
@@ -51,16 +50,6 @@ public class FieldNameConfig
     public FieldNameConfig setTimeField(String timeField)
     {
         this.timeField = timeField;
-        return this;
-    }
-
-    @Config("database.user-excluded-columns")
-    public FieldNameConfig setExcludedColumns(String excludedColumns)
-    {
-        if (excludedColumns != null) {
-            excludedColumns = excludedColumns.replaceAll("\\s+", "");
-            this.excludedColumns = new HashSet<>(Arrays.asList(excludedColumns.split(",")));
-        }
         return this;
     }
 
@@ -94,11 +83,6 @@ public class FieldNameConfig
     public String getTimeField()
     {
         return timeField;
-    }
-
-    public Set<String> getExcludedColumns()
-    {
-        return excludedColumns;
     }
 
     public Set<String> getWhitelistedCollections() {return whitelistedCollections;}

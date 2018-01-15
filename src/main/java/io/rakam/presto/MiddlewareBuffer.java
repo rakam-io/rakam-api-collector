@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public class MiddlewareBuffer<T>
+public class MiddlewareBuffer
 {
     private final Map<SchemaTableName, List<TableCheckpoint>> batches;
     private final MiddlewareConfig config;

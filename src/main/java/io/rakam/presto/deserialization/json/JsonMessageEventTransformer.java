@@ -26,14 +26,12 @@ public abstract class JsonMessageEventTransformer<T>
     static final Logger LOGGER = Logger.get(JsonMessageEventTransformer.class);
     protected final JsonDeserializer jsonDecoder;
     private final String checkpointColumn;
-    private Set<String> whitelistedCollections;
 
     public JsonMessageEventTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler database, JsonDeserializer jsonDecoder)
     {
         super(fieldNameConfig, database);
         this.jsonDecoder = jsonDecoder;
         this.checkpointColumn = fieldNameConfig.getCheckpointField();
-        this.whitelistedCollections = fieldNameConfig.getWhitelistedCollections();
     }
 
     @Override
@@ -45,9 +43,6 @@ public abstract class JsonMessageEventTransformer<T>
             SchemaTableName collection;
             try {
                 collection = extractCollection(record, jsonDecoder);
-                if (whitelistedCollections.size() > 0 && !whitelistedCollections.contains(collection.getTableName())) {
-                    continue;
-                }
             }
             catch (Throwable e) {
                 LOGGER.error(e, "Unable to parse collection from message in Kafka topic.");
