@@ -32,23 +32,19 @@ public class KafkaConfig
     private String requestTimeOut = "15000";
     private String historicalDataTopic;
 
+    private static HostAddress toKafkaHostAddress(String value)
+    {
+        return HostAddress.fromString(value).withDefaultPort(KAFKA_DEFAULT_PORT);
+    }
+
+    private static HostAddress toZookeeperHostAddress(String value)
+    {
+        return HostAddress.fromString(value).withDefaultPort(ZOOKEEPER_DEFAULT_PORT);
+    }
+
     public List<String> getTopic()
     {
         return ImmutableList.copyOf(topic);
-    }
-
-    public String getOffset() {return offset;}
-
-    public String getGroupId() {return groupId;}
-
-    public String getSessionTimeOut()
-    {
-        return sessionTimeOut;
-    }
-
-    public String getRequestTimeOut()
-    {
-        return requestTimeOut;
     }
 
     @Config("kafka.topic")
@@ -61,10 +57,31 @@ public class KafkaConfig
         return this;
     }
 
-    @Size(min = 1)
-    public Set<HostAddress> getNodes()
+    public String getOffset() {return offset;}
+
+    @Config("kafka.offset")
+    public KafkaConfig setOffset(String offset)
     {
-        return nodes;
+        if (offset != null) {
+            this.offset = offset;
+        }
+        return this;
+    }
+
+    public String getGroupId() {return groupId;}
+
+    @Config("kafka.group.id")
+    public KafkaConfig setGroupId(String groupId)
+    {
+        if (groupId != null) {
+            this.groupId = groupId;
+        }
+        return this;
+    }
+
+    public String getSessionTimeOut()
+    {
+        return sessionTimeOut;
     }
 
     @Config("kafka.session.timeout.ms")
@@ -76,6 +93,11 @@ public class KafkaConfig
         return this;
     }
 
+    public String getRequestTimeOut()
+    {
+        return requestTimeOut;
+    }
+
     @Config("kafka.request.timeout.ms")
     public KafkaConfig setRequestTimeOut(String requestTimeOut)
     {
@@ -83,6 +105,12 @@ public class KafkaConfig
             this.requestTimeOut = requestTimeOut;
         }
         return this;
+    }
+
+    @Size(min = 1)
+    public Set<HostAddress> getNodes()
+    {
+        return nodes;
     }
 
     @Config("kafka.nodes")
@@ -94,24 +122,6 @@ public class KafkaConfig
         }
         else {
             this.nodes = null;
-        }
-        return this;
-    }
-
-    @Config("kafka.offset")
-    public KafkaConfig setOffset(String offset)
-    {
-        if (offset != null) {
-            this.offset = offset;
-        }
-        return this;
-    }
-
-    @Config("kafka.group.id")
-    public KafkaConfig setGroupId(String groupId)
-    {
-        if (groupId != null) {
-            this.groupId = groupId;
         }
         return this;
     }
@@ -128,26 +138,16 @@ public class KafkaConfig
         return this;
     }
 
-    @Config("source.data-format")
-    public KafkaConfig setDataFormat(DataFormat dataFormat)
-    {
-        this.dataFormat = dataFormat;
-        return this;
-    }
-
     public DataFormat getDataFormat()
     {
         return dataFormat;
     }
 
-    private static HostAddress toKafkaHostAddress(String value)
+    @Config("source.data-format")
+    public KafkaConfig setDataFormat(DataFormat dataFormat)
     {
-        return HostAddress.fromString(value).withDefaultPort(KAFKA_DEFAULT_PORT);
-    }
-
-    private static HostAddress toZookeeperHostAddress(String value)
-    {
-        return HostAddress.fromString(value).withDefaultPort(ZOOKEEPER_DEFAULT_PORT);
+        this.dataFormat = dataFormat;
+        return this;
     }
 
     public enum DataFormat

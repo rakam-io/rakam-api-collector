@@ -8,8 +8,8 @@ import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
-import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
@@ -18,10 +18,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public abstract class JsonMessageEventTransformer<T>
-        extends MessageEventTransformer<T,JsonDeserializer>
+        extends MessageEventTransformer<T, JsonDeserializer>
 {
     static final Logger LOGGER = Logger.get(JsonMessageEventTransformer.class);
     protected final JsonDeserializer jsonDecoder;

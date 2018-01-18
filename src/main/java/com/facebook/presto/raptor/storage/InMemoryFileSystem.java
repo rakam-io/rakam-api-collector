@@ -6,7 +6,6 @@ package com.facebook.presto.raptor.storage;
 
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
-
 import io.rakam.presto.MemoryTracker;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -97,13 +96,13 @@ public final class InMemoryFileSystem
     }
 
     @Override
-    public void setWorkingDirectory(Path path)
+    public Path getWorkingDirectory()
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Path getWorkingDirectory()
+    public void setWorkingDirectory(Path path)
     {
         throw new UnsupportedOperationException();
     }

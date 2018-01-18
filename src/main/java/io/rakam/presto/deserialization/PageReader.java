@@ -19,8 +19,8 @@ import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 
 public abstract class PageReader<T>
 {
-    private final PageReaderDeserializer<T> datumReader;
     protected final String checkpointColumn;
+    private final PageReaderDeserializer<T> datumReader;
     private List<ColumnMetadata> expectedSchema;
     private List<ColumnMetadata> actualSchema;
     private PageBuilder pageBuilder;
@@ -85,6 +85,15 @@ public abstract class PageReader<T>
         return actualSchema;
     }
 
+    public void setActualSchema(List<ColumnMetadata> actualSchema)
+    {
+        this.actualSchema = actualSchema;
+
+        this.expectedSchema = actualSchema.stream()
+                .filter(a -> !a.getName().startsWith("$") && !a.getName().equals(checkpointColumn))
+                .collect(Collectors.toList());
+    }
+
     public void read(T decoder)
             throws IOException
     {
@@ -94,14 +103,5 @@ public abstract class PageReader<T>
     public List<ColumnMetadata> getExpectedSchema()
     {
         return expectedSchema;
-    }
-
-    public void setActualSchema(List<ColumnMetadata> actualSchema)
-    {
-        this.actualSchema = actualSchema;
-
-        this.expectedSchema = actualSchema.stream()
-                .filter(a -> !a.getName().startsWith("$") && !a.getName().equals(checkpointColumn))
-                .collect(Collectors.toList());
     }
 }

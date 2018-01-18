@@ -24,28 +24,9 @@ public class S3BackupConfig
     private String region;
     private String endpoint;
 
-    @Config("aws.access-key")
-    public S3BackupConfig setAccessKey(String accessKey)
-    {
-        this.accessKey = accessKey;
-        return this;
-    }
-
-    @Config("raptor.aws.s3-bucket")
-    public S3BackupConfig setS3Bucket(String s3Bucket)
-    {
-        this.s3Bucket = s3Bucket;
-        return this;
-    }
-
     public String getRegion()
     {
         return region;
-    }
-
-    public Region getAWSRegion()
-    {
-        return Region.getRegion(region == null ? DEFAULT_REGION : Regions.fromName(region));
     }
 
     @Config("raptor.aws.region")
@@ -55,15 +36,39 @@ public class S3BackupConfig
         return this;
     }
 
+    public Region getAWSRegion()
+    {
+        return Region.getRegion(region == null ? DEFAULT_REGION : Regions.fromName(region));
+    }
+
     @NotNull
     public String getS3Bucket()
     {
         return s3Bucket;
     }
 
+    @Config("raptor.aws.s3-bucket")
+    public S3BackupConfig setS3Bucket(String s3Bucket)
+    {
+        this.s3Bucket = s3Bucket;
+        return this;
+    }
+
     public String getAccessKey()
     {
         return accessKey;
+    }
+
+    @Config("aws.access-key")
+    public S3BackupConfig setAccessKey(String accessKey)
+    {
+        this.accessKey = accessKey;
+        return this;
+    }
+
+    public String getSecretAccessKey()
+    {
+        return secretAccessKey;
     }
 
     @Config("aws.secret-access-key")
@@ -73,9 +78,9 @@ public class S3BackupConfig
         return this;
     }
 
-    public String getSecretAccessKey()
+    public String getEndpoint()
     {
-        return secretAccessKey;
+        return endpoint;
     }
 
     @Config("raptor.aws.s3-endpoint")
@@ -83,11 +88,6 @@ public class S3BackupConfig
     {
         this.endpoint = endpoint;
         return this;
-    }
-
-    public String getEndpoint()
-    {
-        return endpoint;
     }
 
     public AWSCredentialsProvider getCredentials()

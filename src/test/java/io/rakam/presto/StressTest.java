@@ -10,7 +10,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
-import io.airlift.units.Duration;
 import io.rakam.presto.connector.raptor.RaptorConfig;
 import io.rakam.presto.connector.raptor.RaptorDatabaseHandler;
 import io.rakam.presto.connector.raptor.S3BackupConfig;

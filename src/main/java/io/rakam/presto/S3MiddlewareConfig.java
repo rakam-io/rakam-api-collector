@@ -20,22 +20,15 @@ public class S3MiddlewareConfig
     private String accessKey;
     private String endpoint;
 
-    @Config("aws.s3-bulk-bucket")
-    public void setS3Bucket(String s3Bucket)
-    {
-        this.s3Bucket = s3Bucket;
-    }
-
     public String getS3Bucket()
     {
         return s3Bucket;
     }
 
-    @Config("aws.access-key")
-    public S3MiddlewareConfig setAccessKey(String accessKey)
+    @Config("aws.s3-bulk-bucket")
+    public void setS3Bucket(String s3Bucket)
     {
-        this.accessKey = accessKey;
-        return this;
+        this.s3Bucket = s3Bucket;
     }
 
     public String getRegion()
@@ -55,11 +48,16 @@ public class S3MiddlewareConfig
         return accessKey;
     }
 
-    @Config("aws.secret-access-key")
-    public S3MiddlewareConfig setSecretAccessKey(String secretAccessKey)
+    @Config("aws.access-key")
+    public S3MiddlewareConfig setAccessKey(String accessKey)
     {
-        this.secretAccessKey = secretAccessKey;
+        this.accessKey = accessKey;
         return this;
+    }
+
+    public String getEndpoint()
+    {
+        return endpoint;
     }
 
     @Config("aws.s3-endpoint")
@@ -69,14 +67,16 @@ public class S3MiddlewareConfig
         return this;
     }
 
-    public String getEndpoint()
-    {
-        return endpoint;
-    }
-
     public String getSecretAccessKey()
     {
         return secretAccessKey;
+    }
+
+    @Config("aws.secret-access-key")
+    public S3MiddlewareConfig setSecretAccessKey(String secretAccessKey)
+    {
+        this.secretAccessKey = secretAccessKey;
+        return this;
     }
 
     public AWSCredentialsProvider getCredentials()

@@ -77,6 +77,19 @@ public class RemoteBackupManager
         return future;
     }
 
+    @Managed
+    public int getPendingBackupCount()
+    {
+        return pendingBackups.get();
+    }
+
+    @Managed
+    @Flatten
+    public BackupStats getStats()
+    {
+        return stats;
+    }
+
     private class BackgroundBackup
             implements Runnable
     {
@@ -129,18 +142,5 @@ public class RemoteBackupManager
                 throw Throwables.propagate(t);
             }
         }
-    }
-
-    @Managed
-    public int getPendingBackupCount()
-    {
-        return pendingBackups.get();
-    }
-
-    @Managed
-    @Flatten
-    public BackupStats getStats()
-    {
-        return stats;
     }
 }

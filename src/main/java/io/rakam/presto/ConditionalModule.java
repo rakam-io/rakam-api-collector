@@ -17,21 +17,20 @@ import static com.google.common.base.Preconditions.checkState;
 public class ConditionalModule
         implements ConfigurationAwareModule
 {
-    public static ConfigurationAwareModule installIfPropertyEquals(Module module, String property, String expectedValue)
-    {
-        return new ConditionalModule(module, property, expectedValue);
-    }
-
     private final Module module;
     private final String property;
     private final String expectedValue;
     private ConfigurationFactory configurationFactory;
-
     private ConditionalModule(Module module, String property, String expectedValue)
     {
         this.module = Objects.requireNonNull(module, "module is null");
         this.property = Objects.requireNonNull(property, "property is null");
         this.expectedValue = Objects.requireNonNull(expectedValue, "expectedValue is null");
+    }
+
+    public static ConfigurationAwareModule installIfPropertyEquals(Module module, String property, String expectedValue)
+    {
+        return new ConditionalModule(module, property, expectedValue);
     }
 
     @Override

@@ -24,12 +24,19 @@ import static java.lang.Float.floatToIntBits;
 public class AvroPageDatumReader
         implements DatumReader<Void>, PageReaderDeserializer<BinaryDecoder>
 {
+    private static final ThreadLocal<Map<Schema, Map<Schema, ResolvingDecoder>>> RESOLVER_CACHE =
+            new ThreadLocal<Map<Schema, Map<Schema, ResolvingDecoder>>>()
+            {
+                protected Map<Schema, Map<Schema, ResolvingDecoder>> initialValue()
+                {
+                    return new WeakIdentityHashMap<>();
+                }
+            };
     private final PageBuilder builder;
+    private final Thread creator = Thread.currentThread();
     private Schema actualSchema;
     private Schema expectedSchema;
-
     private ResolvingDecoder creatorResolver = null;
-    private final Thread creator = Thread.currentThread();
 
     public AvroPageDatumReader(PageBuilder pageBuilder, Schema schema)
     {
@@ -42,15 +49,6 @@ public class AvroPageDatumReader
         this.actualSchema = actualSchema;
         this.expectedSchema = expectedSchema;
     }
-
-    private static final ThreadLocal<Map<Schema, Map<Schema, ResolvingDecoder>>> RESOLVER_CACHE =
-            new ThreadLocal<Map<Schema, Map<Schema, ResolvingDecoder>>>()
-            {
-                protected Map<Schema, Map<Schema, ResolvingDecoder>> initialValue()
-                {
-                    return new WeakIdentityHashMap<>();
-                }
-            };
 
     protected final ResolvingDecoder getResolver(Schema actual, Schema expected)
             throws IOException

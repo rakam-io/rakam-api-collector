@@ -96,6 +96,11 @@ public class BasicMemoryBuffer<T>
         memoryTracker.reserveMemory(totalBytes - initialSize);
     }
 
+    public interface SizeCalculator<T>
+    {
+        long calculate(T record);
+    }
+
     public class Records
     {
         public final List<T> buffer;
@@ -106,10 +111,5 @@ public class BasicMemoryBuffer<T>
             this.buffer = buffer;
             this.bulkBuffer = bulkBuffer;
         }
-    }
-
-    public interface SizeCalculator<T>
-    {
-        long calculate(T record);
     }
 }
