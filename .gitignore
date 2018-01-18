@@ -1,4 +1,5 @@
-config.properties
+config_dev.properties
+config_prod.properties
 var/*
 target/*
 .idea/*

@@ -214,7 +214,8 @@ public class AvroPageDatumReader
     }
 
     @Override
-    public void read(BinaryDecoder in) throws IOException
+    public void read(BinaryDecoder in)
+            throws IOException
     {
         read(null, in);
     }

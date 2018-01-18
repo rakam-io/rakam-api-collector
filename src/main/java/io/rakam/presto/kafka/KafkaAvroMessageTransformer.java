@@ -6,8 +6,8 @@ package io.rakam.presto.kafka;
 
 import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.SchemaTableName;
-import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.deserialization.avro.AvroMessageEventTransformer;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DecoderFactory;
@@ -26,7 +26,6 @@ public class KafkaAvroMessageTransformer
         super(fieldNameConfig, databaseHandler);
     }
 
-    @SuppressWarnings("Duplicates")
     @Override
     public SchemaTableName extractCollection(ConsumerRecord<byte[], byte[]> message, BinaryDecoder decoder)
             throws IOException
@@ -44,7 +43,7 @@ public class KafkaAvroMessageTransformer
         }
         else {
             if (decoder == null) {
-                decoder = DecoderFactory.get().binaryDecoder(array, decoder);
+                decoder = DecoderFactory.get().binaryDecoder(array, null);
             }
             collection = decoder.readString();
         }

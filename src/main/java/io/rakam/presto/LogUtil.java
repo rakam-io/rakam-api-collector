@@ -35,5 +35,4 @@ public class LogUtil
 
         RAVEN = dsnInternal != null ? RavenFactory.ravenInstance(dsnInternal) : null;
     }
-
 }

@@ -1,16 +1,20 @@
-package io.rakam.presto;
 /*
  * Licensed under the Rakam Incorporation
  */
+package io.rakam.presto;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.joda.time.DateTime;
 
+import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class KafkaProducerTest
 {
@@ -18,7 +22,13 @@ public class KafkaProducerTest
     public static void main(String[] args)
             throws Exception
     {
+        String timestampFormat = "yyyy-MM-dd'T'HH:mm:ss.S'Z'";
+        int topicCount = 10;
+        SimpleDateFormat dateFormat = new SimpleDateFormat(timestampFormat);
+        DateTime beginTime = new DateTime().minusDays(3);
+        DateTime endTime = new DateTime();
         Random random = new Random(10000);
+
         String collection = "dapi_pushmessage_event_from_app_rakam";
         String fabricEvent = "{\n" +
                 "   \"id\": \"151e05df-d1dc-4fd9-80ef-5162ddb0f229\",\n" +
@@ -40,8 +50,8 @@ public class KafkaProducerTest
                 "      \"_collection\": \"dapi_pushmessage_event_from_app_rakam\",\n" +
                 "      \"_project\": \"dapi\",\n" +
                 "      \"event\": \"PushMessage\",\n" +
-                "      \"_actor\": \"860905030145899\",\n" +
-                "      \"imei\": \"860905030145899\",\n" +
+                "      \"_actor\": \"8609050301499\",\n" +
+                "      \"imei\": \"8609050301499\",\n" +
                 "      \"car_category\": \"luxury_sedan\",\n" +
                 "      \"app_version\": \"8.5.3.0.8\",\n" +
                 "      \"source\": \"mqtt\",\n" +
@@ -49,23 +59,20 @@ public class KafkaProducerTest
                 "      \"city\": \"bangalore\",\n" +
                 "      \"device_model\": \"Vivo V3\",\n" +
                 "      \"telecom_provider\": \"Vodafone IN\",\n" +
-                "      \"timestamp\": \"2017-10-31T11:28:59.032\",\n" +
+                "      \"timestamp\": \"2017-12-27T11:28:59.032\",\n" +
                 "      \"os_version\": \"22\",\n" +
                 "      \"payload\": \"dapp#summaryUpdate#1509429539556#a8d00ad7dd694854a962c89515ede983#dapi_tracker#upmbC1yVlAAIrJrUtP2ZKQ==\",\n" +
-                "      \"_time\": \"2017-10-31T05:58:59.32Z\",\n" +
+                "      \"_time\": \"2017-12-26T11:28:59.032\",\n" +
                 "      \"_shard_time\": \"2017-10-31T05:59:25.487Z\"\n" +
                 "   }\n" +
                 "}";
-
-        String message1 = "{\"id\":\"1\",\"metadata\":{\"timestamp\":1508482357905,\"schema\":\"api_failure_rakam\",\"schemaVersion\":1,\"type\":\"EVENT\",\"routingKey\":{\"type\":\"simple\",\"value\":\"1508482357905\"},\"lookupKey\":null,\"tenant\":\"driverapi_instrumentation\",\"stream\":\"driverapi_instrumentation_rakam\",\"sender\":null},\"data\":{\"event\":\"ApiFailure\",\"_actor\":\"864264033112670\",\"imei\":\"864264033112670\",\"api_code\":\"5\",\"car_category\":\"luxury_sedan\",\"app_version\":\"8.5.2.0.7\",\"source\":\"1\",\"connection_type\":\"5G\",\"city\":\"delhi\",\"device_model\":\"Vivo Y21L\",\"telecom_provider\":\"Idea\",\"timestamp\":\"2017-10-20T12:19:11.053\",\"os_version\":\"22\",\"message\":\"Please check the internet connection\",\"http_error_code\":\"408\",\"_time\":\"2017-10-20T06:49:11.53Z\",\"_shard_time\":\"2017-10-20T06:52:38.481Z\",\"_collection\":\"api_failure_rakam\",\"_project\":\"dapi\",\"new_arr_int\":1}}";
-        String message2 = "{\"id\":\"1\",\"metadata\":{\"timestamp\":1508482357905,\"schema\":\"api_failure_rakam\",\"schemaVersion\":1,\"type\":\"EVENT\",\"routingKey\":{\"type\":\"simple\",\"value\":\"1508482357905\"},\"lookupKey\":null,\"tenant\":\"driverapi_instrumentation\",\"stream\":\"driverapi_instrumentation_rakam\",\"sender\":null},\"data\":{\"_collection\":\"api_failure_rakam\",\"_project\":\"dapi\",\"event\":\"ApiFailure\",\"_actor\":\"864264033112670\",\"imei\":\"864264033112670\",\"api_code\":\"5\",\"car_category\":\"luxury_sedan\",\"app_version\":\"8.5.2.0.7\",\"source\":\"1\",\"connection_type\":\"4G\",\"city\":\"delhi\",\"device_model\":\"Vivo Y21L\",\"telecom_provider\":\"Idea\",\"timestamp\":\"2017-10-20T12:19:11.053\",\"os_version\":\"22\",\"message\":\"Please check the internet connection\",\"http_error_code\":\"408\",\"_time\":\"2017-10-20T06:49:11.53Z\",\"_shard_time\":\"2017-10-20T06:52:38.481Z\",\"new_arr_int\":[1,2,3,4]}}";
 
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode node = (ObjectNode) mapper.readTree(fabricEvent);
         ObjectNode data = (ObjectNode) node.get("data");
 
         //Assign topicName to string variable
-        String topicName = "presto_test_1";
+        String topicName = "presto_test_10";
 
         // create instance for properties to access producer configs
         Properties props = new Properties();
@@ -96,22 +103,23 @@ public class KafkaProducerTest
 
         Producer<String, String> producer = new KafkaProducer<String, String>(props);
 
+        boolean flag = true;
 
-        for (int i = 0; i >=0; i++) {
+        for (int i = 0; i >= 0; i++) {
             int randInt = random.nextInt();
-            int index = Math.abs(randInt) % 10;
+            int index = Math.abs(randInt) % topicCount;
+            Timestamp randomDate = new Timestamp(ThreadLocalRandom.current().nextLong(beginTime.getMillis(), endTime.getMillis()));
+
             data.put("_actor", String.valueOf(randInt));
             data.put("_collection", collection + "_" + index);
-            node.put("data", data);
+            data.put("_time", randomDate.toString());
+            data.put("_shard_time", randomDate.toString());
 
-            /*producer.send(new ProducerRecord<String, String>(topicName,
-                    "key+"+Integer.toString(randInt), message2));*/
+            node.put("data", data);
             producer.send(new ProducerRecord<String, String>(topicName,
                     Integer.toString(randInt), mapper.writeValueAsString(node)));
-            /*producer.send(new ProducerRecord<String, String>(topicName,
-                    Integer.toString(randInt), message1));*/
+            Thread.sleep(1);
         }
-
 
         System.out.println("Message sent successfully");
         producer.close();

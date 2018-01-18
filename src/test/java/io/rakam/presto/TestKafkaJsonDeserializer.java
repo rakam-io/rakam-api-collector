@@ -8,7 +8,6 @@ import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.block.Block;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Table;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.TableData;
 import io.rakam.presto.deserialization.json.JsonDeserializer;

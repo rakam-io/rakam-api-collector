@@ -39,7 +39,7 @@ public class ConditionalModule
     {
         this.configurationFactory = Objects.requireNonNull(configurationFactory, "configurationFactory is null");
         configurationFactory.consumeProperty(property);
-        if(module instanceof AbstractConfigurationAwareModule) {
+        if (module instanceof AbstractConfigurationAwareModule) {
             ((AbstractConfigurationAwareModule) module).setConfigurationFactory(configurationFactory);
         }
 

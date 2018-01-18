@@ -8,23 +8,21 @@ import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
-import com.facebook.presto.spi.block.InterleavedBlockBuilder;
-import com.facebook.presto.spi.type.AbstractType;
-import com.facebook.presto.spi.type.ArrayType;
-import com.facebook.presto.spi.type.MapType;
-import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.*;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import io.rakam.presto.deserialization.PageBuilder;
 import org.apache.avro.Schema;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.AvroPageDatumReader;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.io.EncoderFactory;
-import org.apache.avro.io.AvroPageDatumReader;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -39,9 +37,11 @@ import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.RealType.REAL;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
-import static com.facebook.presto.type.TypeJsonUtils.appendToBlockBuilder;
 import static com.google.common.collect.ImmutableList.of;
+import static io.rakam.presto.TestDeserializer.mapType;
+import static java.lang.Float.floatToRawIntBits;
 import static org.apache.avro.Schema.createRecord;
 import static org.apache.avro.Schema.createUnion;
 
@@ -102,7 +102,7 @@ public class TestPageDatumReader
 
         for (int i = 0; i < ITERATION; i++) {
             GenericData.Record record = new GenericData.Record(schema);
-            record.put("test1", String.valueOf(i+ITERATION));
+            record.put("test1", String.valueOf(i + ITERATION));
             record.put("test2", (double) i);
             out.add(get(record));
         }
@@ -114,7 +114,7 @@ public class TestPageDatumReader
             reader.read(null, DecoderFactory.get().binaryDecoder(bytes, null));
         }
 
-        Block stringSequenceBlock = BlockAssertions.createStringSequenceBlock(0, ITERATION*2);
+        Block stringSequenceBlock = BlockAssertions.createStringSequenceBlock(0, ITERATION * 2);
         BlockBuilder blockBuilder = DOUBLE.createBlockBuilder(new BlockBuilderStatus(), ITERATION * 2);
         for (int i = 0; i < ITERATION; i++) {
             blockBuilder.appendNull();
@@ -275,7 +275,7 @@ public class TestPageDatumReader
     public void testMapReader()
             throws Exception
     {
-        MapType mapType = new MapType(false, VARCHAR, VARCHAR, null, null, null);
+        MapType mapType = mapType(VARCHAR, VARCHAR);
         PageBuilder page = new PageBuilder(of(mapType));
 
         Schema elementType = Schema.create(Schema.Type.STRING);
@@ -314,11 +314,80 @@ public class TestPageDatumReader
 
     public static Block mapBlockOf(Type keyType, Type valueType, Map<?, ?> value)
     {
-        BlockBuilder blockBuilder = new InterleavedBlockBuilder(ImmutableList.of(keyType, valueType), new BlockBuilderStatus(), value.size() * 2);
+        MapType mapType = mapType(keyType, valueType);
+        BlockBuilder mapArrayBuilder = mapType.createBlockBuilder(new BlockBuilderStatus(), 1);
+        BlockBuilder singleMapWriter = mapArrayBuilder.beginBlockEntry();
         for (Map.Entry<?, ?> entry : value.entrySet()) {
-            appendToBlockBuilder(keyType, entry.getKey(), blockBuilder);
-            appendToBlockBuilder(valueType, entry.getValue(), blockBuilder);
+            appendToBlockBuilder(keyType, entry.getKey(), singleMapWriter);
+            appendToBlockBuilder(valueType, entry.getValue(), singleMapWriter);
         }
-        return blockBuilder.build();
+        mapArrayBuilder.closeEntry();
+        return mapType.getObject(mapArrayBuilder, 0);
+    }
+
+    public static void appendToBlockBuilder(Type type, Object element, BlockBuilder blockBuilder)
+    {
+        Class<?> javaType = type.getJavaType();
+        if (element == null) {
+            blockBuilder.appendNull();
+        }
+        else if (type.getTypeSignature().getBase().equals(StandardTypes.ARRAY) && element instanceof Iterable<?>) {
+            BlockBuilder subBlockBuilder = blockBuilder.beginBlockEntry();
+            for (Object subElement : (Iterable<?>) element) {
+                appendToBlockBuilder(type.getTypeParameters().get(0), subElement, subBlockBuilder);
+            }
+            blockBuilder.closeEntry();
+        }
+        else if (type.getTypeSignature().getBase().equals(StandardTypes.ROW) && element instanceof Iterable<?>) {
+            BlockBuilder subBlockBuilder = blockBuilder.beginBlockEntry();
+            int field = 0;
+            for (Object subElement : (Iterable<?>) element) {
+                appendToBlockBuilder(type.getTypeParameters().get(field), subElement, subBlockBuilder);
+                field++;
+            }
+            blockBuilder.closeEntry();
+        }
+        else if (type.getTypeSignature().getBase().equals(StandardTypes.MAP) && element instanceof Map<?, ?>) {
+            BlockBuilder subBlockBuilder = blockBuilder.beginBlockEntry();
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) element).entrySet()) {
+                appendToBlockBuilder(type.getTypeParameters().get(0), entry.getKey(), subBlockBuilder);
+                appendToBlockBuilder(type.getTypeParameters().get(1), entry.getValue(), subBlockBuilder);
+            }
+            blockBuilder.closeEntry();
+        }
+        else if (javaType == boolean.class) {
+            type.writeBoolean(blockBuilder, (Boolean) element);
+        }
+        else if (javaType == long.class) {
+            if (element instanceof SqlDecimal) {
+                type.writeLong(blockBuilder, ((SqlDecimal) element).getUnscaledValue().longValue());
+            }
+            else if (REAL.equals(type)) {
+                type.writeLong(blockBuilder, floatToRawIntBits(((Number) element).floatValue()));
+            }
+            else {
+                type.writeLong(blockBuilder, ((Number) element).longValue());
+            }
+        }
+        else if (javaType == double.class) {
+            type.writeDouble(blockBuilder, ((Number) element).doubleValue());
+        }
+        else if (javaType == Slice.class) {
+            if (element instanceof String) {
+                type.writeSlice(blockBuilder, Slices.utf8Slice(element.toString()));
+            }
+            else if (element instanceof byte[]) {
+                type.writeSlice(blockBuilder, Slices.wrappedBuffer((byte[]) element));
+            }
+            else if (element instanceof SqlDecimal) {
+                type.writeSlice(blockBuilder, Decimals.encodeUnscaledValue(((SqlDecimal) element).getUnscaledValue()));
+            }
+            else {
+                type.writeSlice(blockBuilder, (Slice) element);
+            }
+        }
+        else {
+            type.writeObject(blockBuilder, element);
+        }
     }
 }

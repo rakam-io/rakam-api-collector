@@ -12,11 +12,11 @@ import java.net.URI;
 public class RaptorConfig
 {
     private String metadataUrl;
-    private String nodeIdentifier;
-    private File dataDirectory;
+    private String nodeIdentifier = "collector";
     private URI prestoURL;
     private String backupThreads = "5";
     private String dbMaxConnections = "100";
+    private int maxConnection = 100;
 
     public String getMetadataUrl()
     {
@@ -45,6 +45,18 @@ public class RaptorConfig
         return this;
     }
 
+    public int getMaxConnection()
+    {
+        return maxConnection;
+    }
+
+    @Config("raptor.metadata.max-connection")
+    public RaptorConfig setMaxConnection(int maxConnection)
+    {
+        this.maxConnection = maxConnection;
+        return this;
+    }
+
     public String getNodeIdentifier()
     {
         return nodeIdentifier;
@@ -65,21 +77,6 @@ public class RaptorConfig
         if (nodeIdentifier != null) {
             this.nodeIdentifier = nodeIdentifier;
         }
-        return this;
-    }
-
-    public File getDataDirectory()
-    {
-        return dataDirectory;
-    }
-
-    @Config("raptor.storage.data-directory")
-    public RaptorConfig setDataDirectory(File dataDirectory)
-    {
-        if (dataDirectory == null || dataDirectory.length() < 1) {
-            throw new RuntimeException("storage directory cannot be null");
-        }
-        this.dataDirectory = dataDirectory;
         return this;
     }
 

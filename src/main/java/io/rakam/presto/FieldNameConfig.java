@@ -4,11 +4,13 @@
 
 package io.rakam.presto;
 
+import com.facebook.presto.hadoop.$internal.com.google.common.base.Strings;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.DoubleType;
 import com.facebook.presto.spi.type.IntegerType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.VarcharType;
+import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
 
 import java.util.Arrays;
@@ -18,10 +20,9 @@ import java.util.Set;
 public class FieldNameConfig
 {
     private String checkpointField = "_shard_time";
-    private String userFieldName = "_actor";
+    private String userFieldName = "_user";
     private String timeField = "_time";
-    private Set<String> excludedColumns = new HashSet<>();
-    private Set<String> whitelistedCollections = new HashSet<>();
+    private Set<String> whitelistedCollections;
     private UserType userFieldType = UserType.STRING;
 
     @Config("database.checkpoint-field")
@@ -52,22 +53,14 @@ public class FieldNameConfig
         return this;
     }
 
-    @Config("database.user-excluded-columns")
-    public FieldNameConfig setExcludedColumns(String excludedColumns)
-    {
-        if (excludedColumns != null) {
-            excludedColumns = excludedColumns.replaceAll("\\s+", "");
-            this.excludedColumns = new HashSet<>(Arrays.asList(excludedColumns.split(",")));
-        }
-        return this;
-    }
-
     @Config("database.whitelisted.collections")
     public FieldNameConfig setWhitelistedCollections(String collections)
     {
-        if (collections != null) {
+        if (!Strings.isNullOrEmpty(collections)) {
             collections = collections.replaceAll("\\s+", "");
-            this.whitelistedCollections = new HashSet<>(Arrays.asList(collections.split(",")));
+            if (collections.length() > 1 && collections.matches(".*[a-zA-Z]+.*")) {
+                whitelistedCollections = new HashSet<>(Arrays.asList(collections.split(",")));
+            }
         }
         return this;
     }
@@ -90,11 +83,6 @@ public class FieldNameConfig
     public String getTimeField()
     {
         return timeField;
-    }
-
-    public Set<String> getExcludedColumns()
-    {
-        return excludedColumns;
     }
 
     public Set<String> getWhitelistedCollections() {return whitelistedCollections;}

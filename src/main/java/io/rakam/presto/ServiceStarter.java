@@ -4,26 +4,48 @@
 
 package io.rakam.presto;
 
-import com.facebook.presto.orc.stream.OrcInputStream;
+import com.facebook.presto.block.BlockEncodingManager;
+import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.raptor.backup.BackupConfig;
+import com.facebook.presto.raptor.util.RebindSafeMBeanServer;
+import com.facebook.presto.spi.NodeManager;
+import com.facebook.presto.spi.PageSorter;
+import com.facebook.presto.spi.block.BlockEncodingSerde;
+import com.facebook.presto.spi.type.TypeManager;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
+import com.facebook.presto.type.TypeRegistry;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.Binder;
-import com.google.inject.Injector;
+import com.google.inject.Module;
 import com.google.inject.Scopes;
+import com.google.inject.multibindings.OptionalBinder;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
+import io.airlift.jmx.JmxModule;
 import io.airlift.log.Logger;
+import io.airlift.log.Logging;
+import io.airlift.log.LoggingConfiguration;
 import io.rakam.presto.connector.raptor.RaptorModule;
+import io.rakam.presto.kafka.KafkaHistoricalDataHandler;
 import io.rakam.presto.kafka.KafkaStreamSourceModule;
 import io.rakam.presto.kinesis.KinesisStreamSourceModule;
-import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
+import org.weakref.jmx.guice.MBeanModule;
+
+import javax.management.MBeanServer;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
+import java.io.UncheckedIOException;
 import java.net.URL;
 import java.util.Properties;
 
+import static com.google.common.io.ByteStreams.nullOutputStream;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.rakam.presto.ConditionalModule.installIfPropertyEquals;
+import static java.lang.management.ManagementFactory.getPlatformMBeanServer;
+import static org.weakref.jmx.ObjectNames.generatedNameOf;
+import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
 public final class ServiceStarter
 {
@@ -67,10 +89,32 @@ public final class ServiceStarter
             System.setProperty("config", args[0]);
         }
 
+        initializeLogging(System.getProperty("log.levels-file"));
+
         Bootstrap app = new Bootstrap(
                 new StreamSourceModule(),
                 new LogModule(),
-                new RaptorModule());
+                new MBeanModule(),
+                new RaptorModule(), new Module()
+        {
+            @Override
+            public void configure(Binder binder)
+            {
+                MBeanServer mbeanServer = new RebindSafeMBeanServer(getPlatformMBeanServer());
+                binder.bind(MBeanServer.class).toInstance(mbeanServer);
+
+                newExporter(binder).export(MemoryTracker.class).as(generatedNameOf(MemoryTracker.class));
+
+                TypeRegistry typeRegistry = new TypeRegistry();
+                binder.bind(TypeManager.class).toInstance(typeRegistry);
+
+                BlockEncodingManager blockEncodingManager = new BlockEncodingManager(typeRegistry, ImmutableSet.of());
+                binder.bind(BlockEncodingSerde.class).toInstance(blockEncodingManager);
+
+                FunctionRegistry functionRegistry = new FunctionRegistry(typeRegistry, blockEncodingManager, new FeaturesConfig());
+                binder.bind(FunctionRegistry.class).toInstance(functionRegistry);
+            }
+        });
 
         app.requireExplicitBindings(false);
         app.strictConfig().initialize();
@@ -92,6 +136,8 @@ public final class ServiceStarter
             binder.bind(StreamWorkerContext.class).in(Scopes.SINGLETON);
             binder.bind(TargetConnectorCommitter.class).in(Scopes.SINGLETON);
 
+            OptionalBinder.newOptionalBinder(binder, HistoricalDataHandler.class);
+
             bindDataSource("stream.source");
         }
 
@@ -99,6 +145,31 @@ public final class ServiceStarter
         {
             install(installIfPropertyEquals(new KafkaStreamSourceModule(), sourceName, "kafka"));
             install(installIfPropertyEquals(new KinesisStreamSourceModule(), sourceName, "kinesis"));
+        }
+    }
+
+    public static void initializeLogging(String logLevelsFile)
+    {
+        // unhook out and err while initializing logging or logger will print to them
+        PrintStream out = System.out;
+        PrintStream err = System.err;
+
+        try {
+            LoggingConfiguration config = new LoggingConfiguration();
+
+            if (logLevelsFile != null) {
+                config.setLevelsFile(logLevelsFile);
+            }
+
+            Logging logging = Logging.initialize();
+            logging.configure(config);
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        finally {
+            System.setOut(out);
+            System.setErr(err);
         }
     }
 }

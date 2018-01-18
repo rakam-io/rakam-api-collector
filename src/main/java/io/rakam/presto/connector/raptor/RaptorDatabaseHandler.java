@@ -6,10 +6,8 @@ package io.rakam.presto.connector.raptor;
 
 import com.facebook.presto.PagesIndexPageSorter;
 import com.facebook.presto.Session;
-import com.facebook.presto.block.BlockEncodingManager;
 import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.connector.ConnectorId;
-import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.PrestoNode;
 import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.operator.PagesIndex;
@@ -19,9 +17,7 @@ import com.facebook.presto.raptor.RaptorModule;
 import com.facebook.presto.raptor.backup.BackupModule;
 import com.facebook.presto.raptor.metadata.DatabaseMetadataModule;
 import com.facebook.presto.raptor.storage.InMemoryFileSystem;
-import com.facebook.presto.raptor.storage.InMemoryOrcStorageManager;
-import com.facebook.presto.raptor.storage.StorageManager;
-import com.facebook.presto.raptor.storage.StorageModule;
+import com.facebook.presto.raptor.storage.IngestOnlyStorageModule;
 import com.facebook.presto.raptor.storage.backup.RemoteBackupManager;
 import com.facebook.presto.raptor.storage.backup.S3BackupStoreModule;
 import com.facebook.presto.raptor.util.RebindSafeMBeanServer;
@@ -49,22 +45,21 @@ import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.gen.JoinCompiler;
 import com.facebook.presto.sql.gen.OrderingCompiler;
-import com.facebook.presto.type.TypeRegistry;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.EventBus;
+import com.google.common.io.Files;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
-import com.google.inject.util.Modules;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.json.JsonModule;
-import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.MemoryTracker;
 import org.rakam.analysis.JDBCPoolDataSource;
 import org.rakam.collection.FieldType;
 import org.rakam.collection.SchemaField;
@@ -81,7 +76,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
-import java.security.Principal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -100,8 +94,6 @@ import static org.rakam.presto.analysis.PrestoQueryExecution.fromPrestoType;
 public class RaptorDatabaseHandler
         implements DatabaseHandler
 {
-    private static final Logger log = Logger.get(RaptorDatabaseHandler.class);
-
     private static final String RAKAM_RAPTOR_CONNECTOR = "RAKAM_RAPTOR_CONNECTOR";
     private final ConnectorMetadata metadata;
     private final ConnectorSession session;
@@ -111,10 +103,21 @@ public class RaptorDatabaseHandler
     private final Supplier<ConnectorMetadata> writeMetadata;
 
     @Inject
-    public RaptorDatabaseHandler(RaptorConfig config, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig)
+    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig)
+    {
+        this(config, typeManager, s3BackupConfig, fieldNameConfig, null);
+    }
+
+    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule)
     {
         DatabaseMetadataModule metadataModule = new DatabaseMetadataModule();
-        ImmutableMap<String, Module> backupProviders = ImmutableMap.of("s3", new S3BackupStoreModule());
+
+        ImmutableMap.Builder<String, Module> builder = ImmutableMap.builder();
+        builder.put("s3", new S3BackupStoreModule());
+        if (backupStoreModule != null) {
+            builder.put("embedded", backupStoreModule);
+        }
+        ImmutableMap<String, Module> backupProviders = builder.build();
 
         RaptorConnectorFactory raptorConnectorFactory = new RaptorConnectorFactory(
                 RAKAM_RAPTOR_CONNECTOR,
@@ -138,8 +141,9 @@ public class RaptorDatabaseHandler
                             },
                             metadataModule,
                             new BackupModule(backupProviders),
-                            Modules.override(new StorageModule(connectorId)).with((Module) binder -> binder.bind(StorageManager.class).to(InMemoryOrcStorageManager.class).in(Scopes.SINGLETON)),
+                            new IngestOnlyStorageModule(connectorId),
                             new RaptorModule(connectorId),
+                            binder -> binder.bind(MemoryTracker.class).asEagerSingleton(),
                             binder -> binder.bind(InMemoryFileSystem.class).asEagerSingleton(),
                             binder -> binder.bind(RemoteBackupManager.class).in(Scopes.SINGLETON)
                     );
@@ -153,7 +157,7 @@ public class RaptorDatabaseHandler
                     return injector.getInstance(RaptorConnector.class);
                 }
                 catch (Exception e) {
-                    throw Throwables.propagate(e);
+                    throw new RuntimeException(e);
                 }
             }
         };
@@ -161,16 +165,16 @@ public class RaptorDatabaseHandler
         ImmutableMap.Builder<String, String> props = ImmutableMap.<String, String>builder()
                 .put("metadata.db.type", "mysql")
                 .put("metadata.db.url", config.getMetadataUrl())
-                .put("storage.data-directory", config.getDataDirectory().getAbsolutePath())
-                .put("metadata.db.connections.max", config.getDbMaxConnections())
-                .put("storage.compaction-enabled", "false")
-                .put("storage.max-recovery-threads", "1")
-                .put("storage.missing-shard-discovery-interval", "999999d")
-                .put("storage.organization-enabled", "false")
-                .put("backup.timeout", "20m")
-                .put("backup.threads", config.getBackupThreads());
+                .put("backup.threads", String.valueOf(Runtime.getRuntime().availableProcessors() * 3))
+                // No effect
+                .put("storage.data-directory", Files.createTempDir().getAbsolutePath())
+                .put("metadata.db.connections.max", String.valueOf(config.getMaxConnection()))
+                .put("backup.timeout", "20m");
 
-        if (s3BackupConfig.getS3Bucket() != null) {
+        if (backupStoreModule != null) {
+            props.put("backup.provider", "embedded");
+        }
+        else if (s3BackupConfig.getS3Bucket() != null) {
             props.put("backup.provider", "s3");
             props.put("aws.s3-bucket", s3BackupConfig.getS3Bucket());
             props.put("aws.region", s3BackupConfig.getAWSRegion().getName());
@@ -187,23 +191,16 @@ public class RaptorDatabaseHandler
                 props.put("aws.s3-endpoint", s3BackupConfig.getEndpoint());
             }
         }
-        else {
-            throw new RuntimeException("THE BACKUP IS NOT ENABLED!");
-        }
 
         ImmutableMap<String, String> properties = props.build();
 
         NodeManager nodeManager = new SingleNodeManager(config.getNodeIdentifier());
 
         PagesIndexPageSorter pageSorter = new PagesIndexPageSorter(
-                new PagesIndex.DefaultFactory(new OrderingCompiler(), new JoinCompiler()));
-
-        TypeRegistry typeRegistry = new TypeRegistry();
-        BlockEncodingManager blockEncodingManager = new BlockEncodingManager(typeRegistry);
-        new FunctionRegistry(typeRegistry, blockEncodingManager, new FeaturesConfig());
+                new PagesIndex.DefaultFactory(new OrderingCompiler(), new JoinCompiler(), new FeaturesConfig()));
 
         Connector connector = raptorConnectorFactory.create(RAKAM_RAPTOR_CONNECTOR, properties,
-                new ProxyConnectorContext(nodeManager, typeRegistry, pageSorter));
+                new ProxyConnectorContext(nodeManager, typeManager, pageSorter));
 
         connectorTransactionHandle = connector.beginTransaction(READ_COMMITTED, false);
 
@@ -212,7 +209,7 @@ public class RaptorDatabaseHandler
         sessionPropertyManager.addConnectorSessionProperties(connectorId, connector.getSessionProperties());
 
         session = Session.builder(sessionPropertyManager)
-                .setIdentity(new Identity("rakam", Optional.<Principal>empty()))
+                .setIdentity(new Identity("rakam", Optional.empty()))
                 .setTimeZoneKey(UTC_KEY)
                 .setLocale(ENGLISH)
                 .setQueryId(QueryId.valueOf("streaming_batch"))
@@ -226,6 +223,7 @@ public class RaptorDatabaseHandler
 
         pageSinkProvider = connector.getPageSinkProvider();
         JDBCConfig jdbcConfig = new JDBCConfig();
+        jdbcConfig.setConnectionMaxLifeTime(60000L);
         try {
             String uri = new URI(config.getMetadataUrl().substring(5)).getQuery();
             for (String elem : uri.split("&")) {
@@ -238,6 +236,7 @@ public class RaptorDatabaseHandler
                 }
             }
             jdbcConfig.setUrl(config.getMetadataUrl());
+            jdbcConfig.setMaxConnection(config.getMaxConnection() / 3);
         }
         catch (URISyntaxException | UnsupportedEncodingException e) {
             throw new RuntimeException(e);
@@ -312,11 +311,7 @@ public class RaptorDatabaseHandler
             @Override
             public CompletableFuture<Void> commit()
             {
-                long startTime = System.currentTimeMillis();
                 CompletableFuture<Collection<Slice>> finish = pageSink.finish();
-                finish.join();
-                long endTime = System.currentTimeMillis();
-                log.info("Page Sink: " + (endTime - startTime));
                 return finish.thenAccept(slices ->
                         // 6 mysql insert queries
                         connectorMetadata.finishInsert(session, insertTableHandle, slices));
@@ -328,13 +323,13 @@ public class RaptorDatabaseHandler
             implements ConnectorContext
     {
         private final NodeManager nodeManager;
-        private final TypeRegistry typeRegistry;
+        private final TypeManager typeManager;
         private final PagesIndexPageSorter pageSorter;
 
-        public ProxyConnectorContext(NodeManager nodeManager, TypeRegistry typeRegistry, PagesIndexPageSorter pageSorter)
+        public ProxyConnectorContext(NodeManager nodeManager, TypeManager typeManager, PagesIndexPageSorter pageSorter)
         {
             this.nodeManager = nodeManager;
-            this.typeRegistry = typeRegistry;
+            this.typeManager = typeManager;
             this.pageSorter = pageSorter;
         }
 
@@ -345,7 +340,7 @@ public class RaptorDatabaseHandler
 
         public TypeManager getTypeManager()
         {
-            return typeRegistry;
+            return typeManager;
         }
 
         public PageSorter getPageSorter()

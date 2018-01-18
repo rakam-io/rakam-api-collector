@@ -30,7 +30,8 @@ import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.runAsync;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
-public class RemoteBackupManager {
+public class RemoteBackupManager
+{
     private final Optional<BackupStore> backupStore;
     private final ExecutorService executorService;
 
@@ -57,13 +58,15 @@ public class RemoteBackupManager {
         executorService.shutdownNow();
     }
 
+    @SuppressWarnings("NP_NONNULL_PARAM_VIOLATION")
     public CompletableFuture<?> submit(UUID uuid, File source)
     {
         requireNonNull(uuid, "uuid is null");
         requireNonNull(source, "source is null");
 
         if (!backupStore.isPresent()) {
-            return completedFuture(null);
+            // See https://github.com/findbugsproject/findbugs/issues/79
+            return completedFuture(0);
         }
 
         // TODO: decrement when the running task is finished (not immediately on cancel)

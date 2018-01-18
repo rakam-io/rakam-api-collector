@@ -1,3 +1,5 @@
+[![Wercker](https://img.shields.io/wercker/ci/wercker/docs.svg)]()
+
 # rakam-presto-collector
 
 1. Poll data data from Kinesis or Kafka
@@ -29,10 +31,10 @@
 
 #raptor.aws.region=us-east-1
 #raptor.aws.s3-bucket=
+
 #raptor.metadata.url=jdbc:mysql://localhost/presto?user=presto&password=presto
 #raptor.node.id=ffffffff-ffff-ffff-ffff-ffffffffffff
 #raptor.storage.data-directory=/var/presto/data
 #raptor.presto-url=http://localhost:8080/
 #log-active=false
 #database.user-excluded-columns=_shard_time,_collection,_project
-```

@@ -4,43 +4,22 @@
 
 package io.rakam.presto;
 
+import com.facebook.presto.hadoop.$internal.com.google.common.base.Strings;
 import io.airlift.configuration.Config;
-import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 
 import java.util.concurrent.TimeUnit;
 
-import static io.airlift.units.DataSize.Unit.GIGABYTE;
-import static io.airlift.units.DataSize.Unit.MEGABYTE;
-
 public class StreamConfig
 {
     private Duration maxFlushDuration = Duration.succinctDuration(5, TimeUnit.SECONDS);
-    private int maxFlushRecords = 10_000;
-    private DataSize maxSizeOfView = DataSize.succinctDataSize(1, GIGABYTE);
-    private DataSize maxFlushDataSize = DataSize.succinctDataSize(100, MEGABYTE);
+    private int memoryMultiplier = 2;
 
     @Config("stream.max-flush-duration")
-    public void setMaxFlushDuration(Duration maxFlushDuration)
+    public StreamConfig setMaxFlushDuration(Duration maxFlushDuration)
     {
         this.maxFlushDuration = maxFlushDuration;
-    }
-
-    @Config("stream.max-flush-records")
-    public void setMaxFlushRecords(int maxFlushRecords)
-    {
-        this.maxFlushRecords = maxFlushRecords;
-    }
-
-    @Config("stream.max-table-size")
-    public void setMaxSizeOfView(DataSize maxSizeOfView)
-    {
-        this.maxSizeOfView = maxSizeOfView;
-    }
-
-    public DataSize getMaxSizeOfView()
-    {
-        return maxSizeOfView;
+        return this;
     }
 
     public Duration getMaxFlushDuration()
@@ -48,20 +27,16 @@ public class StreamConfig
         return maxFlushDuration;
     }
 
-    public DataSize getDataSize()
+    public int getMemoryMultiplier()
     {
-        return maxFlushDataSize;
+        return memoryMultiplier;
     }
 
-    @Config("stream.max-flush-datasize")
-    public StreamConfig setDataSize(DataSize maxFlushDataSize)
+    @Config("stream.memory-multiplier")
+    public void setMemoryMultiplier(String memoryMultiplier)
     {
-        this.maxFlushDataSize = maxFlushDataSize;
-        return this;
-    }
-
-    public int getMaxFlushRecords()
-    {
-        return maxFlushRecords;
+        if (!Strings.isNullOrEmpty(memoryMultiplier)) {
+            this.memoryMultiplier = Integer.parseInt(memoryMultiplier);
+        }
     }
 }

@@ -4,36 +4,31 @@
 
 package io.rakam.presto;
 
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 public class BasicMemoryBuffer<T>
         implements MemoryBuffer<T>
 {
-    private final int numMessagesToBuffer;
     private final long millisecondsToBuffer;
-    private final List<T> buffer;
-    private final List<T> bulkBuffer;
+    private final ArrayList<T> buffer;
+    private final ArrayList<T> bulkBuffer;
+    private final SizeCalculator<T> sizeCalculator;
+    private final MemoryTracker memoryTracker;
     private long previousFlushTimeMillisecond;
     private int totalBytes;
-    private long dataSizeToBuffer;
+    private int memoryMultiplier;
 
-    public BasicMemoryBuffer(StreamConfig config)
+    public BasicMemoryBuffer(StreamConfig config, MemoryTracker memoryTracker, SizeCalculator<T> sizeCalculator)
     {
-        numMessagesToBuffer = config.getMaxFlushRecords();
+        this.sizeCalculator = sizeCalculator;
+        this.memoryTracker = memoryTracker;
         millisecondsToBuffer = config.getMaxFlushDuration().toMillis();
-        dataSizeToBuffer = config.getDataSize().toBytes();
         previousFlushTimeMillisecond = System.currentTimeMillis();
-        this.buffer = new ArrayList<>(1000);
-        this.bulkBuffer = new ArrayList<>(1000);
+        memoryMultiplier = config.getMemoryMultiplier();
+        buffer = new ArrayList<>(1000);
+        bulkBuffer = new ArrayList<>(1000);
         totalBytes = 0;
-    }
-
-    public long getNumRecordsToBuffer()
-    {
-        return numMessagesToBuffer;
     }
 
     public long getMillisecondsToBuffer()
@@ -41,14 +36,31 @@ public class BasicMemoryBuffer<T>
         return millisecondsToBuffer;
     }
 
+    public long getPreviousFlushTimeMillisecond()
+    {
+        return previousFlushTimeMillisecond;
+    }
+
+    public int getTotalBytes()
+    {
+        return totalBytes;
+    }
+
+    public int getTotalRecords()
+    {
+        return buffer.size() + bulkBuffer.size();
+    }
+
     public void consumeRecord(T record, long size)
     {
         buffer.add(record);
         totalBytes += size;
+        memoryTracker.reserveMemory(size);
     }
 
     public void consumeBatch(T record, long size)
     {
+        memoryTracker.reserveMemory(size);
         bulkBuffer.add(record);
         totalBytes += size;
     }
@@ -58,19 +70,48 @@ public class BasicMemoryBuffer<T>
         buffer.clear();
         bulkBuffer.clear();
         previousFlushTimeMillisecond = System.currentTimeMillis();
+        memoryTracker.freeMemory(totalBytes);
         totalBytes = 0;
     }
 
     public boolean shouldFlush()
     {
-        long timelapseMillisecond = System.currentTimeMillis() - previousFlushTimeMillisecond;
-        return (buffer.size() >= getNumRecordsToBuffer())
-                || (timelapseMillisecond >= getMillisecondsToBuffer())
-                || totalBytes > dataSizeToBuffer;
+        return ((System.currentTimeMillis() - previousFlushTimeMillisecond) >= getMillisecondsToBuffer())
+                || memoryTracker.availableMemory() - (totalBytes * memoryMultiplier) < 0;
     }
 
-    public Map.Entry<List<T>, List<T>> getRecords()
+    public Records getRecords()
     {
-        return new AbstractMap.SimpleEntry<>(buffer, bulkBuffer);
+        return new Records(buffer, bulkBuffer);
+    }
+
+    public void consumeRecords(Iterable<T> records)
+    {
+        long initialSize = totalBytes;
+        for (T record : records) {
+            buffer.add(record);
+
+            long size = sizeCalculator.calculate(record);
+            totalBytes += size;
+        }
+
+        memoryTracker.reserveMemory(totalBytes - initialSize);
+    }
+
+    public class Records
+    {
+        public final List<T> buffer;
+        public final List<T> bulkBuffer;
+
+        public Records(List<T> buffer, List<T> bulkBuffer)
+        {
+            this.buffer = buffer;
+            this.bulkBuffer = bulkBuffer;
+        }
+    }
+
+    public interface SizeCalculator<T>
+    {
+        long calculate(T record);
     }
 }

@@ -5,8 +5,10 @@
 package io.rakam.presto;
 
 import com.facebook.presto.spi.SchemaTableName;
-import com.nurkiewicz.asyncretry.AsyncRetryExecutor;
-import io.airlift.log.Logger;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import net.jodah.failsafe.AsyncFailsafe;
+import net.jodah.failsafe.Failsafe;
+import net.jodah.failsafe.RetryPolicy;
 
 import javax.inject.Inject;
 
@@ -14,65 +16,65 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TargetConnectorCommitter
 {
-    private static final Logger log = Logger.get(TargetConnectorCommitter.class);
+    private final int executorPoolSize;
+    private AtomicInteger activeFlushCount = new AtomicInteger();
     private final DatabaseHandler databaseHandler;
-    private final AsyncRetryExecutor executor;
+    private final AsyncFailsafe<Void> executor;
 
     @Inject
     public TargetConnectorCommitter(DatabaseHandler databaseHandler)
     {
         this.databaseHandler = databaseHandler;
 
-        //ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
-        executor = new AsyncRetryExecutor(scheduler).
-                firstRetryNoDelay().
-                withExponentialBackoff(500, 2).
-                withMaxDelay(10_000).
-                withUniformJitter().
-                withMaxRetries(5);
+        RetryPolicy retryPolicy = new RetryPolicy()
+                .withBackoff(1, 60, TimeUnit.SECONDS)
+                .withJitter(.1)
+                .withMaxDuration(1, TimeUnit.MINUTES)
+                .withMaxRetries(3);
+
+        executorPoolSize = Runtime.getRuntime().availableProcessors() * 2;
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(executorPoolSize,
+                new ThreadFactoryBuilder().setNameFormat("target-committer").build());
+
+        executor = Failsafe.<Void>with(retryPolicy).with(scheduler);
     }
 
     private CompletableFuture<Void> commit(List<MiddlewareBuffer.TableCheckpoint> batches, SchemaTableName table)
     {
         DatabaseHandler.Inserter insert = databaseHandler.insert(table.getSchemaName(), table.getTableName());
-        long size = 0;
+
         for (MiddlewareBuffer.TableCheckpoint batch : batches) {
             insert.addPage(batch.getTable().page);
-            size += batch.getTable().page.getSizeInBytes();
         }
-        log.info("Committing " + size + " bytes for table: " + table.getTableName());
+
         return insert.commit();
+    }
+
+    public boolean isFull()
+    {
+        return activeFlushCount.get() / executorPoolSize > 3;
+    }
+
+    public int getActiveFlushCount()
+    {
+        return activeFlushCount.get();
     }
 
     private CompletableFuture<Void> processInternal(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> value)
     {
-        return commit(value, table).thenRun(() -> checkpoint(value));
+        return commit(value, table);
     }
 
-    public void process(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> value)
+    public CompletableFuture<Void> process(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> value)
     {
-        executor.getFutureWithRetry(retryContext -> processInternal(table, value)).whenComplete((aVoid, throwable) -> {
-            if (throwable != null) {
-                log.error(throwable, "Error while processing records");
-                // TODO: What should we do if we can't process the data?
-                checkpoint(value);
-            }
-        });
-    }
-
-    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value)
-    {
-        for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
-            try {
-                tableCheckpoint.checkpoint();
-            }
-            catch (BatchRecords.CheckpointException e) {
-                log.error(e, "Error while checkpointing records");
-            }
-        }
+        activeFlushCount.incrementAndGet();
+        CompletableFuture<Void> future = executor.future(() -> processInternal(table, value));
+        future.whenComplete((aVoid, throwable) -> activeFlushCount.decrementAndGet());
+        return future;
     }
 }

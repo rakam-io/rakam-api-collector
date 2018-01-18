@@ -6,6 +6,7 @@ package io.rakam.presto;
 
 import com.facebook.presto.spi.SchemaTableName;
 import io.rakam.presto.deserialization.MessageEventTransformer;
+import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
 
 import javax.inject.Inject;
@@ -17,12 +18,16 @@ public class StreamWorkerContext<T>
 {
     private final MessageEventTransformer transformer;
     private final StreamConfig streamConfig;
+    private final MemoryTracker memoryTracker;
+    private final BasicMemoryBuffer.SizeCalculator<T> sizeCalculator;
 
     @Inject
-    public StreamWorkerContext(MessageEventTransformer transformer, StreamConfig streamConfig)
+    public StreamWorkerContext(MessageEventTransformer transformer, BasicMemoryBuffer.SizeCalculator sizeCalculator, MemoryTracker memoryTracker, StreamConfig streamConfig)
     {
         this.transformer = transformer;
         this.streamConfig = streamConfig;
+        this.memoryTracker = memoryTracker;
+        this.sizeCalculator = sizeCalculator;
     }
 
     public void shutdown()
@@ -37,6 +42,6 @@ public class StreamWorkerContext<T>
 
     public BasicMemoryBuffer createBuffer()
     {
-        return new BasicMemoryBuffer(streamConfig);
+        return new BasicMemoryBuffer(streamConfig, memoryTracker, sizeCalculator);
     }
 }

@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
 import com.google.common.collect.ImmutableList;
 import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.deserialization.PageBuilder;
 import io.rakam.presto.deserialization.PageReader;
 import org.rakam.collection.FieldType;
@@ -42,16 +43,23 @@ import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TimeType.TIME;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
-import static com.fasterxml.jackson.core.JsonToken.*;
+import static com.fasterxml.jackson.core.JsonToken.END_ARRAY;
+import static com.fasterxml.jackson.core.JsonToken.END_OBJECT;
+import static com.fasterxml.jackson.core.JsonToken.START_OBJECT;
+import static com.fasterxml.jackson.core.JsonToken.VALUE_NULL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.String.format;
-import static org.rakam.collection.FieldType.*;
+import static org.rakam.collection.FieldType.ARRAY_STRING;
+import static org.rakam.collection.FieldType.MAP_STRING;
+import static org.rakam.collection.FieldType.STRING;
 import static org.rakam.presto.analysis.PrestoRakamRaptorMetastore.toType;
 
-public class RakamJsonDeserializer implements JsonDeserializer
+public class RakamJsonDeserializer
+        implements JsonDeserializer
 {
     private static final JsonFactory READER = new ObjectMapper().getFactory();
     private final DatabaseHandler databaseHandler;
+    private final FieldNameConfig fieldNameConfig;
 
     private Map<Type, FieldType> typeCache = new ConcurrentHashMap<>();
     private String project;
@@ -59,9 +67,10 @@ public class RakamJsonDeserializer implements JsonDeserializer
     private JsonParser jp;
     TokenBuffer propertiesBuffer = null;
 
-    public RakamJsonDeserializer(DatabaseHandler databaseHandler)
+    public RakamJsonDeserializer(FieldNameConfig fieldNameConfig, DatabaseHandler databaseHandler)
     {
         this.databaseHandler = databaseHandler;
+        this.fieldNameConfig = fieldNameConfig;
     }
 
     @Override
@@ -140,6 +149,7 @@ public class RakamJsonDeserializer implements JsonDeserializer
         }
     }
 
+    @SuppressWarnings("Duplicates")
     private void parseProperties(PageReader pageReader)
             throws IOException
     {
@@ -172,7 +182,7 @@ public class RakamJsonDeserializer implements JsonDeserializer
             jp.nextToken();
 
             if (idx == -1) {
-                FieldType type = getTypeForUnknown(jp);
+                FieldType type = getTypeForUnknown(fieldName, jp);
                 if (type != null) {
                     if (newFields == null) {
                         newFields = new ArrayList<>();
@@ -257,6 +267,7 @@ public class RakamJsonDeserializer implements JsonDeserializer
                         for (int i1 = 0; i1 < pageBuilder.getPositionCount(); i1++) {
                             blockBuilder.appendNull();
                         }
+                        blockBuilders[i] = blockBuilder;
                     }
                 }
 
@@ -288,6 +299,7 @@ public class RakamJsonDeserializer implements JsonDeserializer
         return collection;
     }
 
+    @SuppressWarnings("Duplicates")
     private void getValue(BlockBuilder blockBuilder, JsonParser jp, FieldType type, ColumnMetadata field, boolean passInitialToken)
             throws IOException
     {
@@ -464,9 +476,14 @@ public class RakamJsonDeserializer implements JsonDeserializer
         }
     }
 
-    private static FieldType getTypeForUnknown(JsonParser jp)
+    @SuppressWarnings("Duplicates")
+    private FieldType getTypeForUnknown(String fieldName, JsonParser jp)
             throws IOException
     {
+        if (fieldNameConfig.getTimeField().equals(fieldName)) {
+            return FieldType.TIMESTAMP;
+        }
+
         switch (jp.getCurrentToken()) {
             case VALUE_NULL:
                 return null;
@@ -507,7 +524,7 @@ public class RakamJsonDeserializer implements JsonDeserializer
 
                 FieldType type;
                 if (t.isScalarValue()) {
-                    type = getTypeForUnknown(jp);
+                    type = getTypeForUnknown(fieldName, jp);
                 }
                 else {
                     type = MAP_STRING;
@@ -542,7 +559,7 @@ public class RakamJsonDeserializer implements JsonDeserializer
                 if (!t.isScalarValue()) {
                     return MAP_STRING;
                 }
-                type = getTypeForUnknown(jp);
+                type = getTypeForUnknown(fieldName, jp);
                 if (type == null) {
                     // TODO: what if the other values are not null?
                     while (t != END_OBJECT) {

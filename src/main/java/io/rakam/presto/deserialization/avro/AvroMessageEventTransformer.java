@@ -8,13 +8,12 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
-import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
-import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
@@ -95,13 +94,7 @@ public abstract class AvroMessageEventTransformer<T>
                 for (int i = 0; i < countOfColumns; i++) {
                     String columnName = decoder.readString();
                     Optional<ColumnMetadata> column = pageBuilder.getExpectedSchema().stream()
-                            .filter(new Predicate<ColumnMetadata>() {
-                                @Override
-                                public boolean test(ColumnMetadata o)
-                                {
-                                    return o.getName().equals(columnName);
-                                }
-                            })
+                            .filter((Predicate<ColumnMetadata>) o -> o.getName().equals(columnName))
                             .findAny();
                     if (!column.isPresent()) {
                         throw new PrestoException(GENERIC_INTERNAL_ERROR, "Unknown column: " + columnName);
@@ -124,8 +117,9 @@ public abstract class AvroMessageEventTransformer<T>
             }
             catch (Exception e) {
                 LOGGER.error(e, "Error while reading batch data: %s", bulkKey);
-            } finally {
-                if(object != null) {
+            }
+            finally {
+                if (object != null) {
                     object.close();
                 }
             }
@@ -133,7 +127,7 @@ public abstract class AvroMessageEventTransformer<T>
 
         ImmutableMap.Builder<SchemaTableName, TableData> builder = ImmutableMap.builder();
         for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
-            builder.put(entry.getKey(), new TableData(entry.getValue().getPage(), entry.getValue().getActualSchema()));
+            builder.put(entry.getKey(), new TableData(entry.getValue().buildPage(), entry.getValue().getActualSchema()));
         }
 
         return builder.build();

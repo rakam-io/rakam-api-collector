@@ -4,7 +4,10 @@
 
 package com.facebook.presto.raptor.storage.backup;
 
-import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
+import com.amazonaws.regions.Regions;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.facebook.presto.rakam.S3BackupConfig;
@@ -12,7 +15,6 @@ import com.facebook.presto.raptor.RaptorErrorCode;
 import com.facebook.presto.raptor.backup.BackupStore;
 import com.facebook.presto.raptor.storage.InMemoryFileSystem;
 import com.facebook.presto.spi.PrestoException;
-import io.airlift.log.Logger;
 import io.airlift.slice.BasicSliceInput;
 import io.airlift.slice.Slice;
 
@@ -29,9 +31,8 @@ import java.util.UUID;
 public class S3BackupStore
         implements BackupStore
 {
-    private static final Logger log = Logger.get(S3BackupStore.class);
-
-    private final AmazonS3Client s3Client;
+    private static final int TRY_COUNT = 5;
+    private final AmazonS3 s3Client;
     private final S3BackupConfig config;
     private final InMemoryFileSystem inMemoryFileSystem;
 
@@ -39,17 +40,24 @@ public class S3BackupStore
     public S3BackupStore(S3BackupConfig config, InMemoryFileSystem inMemoryFileSystem)
     {
         this.config = config;
-        this.s3Client = new AmazonS3Client(config.getCredentials());
-        this.s3Client.setRegion(config.getAWSRegion());
+        AmazonS3ClientBuilder amazonS3ClientBuilder = AmazonS3ClientBuilder.standard()
+                .withCredentials(config.getCredentials());
+
         if (config.getEndpoint() != null) {
-            this.s3Client.setEndpoint(config.getEndpoint());
+            amazonS3ClientBuilder.setEndpointConfiguration(new EndpointConfiguration(config.getEndpoint(), config.getAWSRegion().getName()));
+            amazonS3ClientBuilder.disableChunkedEncoding().enablePathStyleAccess();
         }
+        else {
+            amazonS3ClientBuilder.setRegion(Regions.fromName(config.getAWSRegion().getName()).getName());
+        }
+
+        s3Client = amazonS3ClientBuilder.build();
         this.inMemoryFileSystem = inMemoryFileSystem;
     }
 
     public void backupShard(UUID uuid, File source)
     {
-        Slice slice = inMemoryFileSystem.get(source.getName());
+        Slice slice = inMemoryFileSystem.remove(source.getName());
         if (slice == null) {
             throw new IllegalStateException();
         }
@@ -64,20 +72,34 @@ public class S3BackupStore
 
         md5.update((byte[]) slice.getBase(), 0, slice.length());
 
+
+        ObjectMetadata objectMetadata = new ObjectMetadata();
+        objectMetadata.setContentLength(slice.length());
+        objectMetadata.setContentMD5(Base64.getEncoder().encodeToString(md5.digest()));
+
         try {
-            ObjectMetadata objectMetadata = new ObjectMetadata();
-            objectMetadata.setContentLength(slice.length());
-            objectMetadata.setContentMD5(Base64.getEncoder().encodeToString(md5.digest()));
+            tryUpload(slice, uuid.toString(), objectMetadata, TRY_COUNT);
+        }
+        catch (Exception ex) {
+            throw new PrestoException(RaptorErrorCode.RAPTOR_BACKUP_ERROR, "Failed to create backup shard file on S3", ex);
+        }
+    }
+
+    private void tryUpload(Slice slice, String key, ObjectMetadata objectMetadata, int tryCount)
+    {
+        try {
             SafeSliceInputStream input = new SafeSliceInputStream(slice.getInput());
-            this.s3Client.putObject(this.config.getS3Bucket(), uuid.toString(), input, objectMetadata);
+            s3Client.putObject(config.getS3Bucket(), key, input, objectMetadata);
             input.close();
         }
         catch (Exception ex) {
-            ex.printStackTrace();
-            throw new PrestoException(RaptorErrorCode.RAPTOR_BACKUP_ERROR, "Failed to create backup shard file on S3", ex);
+            if (tryCount > 0) {
+                tryUpload(slice, key, objectMetadata, tryCount - 1);
+            }
+            else {
+                throw new PrestoException(RaptorErrorCode.RAPTOR_BACKUP_ERROR, "Failed to create backup shard file on S3", ex);
+            }
         }
-
-        inMemoryFileSystem.remove(source.getName());
     }
 
     public void restoreShard(UUID uuid, File target)
@@ -106,7 +128,7 @@ public class S3BackupStore
         }
     }
 
-    private class SafeSliceInputStream
+    private static class SafeSliceInputStream
             extends InputStream
     {
         private final BasicSliceInput sliceInput;
@@ -169,5 +191,3 @@ public class S3BackupStore
         }
     }
 }
-
-

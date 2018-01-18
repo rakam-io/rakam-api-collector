@@ -8,14 +8,10 @@ import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.type.TimestampType;
-import com.facebook.presto.spi.type.VarcharType;
-import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Table;
 import io.airlift.log.Logger;
-import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.DatabaseHandler;
 import org.rakam.util.NotExistsException;
 
 import javax.annotation.Nullable;
@@ -54,11 +50,10 @@ public abstract class MessageEventTransformer<T, C>
             rakamSchema = databaseHandler.getColumns(project, collection);
         }
         catch (IllegalArgumentException e) {
-            databaseHandler.addColumns(project, collection,
+            rakamSchema = databaseHandler.addColumns(project, collection,
                     ImmutableList.of(
                             new ColumnMetadata(fieldNameConfig.getTimeField(), TimestampType.TIMESTAMP),
                             new ColumnMetadata(fieldNameConfig.getUserFieldName(), fieldNameConfig.getUserFieldType().getType())));
-            rakamSchema = databaseHandler.getColumns(project, collection);
         }
 
         if (rakamSchema == null) {
@@ -70,18 +65,6 @@ public abstract class MessageEventTransformer<T, C>
     }
 
     public abstract PageReader<C> createPageReader(List<ColumnMetadata> metadata);
-
-    protected Table<String, String, TableData> buildTable(Map<SchemaTableName, PageReader> builderMap)
-    {
-        Table<String, String, TableData> table = HashBasedTable.create();
-        for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
-            SchemaTableName key = entry.getKey();
-            table.put(key.getSchemaName(), key.getTableName(),
-                    new TableData(entry.getValue().getPage(), entry.getValue().getActualSchema()));
-        }
-
-        return table;
-    }
 
     protected PageReader getReader(Map<SchemaTableName, PageReader> builderMap, SchemaTableName table)
     {

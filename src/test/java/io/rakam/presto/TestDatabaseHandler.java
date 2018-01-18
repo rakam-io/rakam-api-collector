@@ -7,20 +7,20 @@ package io.rakam.presto;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.type.TimestampType;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 
 public class TestDatabaseHandler
         implements DatabaseHandler {
 
     protected final Map<String, Map<String, List<ColumnMetadata>>> columns;
     private final boolean flexibleSchema;
+    private CountDownLatch latch;
 
     public TestDatabaseHandler()
     {
@@ -86,6 +86,10 @@ public class TestDatabaseHandler
         return finalColumnList;
     }
 
+    public void setLatchForInsert(CountDownLatch latch) {
+        this.latch = latch;
+    }
+
     @Override
     public Inserter insert(String schema, String table)
     {
@@ -95,6 +99,9 @@ public class TestDatabaseHandler
             @Override
             public void addPage(Page page)
             {
+                if(latch != null) {
+                    latch.countDown();
+                }
                 isDone[0] = true;
             }
 
@@ -103,6 +110,9 @@ public class TestDatabaseHandler
             {
                 if(!isDone[0]) {
                     throw new IllegalStateException();
+                }
+                if(latch != null) {
+                    latch.countDown();
                 }
                 return CompletableFuture.completedFuture(null);
             }

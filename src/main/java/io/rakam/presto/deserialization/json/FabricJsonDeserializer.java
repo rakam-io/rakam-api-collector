@@ -9,7 +9,6 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.DateType;
-import com.facebook.presto.spi.type.DoubleType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -19,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.util.TokenBuffer;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
@@ -35,11 +35,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
+import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TimeType.TIME;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
@@ -59,17 +61,19 @@ import static org.rakam.presto.analysis.PrestoRakamRaptorMetastore.toType;
  * Support for https://github.com/olacabs/fabric document structure.
  * Sample:
  * {
- *      "id":"1"
- *     "metadata":{},
- *     "data":{
- *         "_project":"",
- *         "_collection":""
- *     }
+ * "id":"1"
+ * "metadata":{},
+ * "data":{
+ * "_project":"",
+ * "_collection":""
  * }
- *
+ * }
  */
-public class FabricJsonDeserializer implements JsonDeserializer
+@SuppressWarnings("Duplicates")
+public class FabricJsonDeserializer
+        implements JsonDeserializer
 {
+    private static final Set<String> EXCLUDED_COLUMNS = ImmutableSet.of("_project", "_collection","_shard_time");
     private static final JsonFactory READER = new ObjectMapper().getFactory();
     private final DatabaseHandler databaseHandler;
     private final FieldNameConfig fieldNameConfig;
@@ -121,8 +125,12 @@ public class FabricJsonDeserializer implements JsonDeserializer
             throw new IllegalArgumentException("Invalid json");
         }
         for (; ; t = jp.nextToken()) {
-            if (JsonToken.FIELD_NAME.equals(t) && jp.getCurrentName().equals("data")) {
+
+            if (JsonToken.FIELD_NAME.equals(t)) {
                 t = jp.nextToken();
+            }
+
+            if (jp.getCurrentName().equals("data")) {
                 if (t != START_OBJECT) {
                     throw new IllegalArgumentException("data must be an object");
                 }
@@ -134,12 +142,11 @@ public class FabricJsonDeserializer implements JsonDeserializer
 
         t = jp.nextToken();
         //Extract project and collection
-        for (t = this.jp.nextToken(); t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
+        for (t = jp.nextToken(); t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
             if (project != null && collection != null) {
                 break;
             }
 
-            //get value
             t = jp.nextToken();
             String fieldName = jp.getCurrentName();
             switch (fieldName) {
@@ -152,6 +159,9 @@ public class FabricJsonDeserializer implements JsonDeserializer
                     break;
                 case "_collection":
                     collection = checkCollectionValid(jp.getValueAsString());
+                    break;
+                default:
+                    // TODO: what to do?
                     break;
             }
         }
@@ -182,8 +192,8 @@ public class FabricJsonDeserializer implements JsonDeserializer
             jp.nextToken();
 
             if (idx == -1) {
-                if (!fieldNameConfig.getExcludedColumns().contains(fieldName)) {
-                    FieldType type = getTypeForUnknown(jp);
+                if (!EXCLUDED_COLUMNS.contains(fieldName)) {
+                    FieldType type = getTypeForUnknown(fieldName, jp);
                     if (type != null) {
                         if (newFields == null) {
                             newFields = new ArrayList<>();
@@ -262,11 +272,11 @@ public class FabricJsonDeserializer implements JsonDeserializer
 
                 for (int i = 0; i < blockBuilders.length; i++) {
                     if (blockBuilders[i] == null) {
-                        BlockBuilder blockBuilder = newColumns.get(i).getType()
-                                .createBlockBuilder(new BlockBuilderStatus(), pageBuilder.getPositionCount());
+                        BlockBuilder blockBuilder = newColumns.get(i).getType().createBlockBuilder(new BlockBuilderStatus(), pageBuilder.getPositionCount());
                         for (int i1 = 0; i1 < pageBuilder.getPositionCount(); i1++) {
                             blockBuilder.appendNull();
                         }
+                        blockBuilders[i] = blockBuilder;
                     }
                 }
 
@@ -335,7 +345,7 @@ public class FabricJsonDeserializer implements JsonDeserializer
                     }
                     break;
                 case DOUBLE:
-                    DoubleType.DOUBLE.writeDouble(blockBuilder, jp.getValueAsDouble());
+                    DOUBLE.writeDouble(blockBuilder, jp.getValueAsDouble());
                     break;
                 case DECIMAL:
                     // TODO
@@ -359,11 +369,13 @@ public class FabricJsonDeserializer implements JsonDeserializer
 
                     break;
                 case TIMESTAMP:
-                    if (jp.getValueAsString().isEmpty()) {
-                        blockBuilder.appendNull();
-                    }
-                    else if (jp.getCurrentToken().isNumeric()) {
-                        blockBuilder.appendNull();
+                    if (jp.getCurrentToken().isNumeric()) {
+                        try {
+                            TIMESTAMP.writeLong(blockBuilder, jp.getValueAsLong());
+                        }
+                        catch (Exception e) {
+                            blockBuilder.appendNull();
+                        }
                     }
                     else {
                         try {
@@ -375,7 +387,6 @@ public class FabricJsonDeserializer implements JsonDeserializer
                     }
                     break;
                 default:
-                    blockBuilder.appendNull();
                     throw new JsonMappingException(jp,
                             format("Scalar value '%s' cannot be cast to %s type for '%s' field.", jp.getValueAsString(),
                                     type.name(), field.getName()));
@@ -481,9 +492,13 @@ public class FabricJsonDeserializer implements JsonDeserializer
         }
     }
 
-    private static FieldType getTypeForUnknown(JsonParser jp)
+    private FieldType getTypeForUnknown(String fieldName, JsonParser jp)
             throws IOException
     {
+        if (fieldNameConfig.getTimeField().equals(fieldName)) {
+            return FieldType.TIMESTAMP;
+        }
+
         switch (jp.getCurrentToken()) {
             case VALUE_NULL:
                 return null;
@@ -524,7 +539,7 @@ public class FabricJsonDeserializer implements JsonDeserializer
 
                 FieldType type;
                 if (t.isScalarValue()) {
-                    type = getTypeForUnknown(jp);
+                    type = getTypeForUnknown(fieldName, jp);
                 }
                 else {
                     type = MAP_STRING;
@@ -559,7 +574,7 @@ public class FabricJsonDeserializer implements JsonDeserializer
                 if (!t.isScalarValue()) {
                     return MAP_STRING;
                 }
-                type = getTypeForUnknown(jp);
+                type = getTypeForUnknown(fieldName, jp);
                 if (type == null) {
                     // TODO: what if the other values are not null?
                     while (t != END_OBJECT) {
