@@ -72,96 +72,6 @@ public class Deduplicator
                 .map(bytes -> Ints.fromByteArray(bytes)).orElse(0);
     }
 
-    public Map<byte[], byte[]> get(List<byte[]> key)
-    {
-        try {
-            return db.multiGet(readOptions, key);
-        }
-        catch (RocksDBException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public synchronized void put(List<byte[]> key)
-    {
-        WriteBatch writeBatch = new WriteBatch();
-        byte[] sequenceNumberKey = Ints.toByteArray(sequenceNumber);
-
-        for (byte[] value : key) {
-            writeBatch.put(columnFamily, sequenceNumberKey, value);
-            writeBatch.put(value, EMPTY_ARRAY);
-        }
-
-        sequenceNumber += 1;
-
-        writeBatch.put(SEQUENCE_NUMBER, Ints.toByteArray(sequenceNumber));
-        try {
-            db.write(writeOpts, writeBatch);
-        }
-        catch (RocksDBException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public synchronized void clean()
-    {
-        try {
-            long totalSize = getItemSize() * 16;
-            if (totalSize < maxBytes) {
-                System.out.println(DataSize.succinctBytes(totalSize));
-                return;
-            }
-
-            int deleteBatchSize = Math.min(Math.max(Ints.checkedCast((totalSize - maxBytes ) / 32), DELETE_BATCH_SIZE), 10_000_000);
-
-            byte[] value = db.get(SEEK_HINT);
-            RocksIterator rocksIterator = db.newIterator(columnFamily);
-
-            if (value != null) {
-                rocksIterator.seek(value);
-            }
-            else {
-                rocksIterator.seekToFirst();
-            }
-
-            int i = 0;
-
-            WriteBatch writeBatch = new WriteBatch();
-
-            byte[] lastSeq = null;
-            while (rocksIterator.isValid() && i < deleteBatchSize) {
-                writeBatch.remove(rocksIterator.value());
-                lastSeq = rocksIterator.key();
-                writeBatch.remove(columnFamily, lastSeq);
-
-                rocksIterator.next();
-                i++;
-            }
-
-
-            if (lastSeq == null) {
-                return;
-            }
-
-            writeBatch.put(SEEK_HINT, lastSeq);
-
-            db.write(writeOpts, writeBatch);
-        }
-        catch (RocksDBException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public long getItemSize()
-    {
-        try {
-            return db.getLongProperty("rocksdb.estimate-num-keys");
-        }
-        catch (RocksDBException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public static void main(String[] args)
             throws RocksDBException
     {
@@ -216,9 +126,97 @@ public class Deduplicator
 
         for (int i = 0; i < 4; i++) {
             Thread thread = new Thread(runnable);
-            thread.setName("thread-"+i);
+            thread.setName("thread-" + i);
             thread.start();
         }
     }
 
+    public Map<byte[], byte[]> get(List<byte[]> key)
+    {
+        try {
+            return db.multiGet(readOptions, key);
+        }
+        catch (RocksDBException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public synchronized void put(List<byte[]> key)
+    {
+        WriteBatch writeBatch = new WriteBatch();
+        byte[] sequenceNumberKey = Ints.toByteArray(sequenceNumber);
+
+        for (byte[] value : key) {
+            writeBatch.put(columnFamily, sequenceNumberKey, value);
+            writeBatch.put(value, EMPTY_ARRAY);
+        }
+
+        sequenceNumber += 1;
+
+        writeBatch.put(SEQUENCE_NUMBER, Ints.toByteArray(sequenceNumber));
+        try {
+            db.write(writeOpts, writeBatch);
+        }
+        catch (RocksDBException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public synchronized void clean()
+    {
+        try {
+            long totalSize = getItemSize() * 16;
+            if (totalSize < maxBytes) {
+                System.out.println(DataSize.succinctBytes(totalSize));
+                return;
+            }
+
+            int deleteBatchSize = Math.min(Math.max(Ints.checkedCast((totalSize - maxBytes) / 32), DELETE_BATCH_SIZE), 10_000_000);
+
+            byte[] value = db.get(SEEK_HINT);
+            RocksIterator rocksIterator = db.newIterator(columnFamily);
+
+            if (value != null) {
+                rocksIterator.seek(value);
+            }
+            else {
+                rocksIterator.seekToFirst();
+            }
+
+            int i = 0;
+
+            WriteBatch writeBatch = new WriteBatch();
+
+            byte[] lastSeq = null;
+            while (rocksIterator.isValid() && i < deleteBatchSize) {
+                writeBatch.remove(rocksIterator.value());
+                lastSeq = rocksIterator.key();
+                writeBatch.remove(columnFamily, lastSeq);
+
+                rocksIterator.next();
+                i++;
+            }
+
+            if (lastSeq == null) {
+                return;
+            }
+
+            writeBatch.put(SEEK_HINT, lastSeq);
+
+            db.write(writeOpts, writeBatch);
+        }
+        catch (RocksDBException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public long getItemSize()
+    {
+        try {
+            return db.getLongProperty("rocksdb.estimate-num-keys");
+        }
+        catch (RocksDBException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

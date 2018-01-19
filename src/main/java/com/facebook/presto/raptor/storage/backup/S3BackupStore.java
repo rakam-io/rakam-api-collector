@@ -4,11 +4,9 @@
 
 package com.facebook.presto.raptor.storage.backup;
 
-import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -17,7 +15,6 @@ import com.facebook.presto.raptor.RaptorErrorCode;
 import com.facebook.presto.raptor.backup.BackupStore;
 import com.facebook.presto.raptor.storage.InMemoryFileSystem;
 import com.facebook.presto.spi.PrestoException;
-import io.airlift.log.Logger;
 import io.airlift.slice.BasicSliceInput;
 import io.airlift.slice.Slice;
 
@@ -74,6 +71,7 @@ public class S3BackupStore
         }
 
         md5.update((byte[]) slice.getBase(), 0, slice.length());
+
 
         ObjectMetadata objectMetadata = new ObjectMetadata();
         objectMetadata.setContentLength(slice.length());

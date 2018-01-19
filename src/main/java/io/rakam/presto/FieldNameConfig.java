@@ -10,7 +10,6 @@ import com.facebook.presto.spi.type.DoubleType;
 import com.facebook.presto.spi.type.IntegerType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.VarcharType;
-import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
 
 import java.util.Arrays;
@@ -22,15 +21,24 @@ public class FieldNameConfig
     private String checkpointField = "_shard_time";
     private String userFieldName = "_user";
     private String timeField = "_time";
-    private Set<String> whitelistedCollections = new HashSet<>();
-    private Set<String> excludedColumns = ImmutableSet.of("_project", "_collection");
+    private Set<String> whitelistedCollections;
     private UserType userFieldType = UserType.STRING;
+
+    public String getCheckpointField()
+    {
+        return checkpointField;
+    }
 
     @Config("database.checkpoint-field")
     public FieldNameConfig setCheckpointField(String checkpointField)
     {
         this.checkpointField = checkpointField;
         return this;
+    }
+
+    public String getUserFieldName()
+    {
+        return userFieldName;
     }
 
     @Config("database.user-field-name")
@@ -40,11 +48,21 @@ public class FieldNameConfig
         return this;
     }
 
+    public UserType getUserFieldType()
+    {
+        return userFieldType;
+    }
+
     @Config("database.user-field-type")
     public FieldNameConfig setUserFieldType(UserType userFieldType)
     {
         this.userFieldType = userFieldType;
         return this;
+    }
+
+    public String getTimeField()
+    {
+        return timeField;
     }
 
     @Config("database.time-field-name")
@@ -54,15 +72,7 @@ public class FieldNameConfig
         return this;
     }
 
-    @Config("database.user-excluded-columns")
-    public FieldNameConfig setExcludedColumns(String excludedColumns)
-    {
-        if (excludedColumns != null) {
-            excludedColumns = excludedColumns.replaceAll("\\s+", "");
-            this.excludedColumns = new HashSet<>(Arrays.asList(excludedColumns.split(",")));
-        }
-        return this;
-    }
+    public Set<String> getWhitelistedCollections() {return whitelistedCollections;}
 
     @Config("database.whitelisted.collections")
     public FieldNameConfig setWhitelistedCollections(String collections)
@@ -75,33 +85,6 @@ public class FieldNameConfig
         }
         return this;
     }
-
-    public String getCheckpointField()
-    {
-        return checkpointField;
-    }
-
-    public String getUserFieldName()
-    {
-        return userFieldName;
-    }
-
-    public UserType getUserFieldType()
-    {
-        return userFieldType;
-    }
-
-    public String getTimeField()
-    {
-        return timeField;
-    }
-
-    public Set<String> getExcludedColumns()
-    {
-        return excludedColumns;
-    }
-
-    public Set<String> getWhitelistedCollections() {return whitelistedCollections;}
 
     public enum UserType
     {

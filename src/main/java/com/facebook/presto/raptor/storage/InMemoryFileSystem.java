@@ -6,7 +6,6 @@ package com.facebook.presto.raptor.storage;
 
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
-
 import io.rakam.presto.MemoryTracker;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -17,7 +16,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
 
 import javax.inject.Inject;
-
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
@@ -26,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class InMemoryFileSystem
         extends FileSystem
 {
+
     private final MemoryTracker memoryTracker;
     Map<String, DynamicSliceOutput> files;
 
@@ -97,13 +96,13 @@ public final class InMemoryFileSystem
     }
 
     @Override
-    public void setWorkingDirectory(Path path)
+    public Path getWorkingDirectory()
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public Path getWorkingDirectory()
+    public void setWorkingDirectory(Path path)
     {
         throw new UnsupportedOperationException();
     }
@@ -112,6 +111,7 @@ public final class InMemoryFileSystem
     public boolean mkdirs(Path path, FsPermission fsPermission)
             throws IOException
     {
+
         throw new UnsupportedOperationException();
     }
 

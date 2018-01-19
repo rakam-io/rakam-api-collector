@@ -28,7 +28,6 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.rakam.util.JsonHelper;
 
-import java.io.IOException;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
@@ -47,7 +46,6 @@ import static java.time.ZoneOffset.UTC;
 public class StressTest
 {
     private static final Logger log = Logger.get(StressTest.class);
-
     public static void main(String[] args)
             throws Exception
     {
@@ -73,7 +71,7 @@ public class StressTest
                 Thread.sleep(500);
             }
             catch (InterruptedException e) {
-                throw new RuntimeException(e);
+                e.printStackTrace();
             }
         });
         RaptorDatabaseHandler databaseHandler = new RaptorDatabaseHandler(raptorConfig, new TypeRegistry(), s3BackupConfig, fieldNameConfig, backupStoreModule);
@@ -165,7 +163,6 @@ public class StressTest
     private static class MockKafkaHistoricalDataHandler
             implements HistoricalDataHandler<ConsumerRecord<byte[], byte[]>>
     {
-
         @Override
         public CompletableFuture<Void> handle(Iterable<ConsumerRecord<byte[], byte[]>> table, int count)
         {
@@ -193,7 +190,7 @@ public class StressTest
 
         public MockKafkaRealTimeWorker(KafkaConfig kafkaConfig, MemoryTracker memoryTracker, MiddlewareConfig middlewareConfig, StreamWorkerContext context, TargetConnectorCommitter targetConnectorCommitter, AtomicLong totalRecord, AtomicLong lastPoll, AtomicLong committedRecords, List<byte[]> consumerRecords)
         {
-            super(kafkaConfig, memoryTracker, Optional.fromNullable(new MockKafkaHistoricalDataHandler()), new KafkaDecoupleMessage(new FieldNameConfig()), middlewareConfig, context, targetConnectorCommitter);
+            super(kafkaConfig, memoryTracker, new FieldNameConfig(), Optional.fromNullable(new MockKafkaHistoricalDataHandler()), new KafkaDecoupleMessage(new FieldNameConfig()), middlewareConfig, context, targetConnectorCommitter);
             this.memoryTracker = memoryTracker;
             this.totalRecord = totalRecord;
             this.lastPoll = lastPoll;

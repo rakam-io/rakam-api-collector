@@ -39,7 +39,6 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
@@ -54,30 +53,22 @@ public class KafkaHistoricalWorker
 
     private final MemoryTracker memoryTracker;
     private final HistoricalDataConfig historicalDataConfig;
-
-    protected KafkaConsumer<byte[], byte[]> consumer;
-
     private final StreamWorkerContext<ConsumerRecord> context;
-    protected KafkaConfig config;
-
     private final TargetConnectorCommitter committer;
-
-    private Thread workerThread;
-    private boolean working;
-
     private final CounterStat databaseFlushStats = new CounterStat();
     private final CounterStat recordStats = new CounterStat();
     private final CounterStat errorStats = new CounterStat();
-    private final AtomicInteger activeFlushCount = new AtomicInteger();
     private final DistributionStat databaseFlushDistribution = new DistributionStat();
-
+    private final Map<Integer, Long> currentKafkaOffsets;
+    private final BasicMemoryBuffer buffer;
+    protected KafkaConsumer<byte[], byte[]> consumer;
+    protected KafkaConfig config;
+    private Thread workerThread;
+    private boolean working;
     private Map<Status, LongHolder> statusSpentTime = new HashMap<>();
     private long lastStatusChangeTime;
     private Status currentStatus;
-
-    private final Map<Integer, Long> currentKafkaOffsets;
     private long lastPollInMillis;
-    private final BasicMemoryBuffer buffer;
 
     @Inject
     public KafkaHistoricalWorker(KafkaConfig config, MemoryTracker memoryTracker, HistoricalDataConfig historicalDataConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
@@ -101,7 +92,7 @@ public class KafkaHistoricalWorker
     @PostConstruct
     public void start()
     {
-        if (config.getHistoricalDataTopic() == null) {
+        if (config.getHistoricalDataTopic() == null || !config.getHistoricalWorkerEnabled()) {
             log.warn("The config `kafka.historical-data-topic` is not set. Ignoring historical processing..");
             return;
         }
@@ -261,7 +252,7 @@ public class KafkaHistoricalWorker
             Queue<List<MiddlewareBuffer.TableCheckpoint>> checkpointQueue = new ArrayBlockingQueue<>(map.size());
 
             KafkaUtil.flush(map, committer, checkpointQueue, memoryTracker,
-                    log, databaseFlushStats, databaseFlushDistribution, errorStats, activeFlushCount);
+                    log, databaseFlushStats, databaseFlushDistribution, recordStats, errorStats);
 
             return Optional.of(checkpointQueue);
         }
@@ -317,7 +308,7 @@ public class KafkaHistoricalWorker
     @Managed
     public int getActiveFlushCount()
     {
-        return activeFlushCount.get();
+        return committer.getActiveFlushCount();
     }
 
     @Managed
@@ -334,13 +325,13 @@ public class KafkaHistoricalWorker
         return errorStats;
     }
 
-    private static class LongHolder
-    {
-        long value;
-    }
-
     private enum Status
     {
         POLLING, FLUSHING_MIDDLEWARE, CHECKPOINTING, SLEEPING, WAITING_FOR_MEMORY;
+    }
+
+    private static class LongHolder
+    {
+        long value;
     }
 }

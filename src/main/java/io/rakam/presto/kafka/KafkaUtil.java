@@ -11,7 +11,6 @@ import io.airlift.stats.CounterStat;
 import io.airlift.stats.DistributionStat;
 import io.airlift.units.Duration;
 import io.rakam.presto.MemoryTracker;
-import io.rakam.presto.MiddlewareBuffer;
 import io.rakam.presto.MiddlewareBuffer.TableCheckpoint;
 import io.rakam.presto.StreamWorkerContext;
 import io.rakam.presto.TargetConnectorCommitter;
@@ -29,7 +28,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static io.airlift.units.DataSize.succinctBytes;
@@ -74,6 +72,8 @@ public class KafkaUtil
         props.put("session.timeout.ms", sessionTimeOut);
         props.put("heartbeat.interval.ms", "1000");
         props.put("request.timeout.ms", requestTimeOut);
+        props.put("max.poll.records", config.getMaxPollRecords());
+
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         return props;
     }
@@ -132,17 +132,15 @@ public class KafkaUtil
     }
 
     public static void flush(
-            Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> map, TargetConnectorCommitter committer,
+            Map<SchemaTableName, List<TableCheckpoint>> map, TargetConnectorCommitter committer,
             Queue<List<TableCheckpoint>> checkpointQueue, MemoryTracker memoryTracker, Logger log,
             CounterStat databaseFlushStats, DistributionStat databaseFlushDistribution,
-            CounterStat errorStats, AtomicInteger activeFlushCount)
+            CounterStat realTimeRecordsStats, CounterStat errorStats)
     {
         long totalRecords = map.entrySet().stream().mapToLong(e -> e.getValue().stream()
                 .mapToLong(v -> v.getTable().page.getPositionCount()).sum()).sum();
 
-        activeFlushCount.addAndGet(map.size());
-
-        log.debug("Saving data, %d collections and %d events in total.", map.size(), totalRecords);
+        log.info("Saving data, %d collections and %d events in total.", map.size(), totalRecords);
         long now = System.currentTimeMillis();
 
         for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
@@ -152,26 +150,33 @@ public class KafkaUtil
                         .mapToLong(e -> e.getTable().page.getPositionCount())
                         .sum();
 
-                if (throwable != null) {
-                    errorStats.update(totalRecordCount);
-                    log.error(throwable, "Error while processing records");
-                }
-
-                // TODO: What should we do if we can't commit the data?
-                checkpointQueue.add(entry.getValue());
                 long totalDataSize = entry.getValue().stream()
                         .mapToLong(e -> e.getTable().page.getRetainedSizeInBytes())
                         .sum();
                 Duration totalDuration = succinctDuration(System.currentTimeMillis() - now, MILLISECONDS);
+                if (throwable != null) {
+                    errorStats.update(totalRecordCount);
+                    log.error(throwable, "Error while processing records for collection %s", entry.getKey().toString());
+
+                    double count = realTimeRecordsStats.getFiveMinute().getCount();
+                    if (count > 100 && (errorStats.getFiveMinute().getCount() / count) > .4) {
+                        log.error("The maximum error threshold is reached. Exiting the program...");
+                        Runtime.getRuntime().exit(1);
+                    }
+                }
+                else {
+                    log.debug("Saved data in buffer (%s - %d records) for collection %s in %s.",
+                            succinctBytes(totalDataSize).toString(), totalRecordCount,
+                            entry.getKey().toString(),
+                            totalDuration.toString());
+                }
+
+                // TODO: What should we do if we can't commit the data?
+                checkpointQueue.add(entry.getValue());
 
                 databaseFlushStats.update(totalRecordCount);
                 databaseFlushDistribution.add(totalDuration.toMillis());
-                activeFlushCount.decrementAndGet();
 
-                log.debug("Saved data in buffer (%s - %d records) for collection %s in %s.",
-                        succinctBytes(totalDataSize).toString(), totalRecordCount,
-                        entry.getKey().toString(),
-                        totalDuration.toString());
                 memoryTracker.freeMemory(totalDataSize);
             });
         }

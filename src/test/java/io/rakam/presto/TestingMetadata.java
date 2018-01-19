@@ -42,6 +42,12 @@ public class TestingMetadata
     private final ConcurrentMap<SchemaTableName, ConnectorTableMetadata> tables = new ConcurrentHashMap<>();
     private final ConcurrentMap<SchemaTableName, String> views = new ConcurrentHashMap<>();
 
+    private static SchemaTableName getTableName(ConnectorTableHandle tableHandle)
+    {
+        requireNonNull(tableHandle, "tableHandle is null");
+        return ((InMemoryTableHandle) tableHandle).getTableName();
+    }
+
     @Override
     public List<String> listSchemaNames(ConnectorSession session)
     {
@@ -141,7 +147,8 @@ public class TestingMetadata
     }
 
     @Override
-    public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting) {
+    public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata, boolean ignoreExisting)
+    {
         ConnectorTableMetadata existingTable = tables.putIfAbsent(tableMetadata.getTable(), tableMetadata);
         checkArgument(existingTable == null, "Table %s already exists", tableMetadata.getTable());
     }
@@ -193,12 +200,6 @@ public class TestingMetadata
             }
         }
         return map.build();
-    }
-
-    private static SchemaTableName getTableName(ConnectorTableHandle tableHandle)
-    {
-        requireNonNull(tableHandle, "tableHandle is null");
-        return ((InMemoryTableHandle) tableHandle).getTableName();
     }
 
     public static class InMemoryColumnHandle

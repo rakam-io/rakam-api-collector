@@ -7,13 +7,11 @@ package io.rakam.presto;
 import com.facebook.presto.spi.SchemaTableName;
 import io.airlift.log.Logger;
 import io.rakam.presto.deserialization.TableData;
-import io.rakam.presto.kafka.KafkaRealTimeWorker;
 
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
 
 public class BatchRecords
 {
@@ -77,10 +75,8 @@ public class BatchRecords
     }
 
     public static class CheckpointException
-            extends Exception
-    {
-        public CheckpointException(Throwable cause)
-        {
+            extends Exception {
+        public CheckpointException(Throwable cause) {
             super("Error while performing checkpoint operation.", cause);
         }
     }

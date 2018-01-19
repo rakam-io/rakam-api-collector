@@ -5,7 +5,9 @@
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.SchemaTableName;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Optional;
+import com.google.common.base.Predicate;
 import com.google.common.collect.Iterators;
 import com.google.common.primitives.Ints;
 import io.airlift.log.Logger;
@@ -15,6 +17,7 @@ import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.BatchRecords;
+import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.HistoricalDataHandler;
 import io.rakam.presto.MemoryTracker;
 import io.rakam.presto.MiddlewareBuffer;
@@ -47,10 +50,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
@@ -61,41 +64,38 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 public class KafkaRealTimeWorker
 {
     private static final String THREAD_NAME = "kafka-realtime-worker";
-
     private static final Logger log = Logger.get(KafkaRealTimeWorker.class);
     private final DecoupleMessage<ConsumerRecord<byte[], byte[]>> decoupleMessage;
     private final HistoricalDataHandler historicalDataHandler;
-
-    protected KafkaConsumer<byte[], byte[]> consumer;
-
+    private final Predicate<String> whiteListCollections;
     private final StreamWorkerContext<ConsumerRecord<byte[], byte[]>> context;
     private final MemoryTracker memoryTracker;
-    protected KafkaConfig config;
-
     private final BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>> buffer;
     private final MiddlewareBuffer middlewareBuffer;
-
     private final TargetConnectorCommitter committer;
     private final Queue<List<TableCheckpoint>> checkpointQueue;
-
+    protected KafkaConsumer<byte[], byte[]> consumer;
+    protected KafkaConfig config;
     private Thread workerThread;
     private boolean working;
     private CounterStat realTimeRecordsStats = new CounterStat();
     private CounterStat historicalRecordsStats = new CounterStat();
     private CounterStat databaseFlushStats = new CounterStat();
     private CounterStat errorStats = new CounterStat();
-    private AtomicInteger activeFlushCount = new AtomicInteger();
     private DistributionStat databaseFlushDistribution = new DistributionStat();
     private Map<Status, LongHolder> statusSpentTime = new HashMap<>();
     private long lastStatusChangeTime;
     private Status currentStatus;
 
     @Inject
-    public KafkaRealTimeWorker(KafkaConfig config, MemoryTracker memoryTracker, Optional<HistoricalDataHandler> historicalDataHandler, DecoupleMessage decoupleMessage, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord<byte[], byte[]>> context, TargetConnectorCommitter committer)
+    public KafkaRealTimeWorker(KafkaConfig config, MemoryTracker memoryTracker, FieldNameConfig fieldNameConfig, Optional<HistoricalDataHandler> historicalDataHandler, DecoupleMessage decoupleMessage, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord<byte[], byte[]>> context, TargetConnectorCommitter committer)
     {
         this.config = config;
         this.context = context;
         this.decoupleMessage = decoupleMessage;
+        Set<String> whitelistedCollections = fieldNameConfig.getWhitelistedCollections();
+        this.whiteListCollections = whitelistedCollections == null ? input -> true : input -> whitelistedCollections.contains(input);
+
         this.historicalDataHandler = historicalDataHandler.orNull();
         this.committer = committer;
         this.memoryTracker = memoryTracker;
@@ -172,12 +172,6 @@ public class KafkaRealTimeWorker
                             checkpoint();
                         }
                     }
-
-                    double count = realTimeRecordsStats.getFiveMinute().getCount();
-                    if (count > 100 && (errorStats.getFiveMinute().getCount() / count) > .4) {
-                        log.error("The maximum error threshold is reached. Exiting the program...");
-                        Runtime.getRuntime().exit(1);
-                    }
                 }
                 catch (Throwable e) {
                     log.error(e, "Unexpected exception in Kafka real-time records consumer thread.");
@@ -217,7 +211,7 @@ public class KafkaRealTimeWorker
                 changeType(Status.FLUSHING_MIDDLEWARE);
 
                 long now = System.currentTimeMillis();
-                log.debug("Flushing records (%s) from stream buffer, it's been %s since last flush.",
+                log.info("Flushing records (%s) from stream buffer, it's been %s since last flush.",
                         DataSize.succinctBytes(buffer.getTotalBytes()).toString(),
                         Duration.succinctDuration(now - buffer.getPreviousFlushTimeMillisecond(), MILLISECONDS).toString());
 
@@ -234,16 +228,18 @@ public class KafkaRealTimeWorker
                 middlewareBuffer.add(new BatchRecords(data, historicalDataAction, () -> commitSyncOffset(consumer, latestOffsets)));
 
                 long totalDataSize = data.entrySet().stream().mapToLong(e -> e.getValue().page.getRetainedSizeInBytes()).sum();
-                log.debug("Flushed records to middleware buffer in %s, the data size is %s",
+                log.info("Flushed records to middleware buffer in %s, the data size is %s",
                         Duration.succinctDuration(System.currentTimeMillis() - now, MILLISECONDS).toString(),
                         DataSize.succinctBytes(totalDataSize));
             }
 
-            Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();
-            if (!map.isEmpty()) {
-                changeType(Status.FLUSHING_MIDDLEWARE);
-                KafkaUtil.flush(map, committer, checkpointQueue, memoryTracker,
-                        log, databaseFlushStats, databaseFlushDistribution, errorStats, activeFlushCount);
+            if (!committer.isFull()) {
+                Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();
+                if (!map.isEmpty()) {
+                    changeType(Status.FLUSHING_MIDDLEWARE);
+                    KafkaUtil.flush(map, committer, checkpointQueue, memoryTracker,
+                            log, databaseFlushStats, databaseFlushDistribution, realTimeRecordsStats, errorStats);
+                }
             }
         }
         catch (Throwable e) {
@@ -254,17 +250,19 @@ public class KafkaRealTimeWorker
 
     private Map.Entry<Iterable<ConsumerRecord<byte[], byte[]>>, CompletableFuture<Void>> extract(BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records)
     {
-        if (historicalDataHandler == null) {
-            return new SimpleImmutableEntry<>(records.buffer, BatchRecords.COMPLETED_FUTURE);
-        }
+        CompletableFuture<Void> historicalDataAction = BatchRecords.COMPLETED_FUTURE;
+
+        /*if (historicalDataHandler == null) {
+            return new SimpleImmutableEntry<>(records.buffer, historicalDataAction);
+        }*/
 
         ProcessedRecords processedRecords = processRecords(records);
         int totalRecords = records.buffer.size();
 
-        CompletableFuture<Void> historicalDataAction;
         Iterable<ConsumerRecord<byte[], byte[]>> realTimeRecords;
         if (processedRecords.recordsIndexedByDay.isEmpty()) {
-            realTimeRecords = records.buffer;
+            realTimeRecords = () -> Iterators.filter(records.buffer.iterator(), new BitMapRecordPredicate(processedRecords.bitmapForRecords));
+            totalRecords = processedRecords.realTimeRecordCount;
             historicalDataAction = BatchRecords.COMPLETED_FUTURE;
             realTimeRecordsStats.update(totalRecords);
             historicalRecordsStats.update(0);
@@ -277,7 +275,9 @@ public class KafkaRealTimeWorker
             Iterable<ConsumerRecord<byte[], byte[]>> filter = () -> Iterators.filter(records.buffer.iterator(), new NegateBitMapRecordPredicate(processedRecords.bitmapForRecords));
             changeType(Status.FLUSHING_HISTORICAL);
 
-            historicalDataAction = historicalDataHandler.handle(filter, historicalRecordCount);
+            if (historicalDataHandler != null) {
+                historicalDataAction = historicalDataHandler.handle(filter, historicalRecordCount);
+            }
 
             changeType(Status.FLUSHING_MIDDLEWARE);
 
@@ -285,21 +285,8 @@ public class KafkaRealTimeWorker
             historicalRecordsStats.update(historicalRecordCount);
         }
 
+        log.info("realTimeRecords: "+ processedRecords.realTimeRecordCount);
         return new SimpleImmutableEntry<>(realTimeRecords, historicalDataAction);
-    }
-
-    private static class ProcessedRecords
-    {
-        public final Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay;
-        public final boolean[] bitmapForRecords;
-        public final int realTimeRecordCount;
-
-        public ProcessedRecords(Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay, boolean[] bitmapForRecords, int realTimeRecordCount)
-        {
-            this.recordsIndexedByDay = recordsIndexedByDay;
-            this.bitmapForRecords = bitmapForRecords;
-            this.realTimeRecordCount = realTimeRecordCount;
-        }
     }
 
     private ProcessedRecords processRecords(BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records)
@@ -307,22 +294,29 @@ public class KafkaRealTimeWorker
         Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay = new Int2ObjectArrayMap<>();
         int todayInDate = Ints.checkedCast(LocalDate.now().toEpochDay());
         int previousDay = todayInDate - 1;
-
+        DecoupleMessage.RecordData recordData = new DecoupleMessage.RecordData();
         int realtimeRecordCount = 0;
         boolean[] bitmapForRecords = new boolean[records.buffer.size()];
         for (int i = 0; i < records.buffer.size(); i++) {
             ConsumerRecord<byte[], byte[]> record = records.buffer.get(i);
 
             int dayOfRecord;
+            String collection;
             try {
-                dayOfRecord = decoupleMessage.getDateOfRecord(record);
+                decoupleMessage.read(record, recordData);
+                dayOfRecord = recordData.date;
+                collection = recordData.collection;
             }
             catch (Throwable e) {
                 log.error(e, "Error while parsing record");
                 continue;
             }
 
-            if (dayOfRecord == previousDay || dayOfRecord == todayInDate) {
+            if (!whiteListCollections.apply(collection)) {
+                continue;
+            }
+
+            if (dayOfRecord == previousDay || dayOfRecord == todayInDate || historicalDataHandler == null) {
                 bitmapForRecords[i] = true;
                 realtimeRecordCount++;
             }
@@ -393,7 +387,7 @@ public class KafkaRealTimeWorker
     @Managed
     public int getActiveFlushCount()
     {
-        return activeFlushCount.get();
+        return committer.getActiveFlushCount();
     }
 
     @Managed
@@ -415,6 +409,25 @@ public class KafkaRealTimeWorker
     public Map<Status, LongHolder> getStatusSpentTime()
     {
         return statusSpentTime;
+    }
+
+    private enum Status
+    {
+        POLLING, FLUSHING_STREAM, FLUSHING_MIDDLEWARE, CHECKPOINTING, FLUSHING_HISTORICAL, WAITING_FOR_MEMORY;
+    }
+
+    private static class ProcessedRecords
+    {
+        public final Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay;
+        public final boolean[] bitmapForRecords;
+        public final int realTimeRecordCount;
+
+        public ProcessedRecords(Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay, boolean[] bitmapForRecords, int realTimeRecordCount)
+        {
+            this.recordsIndexedByDay = recordsIndexedByDay;
+            this.bitmapForRecords = bitmapForRecords;
+            this.realTimeRecordCount = realTimeRecordCount;
+        }
     }
 
     private static class NegateBitMapRecordPredicate
@@ -451,11 +464,6 @@ public class KafkaRealTimeWorker
         {
             return bitmapForRecords[i++];
         }
-    }
-
-    private enum Status
-    {
-        POLLING, FLUSHING_STREAM, FLUSHING_MIDDLEWARE, CHECKPOINTING, FLUSHING_HISTORICAL, WAITING_FOR_MEMORY;
     }
 
     private static class LongHolder

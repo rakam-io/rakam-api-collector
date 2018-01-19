@@ -16,7 +16,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
 public class TestDatabaseHandler
-        implements DatabaseHandler {
+        implements DatabaseHandler
+{
 
     protected final Map<String, Map<String, List<ColumnMetadata>>> columns;
     private final boolean flexibleSchema;
@@ -47,9 +48,9 @@ public class TestDatabaseHandler
     public List<ColumnMetadata> getColumns(String schema, String table)
     {
         Map<String, List<ColumnMetadata>> map = this.columns.get(schema);
-        if(map != null) {
+        if (map != null) {
             List<ColumnMetadata> columnList = map.get(table);
-            if(columnList != null) {
+            if (columnList != null) {
                 return columnList;
             }
         }
@@ -60,19 +61,19 @@ public class TestDatabaseHandler
     @Override
     public synchronized List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns)
     {
-        if(!flexibleSchema) {
+        if (!flexibleSchema) {
             throw new UnsupportedOperationException();
         }
 
         Map<String, List<ColumnMetadata>> tables = this.columns.get(schema);
-        if(tables == null) {
+        if (tables == null) {
             tables = new HashMap<>();
             this.columns.put(schema, tables);
         }
 
         List<ColumnMetadata> columnList = tables.get(table);
 
-        if(columnList == null) {
+        if (columnList == null) {
             columnList = new ArrayList<>();
             columnList.add(new ColumnMetadata("_shard_time", TimestampType.TIMESTAMP));
             tables.put(table, columnList);
@@ -86,7 +87,8 @@ public class TestDatabaseHandler
         return finalColumnList;
     }
 
-    public void setLatchForInsert(CountDownLatch latch) {
+    public void setLatchForInsert(CountDownLatch latch)
+    {
         this.latch = latch;
     }
 
@@ -95,11 +97,12 @@ public class TestDatabaseHandler
     {
         boolean[] isDone = new boolean[1];
 
-        return new Inserter() {
+        return new Inserter()
+        {
             @Override
             public void addPage(Page page)
             {
-                if(latch != null) {
+                if (latch != null) {
                     latch.countDown();
                 }
                 isDone[0] = true;
@@ -108,10 +111,10 @@ public class TestDatabaseHandler
             @Override
             public CompletableFuture<Void> commit()
             {
-                if(!isDone[0]) {
+                if (!isDone[0]) {
                     throw new IllegalStateException();
                 }
-                if(latch != null) {
+                if (latch != null) {
                     latch.countDown();
                 }
                 return CompletableFuture.completedFuture(null);

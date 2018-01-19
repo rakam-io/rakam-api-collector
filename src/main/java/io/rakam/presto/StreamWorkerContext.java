@@ -6,7 +6,6 @@ package io.rakam.presto;
 
 import com.facebook.presto.spi.SchemaTableName;
 import io.rakam.presto.deserialization.MessageEventTransformer;
-import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
 
 import javax.inject.Inject;

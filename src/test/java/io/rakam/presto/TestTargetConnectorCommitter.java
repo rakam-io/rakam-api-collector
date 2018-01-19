@@ -9,31 +9,11 @@ import com.facebook.presto.block.BlockEncodingManager;
 import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.connector.informationSchema.InformationSchemaConnector;
 import com.facebook.presto.connector.system.SystemConnector;
-import com.facebook.presto.metadata.Catalog;
-import com.facebook.presto.metadata.CatalogManager;
-import com.facebook.presto.metadata.InMemoryNodeManager;
-import com.facebook.presto.metadata.InternalNodeManager;
-import com.facebook.presto.metadata.MetadataManager;
-import com.facebook.presto.metadata.SchemaPropertyManager;
-import com.facebook.presto.metadata.SessionPropertyManager;
-import com.facebook.presto.metadata.TablePropertyManager;
+import com.facebook.presto.metadata.*;
 import com.facebook.presto.security.AllowAllAccessControl;
-import com.facebook.presto.spi.ColumnMetadata;
-import com.facebook.presto.spi.ConnectorInsertTableHandle;
-import com.facebook.presto.spi.ConnectorOutputTableHandle;
-import com.facebook.presto.spi.ConnectorPageSink;
-import com.facebook.presto.spi.ConnectorSession;
-import com.facebook.presto.spi.ConnectorTableHandle;
-import com.facebook.presto.spi.ConnectorTableMetadata;
-import com.facebook.presto.spi.Page;
-import com.facebook.presto.spi.SchemaTableName;
+import com.facebook.presto.spi.*;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
-import com.facebook.presto.spi.connector.Connector;
-import com.facebook.presto.spi.connector.ConnectorMetadata;
-import com.facebook.presto.spi.connector.ConnectorOutputMetadata;
-import com.facebook.presto.spi.connector.ConnectorPageSinkProvider;
-import com.facebook.presto.spi.connector.ConnectorSplitManager;
-import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.connector.*;
 import com.facebook.presto.spi.transaction.IsolationLevel;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.TypeManager;
@@ -73,6 +53,41 @@ public class TestTargetConnectorCommitter
     private MetadataManager testMetadataManager;
     private Session session;
 
+    public static Catalog createTestingCatalog(String catalogName, ConnectorId connectorId, Connector connector, TransactionManager transactionManager, MetadataManager metadata)
+    {
+        ConnectorId systemId = createSystemTablesConnectorId(connectorId);
+        InternalNodeManager nodeManager = new InMemoryNodeManager();
+        AllowAllAccessControl allowAllAccessControl = new AllowAllAccessControl();
+        return new Catalog(
+                catalogName,
+                connectorId,
+                connector,
+                createInformationSchemaConnectorId(connectorId),
+                new InformationSchemaConnector(catalogName, nodeManager, metadata, allowAllAccessControl),
+                systemId,
+                new SystemConnector(
+                        systemId,
+                        nodeManager,
+                        connector.getSystemTables(),
+                        transactionId -> transactionManager.getConnectorTransaction(transactionId, connectorId)));
+    }
+
+    public static MetadataManager createTestMetadataManager(TransactionManager transactionManager)
+    {
+        FeaturesConfig featuresConfig = new FeaturesConfig();
+        TypeManager typeManager = new TypeRegistry();
+        SessionPropertyManager sessionPropertyManager = new SessionPropertyManager();
+        BlockEncodingSerde blockEncodingSerde = new BlockEncodingManager(typeManager);
+        return new MetadataManager(
+                featuresConfig,
+                typeManager,
+                blockEncodingSerde,
+                sessionPropertyManager,
+                new SchemaPropertyManager(),
+                new TablePropertyManager(),
+                transactionManager);
+    }
+
     @BeforeMethod
     @AfterMethod
     private void reset()
@@ -104,11 +119,10 @@ public class TestTargetConnectorCommitter
 
         SchemaTableName table = new SchemaTableName("test", "test");
         TableData tableData = new TableData(new Page(1), ImmutableList.of());
-        BatchRecords batchRecords = new BatchRecords(ImmutableMap.of(table, tableData),() -> latch.countDown());
+        BatchRecords batchRecords = new BatchRecords(ImmutableMap.of(table, tableData), () -> latch.countDown());
 
         ImmutableList<TableCheckpoint> checkpoints = ImmutableList.of(new TableCheckpoint(batchRecords, table));
         committer.process(table, checkpoints).whenComplete(generate(checkpoints));
-
         assertTrue(latch.await(5, TimeUnit.SECONDS));
     }
 
@@ -138,9 +152,9 @@ public class TestTargetConnectorCommitter
         TableData tableData = new TableData(new Page(1), ImmutableList.of());
 
         ImmutableList<TableCheckpoint> checkpoints0 = ImmutableList.of(new TableCheckpoint(new BatchRecords(ImmutableMap.of(table0, tableData),
-                 () -> latch.countDown()), table0));
+                () -> latch.countDown()), table0));
         ImmutableList<TableCheckpoint> checkpoints1 = ImmutableList.of(new TableCheckpoint(new BatchRecords(ImmutableMap.of(table1, tableData),
-                 () -> latch.countDown()), table1));
+                () -> latch.countDown()), table1));
         committer.process(table0, checkpoints0).whenComplete(generate(checkpoints0));
         committer.process(table1, checkpoints1).whenComplete(generate(checkpoints1));
 
@@ -201,8 +215,7 @@ public class TestTargetConnectorCommitter
     }
 
     private static class TestingConnectorPageSinkProvider
-            implements ConnectorPageSinkProvider
-    {
+            implements ConnectorPageSinkProvider {
         private final CountDownLatch latch;
 
         public TestingConnectorPageSinkProvider(CountDownLatch latch)
@@ -211,37 +224,32 @@ public class TestTargetConnectorCommitter
         }
 
         @Override
-        public ConnectorPageSink createPageSink(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorOutputTableHandle outputTableHandle)
-        {
+        public ConnectorPageSink createPageSink(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorOutputTableHandle outputTableHandle) {
             fail();
             return null;
         }
 
         @Override
-        public ConnectorPageSink createPageSink(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorInsertTableHandle insertTableHandle)
-        {
+        public ConnectorPageSink createPageSink(ConnectorTransactionHandle transactionHandle, ConnectorSession session, ConnectorInsertTableHandle insertTableHandle) {
             latch.countDown();
 
             return new ConnectorPageSink()
             {
                 @SuppressWarnings("Duplicates")
                 @Override
-                public CompletableFuture appendPage(Page page)
-                {
+                public CompletableFuture appendPage(Page page) {
                     latch.countDown();
                     return CompletableFuture.completedFuture(null);
                 }
 
                 @Override
-                public CompletableFuture<Collection<Slice>> finish()
-                {
+                public CompletableFuture<Collection<Slice>> finish() {
                     latch.countDown();
                     return CompletableFuture.completedFuture(ImmutableList.of());
                 }
 
                 @Override
-                public void abort()
-                {
+                public void abort() {
                     fail();
                 }
             };
@@ -291,8 +299,7 @@ public class TestTargetConnectorCommitter
     }
 
     private static class LatchTestingMetadata
-            extends TestingMetadata
-    {
+            extends TestingMetadata {
         private final CountDownLatch latch;
 
         public LatchTestingMetadata(CountDownLatch latch)
@@ -301,34 +308,29 @@ public class TestTargetConnectorCommitter
         }
 
         @Override
-        public ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
-        {
+        public ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle) {
             return new TestingConnectorInsertTableHandle(tableHandle);
         }
 
         @Override
-        public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session, ConnectorInsertTableHandle insertHandle, Collection<Slice> fragments)
-        {
+        public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session, ConnectorInsertTableHandle insertHandle, Collection<Slice> fragments) {
             latch.countDown();
             return Optional.empty();
         }
     }
 
     private static class TestingConnectorInsertTableHandle
-            implements ConnectorInsertTableHandle
-    {
+            implements ConnectorInsertTableHandle {
 
         private final ConnectorTableHandle tableHandle;
 
-        public TestingConnectorInsertTableHandle(ConnectorTableHandle inMemoryTableHandle)
-        {
+        public TestingConnectorInsertTableHandle(ConnectorTableHandle inMemoryTableHandle) {
             this.tableHandle = inMemoryTableHandle;
         }
     }
 
     private static class TestingConnector
-            implements Connector
-    {
+            implements Connector {
         private final TestingMetadata connectorMetadata;
 
         public TestingConnector(TestingMetadata connectorMetadata)
@@ -337,56 +339,19 @@ public class TestTargetConnectorCommitter
         }
 
         @Override
-        public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly)
-        {
+        public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly) {
             return TestingTransactionHandle.create();
         }
 
         @Override
-        public ConnectorMetadata getMetadata(ConnectorTransactionHandle transactionHandle)
-        {
+        public ConnectorMetadata getMetadata(ConnectorTransactionHandle transactionHandle) {
             return connectorMetadata;
         }
 
         @Override
-        public ConnectorSplitManager getSplitManager()
-        {
+        public ConnectorSplitManager getSplitManager() {
             return null;
         }
     }
 
-    public static Catalog createTestingCatalog(String catalogName, ConnectorId connectorId, Connector connector, TransactionManager transactionManager, MetadataManager metadata)
-    {
-        ConnectorId systemId = createSystemTablesConnectorId(connectorId);
-        InternalNodeManager nodeManager = new InMemoryNodeManager();
-        AllowAllAccessControl allowAllAccessControl = new AllowAllAccessControl();
-        return new Catalog(
-                catalogName,
-                connectorId,
-                connector,
-                createInformationSchemaConnectorId(connectorId),
-                new InformationSchemaConnector(catalogName, nodeManager, metadata, allowAllAccessControl),
-                systemId,
-                new SystemConnector(
-                        systemId,
-                        nodeManager,
-                        connector.getSystemTables(),
-                        transactionId -> transactionManager.getConnectorTransaction(transactionId, connectorId)));
-    }
-
-    public static MetadataManager createTestMetadataManager(TransactionManager transactionManager)
-    {
-        FeaturesConfig featuresConfig = new FeaturesConfig();
-        TypeManager typeManager = new TypeRegistry();
-        SessionPropertyManager sessionPropertyManager = new SessionPropertyManager();
-        BlockEncodingSerde blockEncodingSerde = new BlockEncodingManager(typeManager);
-        return new MetadataManager(
-                featuresConfig,
-                typeManager,
-                blockEncodingSerde,
-                sessionPropertyManager,
-                new SchemaPropertyManager(),
-                new TablePropertyManager(),
-                transactionManager);
-    }
 }

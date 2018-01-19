@@ -5,8 +5,6 @@
 package io.rakam.presto;
 
 import com.facebook.presto.spi.SchemaTableName;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.rakam.presto.deserialization.TableData;
 
@@ -18,10 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-public class MiddlewareBuffer<T>
+public class MiddlewareBuffer
 {
     private final Map<SchemaTableName, List<TableCheckpoint>> batches;
     private final MiddlewareConfig config;
@@ -66,7 +63,7 @@ public class MiddlewareBuffer<T>
     public Map<SchemaTableName, List<TableCheckpoint>> getRecordsToBeFlushed()
     {
         long now = System.currentTimeMillis();
-        long memoryNeedsToBeAvailable = (long) (MemoryTracker.getAvailableHeapSize() * .3);
+        long memoryNeedsToBeAvailable = (long) (MemoryTracker.getAvailableHeapSize() * .6);
         long availableMemory = memoryTracker.availableMemory();
 
         Map<SchemaTableName, List<TableCheckpoint>> map = new ConcurrentHashMap<>();

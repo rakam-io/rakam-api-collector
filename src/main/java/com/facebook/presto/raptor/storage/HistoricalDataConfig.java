@@ -14,6 +14,11 @@ public class HistoricalDataConfig
     private Duration maxFlushDuration = Duration.succinctDuration(30, TimeUnit.MINUTES);
     private int maxFlushRecords = 500_000;
 
+    public Duration getMaxFlushDuration()
+    {
+        return maxFlushDuration;
+    }
+
     @Config("historical.max-flush-duration")
     public HistoricalDataConfig setMaxFlushDuration(Duration maxFlushDuration)
     {
@@ -21,9 +26,9 @@ public class HistoricalDataConfig
         return this;
     }
 
-    public Duration getMaxFlushDuration()
+    public int getMaxFlushRecords()
     {
-        return maxFlushDuration;
+        return maxFlushRecords;
     }
 
     @Config("historical.max-flush-records")
@@ -31,10 +36,5 @@ public class HistoricalDataConfig
     {
         this.maxFlushRecords = maxFlushRecords;
         return this;
-    }
-
-    public int getMaxFlushRecords()
-    {
-        return maxFlushRecords;
     }
 }

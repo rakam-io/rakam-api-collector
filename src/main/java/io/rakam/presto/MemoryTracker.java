@@ -21,6 +21,12 @@ public class MemoryTracker
         reservedMemory = new AtomicLong();
     }
 
+    @Managed
+    public static long getAvailableHeapSize()
+    {
+        return AVAILABLE_HEAP_SIZE;
+    }
+
     public void reserveMemory(long bytes)
     {
         reservedMemory.addAndGet(bytes);
@@ -36,12 +42,6 @@ public class MemoryTracker
     public double availableMemoryInPercentage()
     {
         return availableMemory() * 1.0 / AVAILABLE_HEAP_SIZE;
-    }
-
-    @Managed
-    public static long getAvailableHeapSize()
-    {
-        return AVAILABLE_HEAP_SIZE;
     }
 
     public void freeMemory(long bytes)

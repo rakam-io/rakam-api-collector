@@ -60,17 +60,26 @@ public class RakamJsonDeserializer
     private static final JsonFactory READER = new ObjectMapper().getFactory();
     private final DatabaseHandler databaseHandler;
     private final FieldNameConfig fieldNameConfig;
-
+    TokenBuffer propertiesBuffer = null;
     private Map<Type, FieldType> typeCache = new ConcurrentHashMap<>();
     private String project;
     private String collection;
     private JsonParser jp;
-    TokenBuffer propertiesBuffer = null;
 
     public RakamJsonDeserializer(FieldNameConfig fieldNameConfig, DatabaseHandler databaseHandler)
     {
         this.databaseHandler = databaseHandler;
         this.fieldNameConfig = fieldNameConfig;
+    }
+
+    public static String checkCollectionValid(String collection)
+    {
+        checkArgument(collection != null, "collection is null");
+        checkArgument(!collection.isEmpty(), "collection is empty string");
+        if (collection.length() > 100) {
+            throw new IllegalArgumentException("Collection name must have maximum 250 characters.");
+        }
+        return collection;
     }
 
     @Override
@@ -287,16 +296,6 @@ public class RakamJsonDeserializer
                 throw new IllegalArgumentException("Error while de-serializing event");
             }
         }
-    }
-
-    public static String checkCollectionValid(String collection)
-    {
-        checkArgument(collection != null, "collection is null");
-        checkArgument(!collection.isEmpty(), "collection is empty string");
-        if (collection.length() > 100) {
-            throw new IllegalArgumentException("Collection name must have maximum 250 characters.");
-        }
-        return collection;
     }
 
     @SuppressWarnings("Duplicates")

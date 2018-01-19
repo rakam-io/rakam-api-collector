@@ -12,8 +12,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
-import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
@@ -31,7 +31,7 @@ import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public abstract class AvroMessageEventTransformer<T>
-        extends MessageEventTransformer<T, BinaryDecoder>
+        extends MessageEventTransformer<T,BinaryDecoder>
 {
     private final static Logger LOGGER = Logger.get(AvroMessageEventTransformer.class);
     private final String checkpointColumn;

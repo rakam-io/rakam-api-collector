@@ -13,16 +13,16 @@ public class JsonConfig
 {
     private JsonFormat dataLayout = JsonFormat.FABRIC;
 
+    public JsonFormat getDataLayout()
+    {
+        return dataLayout;
+    }
+
     @Config("source.data-format.json.layout")
     public JsonConfig setDataLayout(JsonFormat dataLayout)
     {
         this.dataLayout = dataLayout;
         return this;
-    }
-
-    public JsonFormat getDataLayout()
-    {
-        return dataLayout;
     }
 
     public enum JsonFormat

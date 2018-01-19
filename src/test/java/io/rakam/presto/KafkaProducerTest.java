@@ -25,7 +25,7 @@ public class KafkaProducerTest
         String timestampFormat = "yyyy-MM-dd'T'HH:mm:ss.S'Z'";
         int topicCount = 10;
         SimpleDateFormat dateFormat = new SimpleDateFormat(timestampFormat);
-        DateTime beginTime = new DateTime().minusDays(2);
+        DateTime beginTime = new DateTime().minusDays(3);
         DateTime endTime = new DateTime();
         Random random = new Random(10000);
 
@@ -72,7 +72,7 @@ public class KafkaProducerTest
         ObjectNode data = (ObjectNode) node.get("data");
 
         //Assign topicName to string variable
-        String topicName = "presto_test_9";
+        String topicName = "presto_test_10";
 
         // create instance for properties to access producer configs
         Properties props = new Properties();

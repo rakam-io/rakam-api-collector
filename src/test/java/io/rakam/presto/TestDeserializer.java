@@ -54,45 +54,14 @@ import static org.testng.Assert.assertTrue;
 
 public abstract class TestDeserializer<T>
 {
-    private static final TypeManager TYPE_MANAGER = new TypeRegistry();
-    static {
-        // associate TYPE_MANAGER with a function registry
-        new FunctionRegistry(TYPE_MANAGER, new BlockEncodingManager(TYPE_MANAGER), new FeaturesConfig());
-    }
-
     protected static final List<FieldType> FIELDS = Arrays.stream(FieldType.values())
             .filter(e -> e != FieldType.DECIMAL && e != FieldType.ARRAY_DECIMAL && e != FieldType.MAP_DECIMAL)
             .filter(e -> e != FieldType.BINARY && e != FieldType.ARRAY_BINARY && e != FieldType.MAP_BINARY)
             .collect(toImmutableList());
-
     protected static final List<ColumnMetadata> COLUMNS;
-    static {
-        ImmutableList.Builder<ColumnMetadata> builder = ImmutableList.builder();
-        builder.add(new ColumnMetadata("_shard_time", TIMESTAMP));
-        FIELDS.stream()
-                .forEach(e -> builder.add(new ColumnMetadata("col" + e.name().toLowerCase(), toType(e))));
-        COLUMNS = builder.build();
-    }
-
     protected static final int ITERATION_COUNT = 3;
     protected static final List<Map<String, Object>> EVENTS;
-
-    static {
-        List<Map<String, Object>> events = new ArrayList<>();
-
-        for (int i = 0; i < ITERATION_COUNT; i++) {
-            HashMap<String, Object> event = new HashMap<>();
-
-            for (int i1 = 0; i1 < FIELDS.size(); i1++) {
-                FieldType value = FIELDS.get(i1);
-                event.put("col" + value.name().toLowerCase(), getExampleValue(value, i));
-            }
-
-            events.add(Collections.unmodifiableMap(event));
-        }
-
-        EVENTS = ImmutableList.copyOf(events);
-    }
+    private static final TypeManager TYPE_MANAGER = new TypeRegistry();
 
     private static Object getExampleValue(FieldType fieldType, int i)
     {
@@ -133,66 +102,6 @@ public abstract class TestDeserializer<T>
                     return Collections.unmodifiableMap(map);
                 }
                 throw new IllegalStateException();
-        }
-    }
-
-    public abstract MessageEventTransformer getMessageEventTransformer();
-
-    public abstract List<T> getRecordsForEvents(String project, String collection, Optional<int[]> columnIdx)
-            throws IOException;
-
-    @Test
-    public void testAllTypes()
-            throws IOException
-    {
-        MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
-        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.empty()), ImmutableList.of());
-        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
-
-        assertEquals(testcollection.metadata, COLUMNS);
-        assertEquals(testcollection.page.getChannelCount(), COLUMNS.size());
-        assertEquals(testcollection.page.getPositionCount(), ITERATION_COUNT);
-
-        long aLong = BigintType.BIGINT.getLong(testcollection.page.getBlock(0), 0);
-        assertTrue(Instant.now().toEpochMilli() - aLong < 10000);
-        Block expectedShardTime = RunLengthEncodedBlock.create(TIMESTAMP, aLong, testcollection.page.getPositionCount());
-        BlockAssertions.assertBlockEquals(TIMESTAMP, testcollection.page.getBlock(0), expectedShardTime);
-
-        for (int i = 1; i < testcollection.page.getBlocks().length; i++) {
-            Block block = testcollection.page.getBlock(i);
-
-            FieldType fieldType = FIELDS.get(i - 1);
-            Block expectedBlock = getBlock(fieldType);
-
-            BlockAssertions.assertBlockEquals(COLUMNS.get(i).getType(), block, expectedBlock);
-        }
-    }
-
-    @Test
-    public void testNullValues()
-            throws IOException
-    {
-        MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
-
-        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.of(new int[] {
-                1})), ImmutableList.of());
-        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
-
-        assertEquals(testcollection.metadata, COLUMNS);
-        assertEquals(testcollection.page.getChannelCount(), COLUMNS.size());
-        assertEquals(testcollection.page.getPositionCount(), ITERATION_COUNT);
-
-        Block block = testcollection.page.getBlock(1);
-        Block expectedBlock = getBlock(FieldType.STRING);
-        BlockAssertions.assertBlockEquals(VARCHAR, block, expectedBlock);
-
-        for (int i = 2; i < COLUMNS.size(); i++) {
-            Block block1 = testcollection.page.getBlock(i);
-            assertEquals(block1.getPositionCount(), ITERATION_COUNT);
-
-            for (int i1 = 0; i1 < ITERATION_COUNT; i1++) {
-                assertTrue(block1.isNull(i1));
-            }
         }
     }
 
@@ -297,5 +206,95 @@ public abstract class TestDeserializer<T>
         return (MapType) TYPE_MANAGER.getParameterizedType(StandardTypes.MAP, ImmutableList.of(
                 TypeSignatureParameter.of(keyType.getTypeSignature()),
                 TypeSignatureParameter.of(valueType.getTypeSignature())));
+    }
+
+    public abstract MessageEventTransformer getMessageEventTransformer();
+
+    public abstract List<T> getRecordsForEvents(String project, String collection, Optional<int[]> columnIdx)
+            throws IOException;
+
+    @Test
+    public void testAllTypes()
+            throws IOException
+    {
+        MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.empty()), ImmutableList.of());
+        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
+
+        assertEquals(testcollection.metadata, COLUMNS);
+        assertEquals(testcollection.page.getChannelCount(), COLUMNS.size());
+        assertEquals(testcollection.page.getPositionCount(), ITERATION_COUNT);
+
+        long aLong = BigintType.BIGINT.getLong(testcollection.page.getBlock(0), 0);
+        assertTrue(Instant.now().toEpochMilli() - aLong < 10000);
+        Block expectedShardTime = RunLengthEncodedBlock.create(TIMESTAMP, aLong, testcollection.page.getPositionCount());
+        BlockAssertions.assertBlockEquals(TIMESTAMP, testcollection.page.getBlock(0), expectedShardTime);
+
+        for (int i = 1; i < testcollection.page.getBlocks().length; i++) {
+            Block block = testcollection.page.getBlock(i);
+
+            FieldType fieldType = FIELDS.get(i - 1);
+            Block expectedBlock = getBlock(fieldType);
+
+            BlockAssertions.assertBlockEquals(COLUMNS.get(i).getType(), block, expectedBlock);
+        }
+    }
+
+    @Test
+    public void testNullValues()
+            throws IOException
+    {
+        MessageEventTransformer messageEventTransformer = getMessageEventTransformer();
+
+        Map<SchemaTableName, TableData> pageTable = messageEventTransformer.createPageTable(getRecordsForEvents("testproject", "testcollection", Optional.of(new int[] {
+                1})), ImmutableList.of());
+        TableData testcollection = pageTable.get(new SchemaTableName("testproject", "testcollection"));
+
+        assertEquals(testcollection.metadata, COLUMNS);
+        assertEquals(testcollection.page.getChannelCount(), COLUMNS.size());
+        assertEquals(testcollection.page.getPositionCount(), ITERATION_COUNT);
+
+        Block block = testcollection.page.getBlock(1);
+        Block expectedBlock = getBlock(FieldType.STRING);
+        BlockAssertions.assertBlockEquals(VARCHAR, block, expectedBlock);
+
+        for (int i = 2; i < COLUMNS.size(); i++) {
+            Block block1 = testcollection.page.getBlock(i);
+            assertEquals(block1.getPositionCount(), ITERATION_COUNT);
+
+            for (int i1 = 0; i1 < ITERATION_COUNT; i1++) {
+                assertTrue(block1.isNull(i1));
+            }
+        }
+    }
+
+    static {
+        // associate TYPE_MANAGER with a function registry
+        new FunctionRegistry(TYPE_MANAGER, new BlockEncodingManager(TYPE_MANAGER), new FeaturesConfig());
+    }
+
+    static {
+        ImmutableList.Builder<ColumnMetadata> builder = ImmutableList.builder();
+        builder.add(new ColumnMetadata("_shard_time", TIMESTAMP));
+        FIELDS.stream()
+                .forEach(e -> builder.add(new ColumnMetadata("col" + e.name().toLowerCase(), toType(e))));
+        COLUMNS = builder.build();
+    }
+
+    static {
+        List<Map<String, Object>> events = new ArrayList<>();
+
+        for (int i = 0; i < ITERATION_COUNT; i++) {
+            HashMap<String, Object> event = new HashMap<>();
+
+            for (int i1 = 0; i1 < FIELDS.size(); i1++) {
+                FieldType value = FIELDS.get(i1);
+                event.put("col" + value.name().toLowerCase(), getExampleValue(value, i));
+            }
+
+            events.add(Collections.unmodifiableMap(event));
+        }
+
+        EVENTS = ImmutableList.copyOf(events);
     }
 }

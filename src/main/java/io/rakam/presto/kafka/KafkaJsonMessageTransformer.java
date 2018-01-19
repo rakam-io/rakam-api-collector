@@ -5,8 +5,8 @@
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.SchemaTableName;
-import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.deserialization.json.JsonDeserializer;
 import io.rakam.presto.deserialization.json.JsonMessageEventTransformer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

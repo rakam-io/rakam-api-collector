@@ -16,9 +16,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
-import io.rakam.presto.*;
+import io.rakam.presto.BasicMemoryBuffer;
+import io.rakam.presto.BatchRecords;
+import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.MemoryTracker;
+import io.rakam.presto.MiddlewareBuffer;
+import io.rakam.presto.MiddlewareConfig;
+import io.rakam.presto.StreamWorkerContext;
+import io.rakam.presto.TargetConnectorCommitter;
 import io.rakam.presto.deserialization.DecoupleMessage;
 import io.rakam.presto.deserialization.TableData;
 
@@ -165,10 +172,11 @@ public class KinesisRecordProcessor
                     });
         }
 
-        public int getDateOfRecord(Record record)
+        @Override
+        public void read(Record record, RecordData recordData)
                 throws IOException
         {
-            return 1;
+
         }
     }
 }

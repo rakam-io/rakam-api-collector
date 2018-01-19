@@ -56,6 +56,11 @@ public class LogModule
         private boolean logActive = true;
         private String tags;
 
+        public boolean getLogActive()
+        {
+            return logActive;
+        }
+
         @Config("log-active")
         public LogConfig setLogActive(boolean logActive)
         {
@@ -63,9 +68,9 @@ public class LogModule
             return this;
         }
 
-        public boolean getLogActive()
+        public String getTags()
         {
-            return logActive;
+            return tags;
         }
 
         @Config("log-identifier")
@@ -73,11 +78,6 @@ public class LogModule
         {
             this.tags = tags;
             return this;
-        }
-
-        public String getTags()
-        {
-            return tags;
         }
     }
 }

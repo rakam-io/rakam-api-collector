@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -21,7 +21,7 @@
         <skip.deploy.s3>false</skip.deploy.s3>
         <air.check.skip-duplicate-finder>true</air.check.skip-duplicate-finder>
         <air.check.skip-jacoco>true</air.check.skip-jacoco>
-        <kafka.client.version>0.9.0.1</kafka.client.version>
+        <kafka.client.version>0.10.2.0</kafka.client.version>
     </properties>
 
     <dependencies>
@@ -45,6 +45,11 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>net.jodah</groupId>
+            <artifactId>failsafe</artifactId>
+            <version>1.0.5</version>
+        </dependency>
+        <dependency>
             <groupId>com.google.inject.extensions</groupId>
             <artifactId>guice-multibindings</artifactId>
         </dependency>
@@ -56,11 +61,7 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.nurkiewicz.asyncretry</groupId>
-            <artifactId>asyncretry</artifactId>
-            <version>0.0.7</version>
-        </dependency>
+
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
@@ -613,9 +614,10 @@
                     <plugin>
                         <groupId>com.spotify</groupId>
                         <artifactId>docker-maven-plugin</artifactId>
-                        <version>0.3.7</version>
+
+                        <version>0.3.9</version>
                         <configuration>
-                            <imageName>artifactory.corp.olacabs.com:6001/collector:${project.version}</imageName>
+                            <imageName>artifactory.corp.olacabs.com:5002/collector:${project.version}</imageName>
                             <serverId>docker</serverId>
                             <dockerDirectory>${project.basedir}</dockerDirectory>
                             <resources>
@@ -631,6 +633,7 @@
                                 <phase>package</phase>
                                 <goals>
                                     <goal>build</goal>
+                                    <goal>push</goal>
                                 </goals>
                             </execution>
                         </executions>

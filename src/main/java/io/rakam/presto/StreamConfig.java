@@ -4,18 +4,21 @@
 
 package io.rakam.presto;
 
+import com.facebook.presto.hadoop.$internal.com.google.common.base.Strings;
 import io.airlift.configuration.Config;
-import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
-import io.airlift.units.MinDataSize;
 
 import java.util.concurrent.TimeUnit;
-
-import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
 public class StreamConfig
 {
     private Duration maxFlushDuration = Duration.succinctDuration(5, TimeUnit.SECONDS);
+    private int memoryMultiplier = 2;
+
+    public Duration getMaxFlushDuration()
+    {
+        return maxFlushDuration;
+    }
 
     @Config("stream.max-flush-duration")
     public StreamConfig setMaxFlushDuration(Duration maxFlushDuration)
@@ -24,8 +27,17 @@ public class StreamConfig
         return this;
     }
 
-    public Duration getMaxFlushDuration()
+    public int getMemoryMultiplier()
     {
-        return maxFlushDuration;
+        return memoryMultiplier;
     }
+
+    @Config("stream.memory-multiplier")
+    public void setMemoryMultiplier(String memoryMultiplier)
+    {
+        if (!Strings.isNullOrEmpty(memoryMultiplier)) {
+            this.memoryMultiplier = Integer.parseInt(memoryMultiplier);
+        }
+    }
+
 }

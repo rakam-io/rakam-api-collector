@@ -17,6 +17,7 @@ public class BasicMemoryBuffer<T>
     private final MemoryTracker memoryTracker;
     private long previousFlushTimeMillisecond;
     private int totalBytes;
+    private int memoryMultiplier;
 
     public BasicMemoryBuffer(StreamConfig config, MemoryTracker memoryTracker, SizeCalculator<T> sizeCalculator)
     {
@@ -24,6 +25,7 @@ public class BasicMemoryBuffer<T>
         this.memoryTracker = memoryTracker;
         millisecondsToBuffer = config.getMaxFlushDuration().toMillis();
         previousFlushTimeMillisecond = System.currentTimeMillis();
+        memoryMultiplier = config.getMemoryMultiplier();
         buffer = new ArrayList<>(1000);
         bulkBuffer = new ArrayList<>(1000);
         totalBytes = 0;
@@ -75,7 +77,7 @@ public class BasicMemoryBuffer<T>
     public boolean shouldFlush()
     {
         return ((System.currentTimeMillis() - previousFlushTimeMillisecond) >= getMillisecondsToBuffer())
-                || memoryTracker.availableMemory() - (totalBytes * 2) < 0;
+                || memoryTracker.availableMemory() - (totalBytes * memoryMultiplier) < 0;
     }
 
     public Records getRecords()
@@ -96,6 +98,11 @@ public class BasicMemoryBuffer<T>
         memoryTracker.reserveMemory(totalBytes - initialSize);
     }
 
+    public interface SizeCalculator<T>
+    {
+        long calculate(T record);
+    }
+
     public class Records
     {
         public final List<T> buffer;
@@ -106,10 +113,5 @@ public class BasicMemoryBuffer<T>
             this.buffer = buffer;
             this.bulkBuffer = bulkBuffer;
         }
-    }
-
-    public interface SizeCalculator<T>
-    {
-        long calculate(T record);
     }
 }
