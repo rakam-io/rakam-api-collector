@@ -21,35 +21,6 @@ import static org.apache.avro.Schema.Type.NULL;
 
 public class AvroUtil
 {
-    static {
-        try {
-            Field validateNames = Schema.class.getDeclaredField("validateNames");
-            boolean accessible = validateNames.isAccessible();
-            validateNames.setAccessible(true);
-            validateNames.set(null, new ThreadLocal<Boolean>()
-            {
-                @Override
-                public Boolean get()
-                {
-                    return false;
-                }
-
-                @Override
-                public void set(Boolean value)
-                {
-                    // no-op
-                    return;
-                }
-            });
-            if (!accessible) {
-                validateNames.setAccessible(false);
-            }
-        }
-        catch (NoSuchFieldException | IllegalAccessException e) {
-            throw Throwables.propagate(e);
-        }
-    }
-
     public static Schema convertAvroSchema(Collection<ColumnMetadata> fields, String checkpointColumn)
     {
         List<Schema.Field> avroFields = fields.stream()
@@ -97,6 +68,35 @@ public class AvroUtil
                 return Schema.createMap(map);
             default:
                 throw new IllegalStateException();
+        }
+    }
+
+    static {
+        try {
+            Field validateNames = Schema.class.getDeclaredField("validateNames");
+            boolean accessible = validateNames.isAccessible();
+            validateNames.setAccessible(true);
+            validateNames.set(null, new ThreadLocal<Boolean>()
+            {
+                @Override
+                public Boolean get()
+                {
+                    return false;
+                }
+
+                @Override
+                public void set(Boolean value)
+                {
+                    // no-op
+                    return;
+                }
+            });
+            if (!accessible) {
+                validateNames.setAccessible(false);
+            }
+        }
+        catch (NoSuchFieldException | IllegalAccessException e) {
+            throw Throwables.propagate(e);
         }
     }
 }

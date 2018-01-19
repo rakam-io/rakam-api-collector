@@ -6,7 +6,6 @@ package io.rakam.presto.connector.raptor;
 
 import io.airlift.configuration.Config;
 
-import java.io.File;
 import java.net.URI;
 
 public class RaptorConfig
@@ -23,10 +22,6 @@ public class RaptorConfig
         return metadataUrl;
     }
 
-    public String getBackupThreads() {return backupThreads;}
-
-    public String getDbMaxConnections() {return dbMaxConnections;}
-
     @Config("raptor.metadata.url")
     public RaptorConfig setMetadataUrl(String metadataUrl)
     {
@@ -35,6 +30,19 @@ public class RaptorConfig
         }
         return this;
     }
+
+    public String getBackupThreads() {return backupThreads;}
+
+    @Config("raptor.backup.threads")
+    public RaptorConfig setBackupThreads(String backupThreads)
+    {
+        if (backupThreads != null) {
+            this.backupThreads = backupThreads;
+        }
+        return this;
+    }
+
+    public String getDbMaxConnections() {return dbMaxConnections;}
 
     @Config("metadata.db.connections.max")
     public RaptorConfig setDbMaxConnections(String connections)
@@ -60,15 +68,6 @@ public class RaptorConfig
     public String getNodeIdentifier()
     {
         return nodeIdentifier;
-    }
-
-    @Config("raptor.backup.threads")
-    public RaptorConfig setBackupThreads(String backupThreads)
-    {
-        if (backupThreads != null) {
-            this.backupThreads = backupThreads;
-        }
-        return this;
     }
 
     @Config("raptor.node.id")

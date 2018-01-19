@@ -53,6 +53,41 @@ public class TestTargetConnectorCommitter
     private MetadataManager testMetadataManager;
     private Session session;
 
+    public static Catalog createTestingCatalog(String catalogName, ConnectorId connectorId, Connector connector, TransactionManager transactionManager, MetadataManager metadata)
+    {
+        ConnectorId systemId = createSystemTablesConnectorId(connectorId);
+        InternalNodeManager nodeManager = new InMemoryNodeManager();
+        AllowAllAccessControl allowAllAccessControl = new AllowAllAccessControl();
+        return new Catalog(
+                catalogName,
+                connectorId,
+                connector,
+                createInformationSchemaConnectorId(connectorId),
+                new InformationSchemaConnector(catalogName, nodeManager, metadata, allowAllAccessControl),
+                systemId,
+                new SystemConnector(
+                        systemId,
+                        nodeManager,
+                        connector.getSystemTables(),
+                        transactionId -> transactionManager.getConnectorTransaction(transactionId, connectorId)));
+    }
+
+    public static MetadataManager createTestMetadataManager(TransactionManager transactionManager)
+    {
+        FeaturesConfig featuresConfig = new FeaturesConfig();
+        TypeManager typeManager = new TypeRegistry();
+        SessionPropertyManager sessionPropertyManager = new SessionPropertyManager();
+        BlockEncodingSerde blockEncodingSerde = new BlockEncodingManager(typeManager);
+        return new MetadataManager(
+                featuresConfig,
+                typeManager,
+                blockEncodingSerde,
+                sessionPropertyManager,
+                new SchemaPropertyManager(),
+                new TablePropertyManager(),
+                transactionManager);
+    }
+
     @BeforeMethod
     @AfterMethod
     private void reset()
@@ -84,7 +119,7 @@ public class TestTargetConnectorCommitter
 
         SchemaTableName table = new SchemaTableName("test", "test");
         TableData tableData = new TableData(new Page(1), ImmutableList.of());
-        BatchRecords batchRecords = new BatchRecords(ImmutableMap.of(table, tableData),() -> latch.countDown());
+        BatchRecords batchRecords = new BatchRecords(ImmutableMap.of(table, tableData), () -> latch.countDown());
 
         ImmutableList<TableCheckpoint> checkpoints = ImmutableList.of(new TableCheckpoint(batchRecords, table));
         committer.process(table, checkpoints).whenComplete(generate(checkpoints));
@@ -117,9 +152,9 @@ public class TestTargetConnectorCommitter
         TableData tableData = new TableData(new Page(1), ImmutableList.of());
 
         ImmutableList<TableCheckpoint> checkpoints0 = ImmutableList.of(new TableCheckpoint(new BatchRecords(ImmutableMap.of(table0, tableData),
-                 () -> latch.countDown()), table0));
+                () -> latch.countDown()), table0));
         ImmutableList<TableCheckpoint> checkpoints1 = ImmutableList.of(new TableCheckpoint(new BatchRecords(ImmutableMap.of(table1, tableData),
-                 () -> latch.countDown()), table1));
+                () -> latch.countDown()), table1));
         committer.process(table0, checkpoints0).whenComplete(generate(checkpoints0));
         committer.process(table1, checkpoints1).whenComplete(generate(checkpoints1));
 
@@ -319,36 +354,4 @@ public class TestTargetConnectorCommitter
         }
     }
 
-    public static Catalog createTestingCatalog(String catalogName, ConnectorId connectorId, Connector connector, TransactionManager transactionManager, MetadataManager metadata) {
-        ConnectorId systemId = createSystemTablesConnectorId(connectorId);
-        InternalNodeManager nodeManager = new InMemoryNodeManager();
-        AllowAllAccessControl allowAllAccessControl = new AllowAllAccessControl();
-        return new Catalog(
-                catalogName,
-                connectorId,
-                connector,
-                createInformationSchemaConnectorId(connectorId),
-                new InformationSchemaConnector(catalogName, nodeManager, metadata, allowAllAccessControl),
-                systemId,
-                new SystemConnector(
-                        systemId,
-                        nodeManager,
-                        connector.getSystemTables(),
-                        transactionId -> transactionManager.getConnectorTransaction(transactionId, connectorId)));
-    }
-
-    public static MetadataManager createTestMetadataManager(TransactionManager transactionManager) {
-        FeaturesConfig featuresConfig = new FeaturesConfig();
-        TypeManager typeManager = new TypeRegistry();
-        SessionPropertyManager sessionPropertyManager = new SessionPropertyManager();
-        BlockEncodingSerde blockEncodingSerde = new BlockEncodingManager(typeManager);
-        return new MetadataManager(
-                featuresConfig,
-                typeManager,
-                blockEncodingSerde,
-                sessionPropertyManager,
-                new SchemaPropertyManager(),
-                new TablePropertyManager(),
-                transactionManager);
-    }
 }

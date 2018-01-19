@@ -15,16 +15,16 @@ public class StreamConfig
     private Duration maxFlushDuration = Duration.succinctDuration(5, TimeUnit.SECONDS);
     private int memoryMultiplier = 2;
 
+    public Duration getMaxFlushDuration()
+    {
+        return maxFlushDuration;
+    }
+
     @Config("stream.max-flush-duration")
     public StreamConfig setMaxFlushDuration(Duration maxFlushDuration)
     {
         this.maxFlushDuration = maxFlushDuration;
         return this;
-    }
-
-    public Duration getMaxFlushDuration()
-    {
-        return maxFlushDuration;
     }
 
     public int getMemoryMultiplier()
@@ -39,4 +39,5 @@ public class StreamConfig
             this.memoryMultiplier = Integer.parseInt(memoryMultiplier);
         }
     }
+
 }

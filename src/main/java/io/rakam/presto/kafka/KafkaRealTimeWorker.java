@@ -68,19 +68,14 @@ public class KafkaRealTimeWorker
     private final DecoupleMessage<ConsumerRecord<byte[], byte[]>> decoupleMessage;
     private final HistoricalDataHandler historicalDataHandler;
     private final Predicate<String> whiteListCollections;
-
-    protected KafkaConsumer<byte[], byte[]> consumer;
-
     private final StreamWorkerContext<ConsumerRecord<byte[], byte[]>> context;
     private final MemoryTracker memoryTracker;
-    protected KafkaConfig config;
-
     private final BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>> buffer;
     private final MiddlewareBuffer middlewareBuffer;
-
     private final TargetConnectorCommitter committer;
     private final Queue<List<TableCheckpoint>> checkpointQueue;
-
+    protected KafkaConsumer<byte[], byte[]> consumer;
+    protected KafkaConfig config;
     private Thread workerThread;
     private boolean working;
     private CounterStat realTimeRecordsStats = new CounterStat();
@@ -294,20 +289,6 @@ public class KafkaRealTimeWorker
         return new SimpleImmutableEntry<>(realTimeRecords, historicalDataAction);
     }
 
-    private static class ProcessedRecords
-    {
-        public final Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay;
-        public final boolean[] bitmapForRecords;
-        public final int realTimeRecordCount;
-
-        public ProcessedRecords(Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay, boolean[] bitmapForRecords, int realTimeRecordCount)
-        {
-            this.recordsIndexedByDay = recordsIndexedByDay;
-            this.bitmapForRecords = bitmapForRecords;
-            this.realTimeRecordCount = realTimeRecordCount;
-        }
-    }
-
     private ProcessedRecords processRecords(BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records)
     {
         Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay = new Int2ObjectArrayMap<>();
@@ -430,6 +411,25 @@ public class KafkaRealTimeWorker
         return statusSpentTime;
     }
 
+    private enum Status
+    {
+        POLLING, FLUSHING_STREAM, FLUSHING_MIDDLEWARE, CHECKPOINTING, FLUSHING_HISTORICAL, WAITING_FOR_MEMORY;
+    }
+
+    private static class ProcessedRecords
+    {
+        public final Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay;
+        public final boolean[] bitmapForRecords;
+        public final int realTimeRecordCount;
+
+        public ProcessedRecords(Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay, boolean[] bitmapForRecords, int realTimeRecordCount)
+        {
+            this.recordsIndexedByDay = recordsIndexedByDay;
+            this.bitmapForRecords = bitmapForRecords;
+            this.realTimeRecordCount = realTimeRecordCount;
+        }
+    }
+
     private static class NegateBitMapRecordPredicate
             implements com.google.common.base.Predicate<ConsumerRecord<byte[], byte[]>>
     {
@@ -464,11 +464,6 @@ public class KafkaRealTimeWorker
         {
             return bitmapForRecords[i++];
         }
-    }
-
-    private enum Status
-    {
-        POLLING, FLUSHING_STREAM, FLUSHING_MIDDLEWARE, CHECKPOINTING, FLUSHING_HISTORICAL, WAITING_FOR_MEMORY;
     }
 
     private static class LongHolder

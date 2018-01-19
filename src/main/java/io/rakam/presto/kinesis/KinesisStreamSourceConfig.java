@@ -34,22 +34,20 @@ public class KinesisStreamSourceConfig
         this.streamName = streamName;
     }
 
+    public String getDynamodbTable()
+    {
+        return dynamodbTable;
+    }
+
     @Config("kinesis.consumer-dynamodb-table")
     public void setDynamodbTable(String dynamodbTable)
     {
         this.dynamodbTable = dynamodbTable;
     }
 
-    public String getDynamodbTable()
+    public boolean getEnableCloudWatch()
     {
-        return dynamodbTable;
-    }
-
-    @Config("aws.access-key")
-    public KinesisStreamSourceConfig setAccessKey(String accessKey)
-    {
-        this.accessKey = accessKey;
-        return this;
+        return enableCloudWatch;
     }
 
     @Config("aws.enable-cloudwatch")
@@ -59,9 +57,9 @@ public class KinesisStreamSourceConfig
         return this;
     }
 
-    public boolean getEnableCloudWatch()
+    public String getKinesisEndpoint()
     {
-        return enableCloudWatch;
+        return kinesisEndpoint;
     }
 
     @Config("aws.kinesis-endpoint")
@@ -71,9 +69,9 @@ public class KinesisStreamSourceConfig
         return this;
     }
 
-    public String getKinesisEndpoint()
+    public String getDynamodbEndpoint()
     {
-        return kinesisEndpoint;
+        return dynamodbEndpoint;
     }
 
     @Config("aws.dynamodb-endpoint")
@@ -81,11 +79,6 @@ public class KinesisStreamSourceConfig
     {
         this.dynamodbEndpoint = dynamodbEndpoint;
         return this;
-    }
-
-    public String getDynamodbEndpoint()
-    {
-        return dynamodbEndpoint;
     }
 
     public String getRegion()
@@ -105,16 +98,23 @@ public class KinesisStreamSourceConfig
         return accessKey;
     }
 
-    @Config("aws.secret-access-key")
-    public KinesisStreamSourceConfig setSecretAccessKey(String secretAccessKey)
+    @Config("aws.access-key")
+    public KinesisStreamSourceConfig setAccessKey(String accessKey)
     {
-        this.secretAccessKey = secretAccessKey;
+        this.accessKey = accessKey;
         return this;
     }
 
     public String getSecretAccessKey()
     {
         return secretAccessKey;
+    }
+
+    @Config("aws.secret-access-key")
+    public KinesisStreamSourceConfig setSecretAccessKey(String secretAccessKey)
+    {
+        this.secretAccessKey = secretAccessKey;
+        return this;
     }
 
     public AWSCredentialsProvider getCredentials()

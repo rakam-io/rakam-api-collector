@@ -20,14 +20,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public class TestKafkaRakamJsonDeserializer extends TestKafkaJsonDeserializer {
+public class TestKafkaRakamJsonDeserializer
+        extends TestKafkaJsonDeserializer
+{
     @Override
-    public JsonDeserializer getJsonDeserializer(DatabaseHandler databaseHandler) {
+    public JsonDeserializer getJsonDeserializer(DatabaseHandler databaseHandler)
+    {
         return new RakamJsonDeserializer(new FieldNameConfig(), databaseHandler);
     }
 
     @Override
-    protected ImmutableList<ConsumerRecord<byte[], byte[]>> getSampleData() {
+    protected ImmutableList<ConsumerRecord<byte[], byte[]>> getSampleData()
+    {
         ImmutableList.Builder<ConsumerRecord<byte[], byte[]>> builder = ImmutableList.builder();
         for (int i = 0; i < ITERATION_COUNT; i++) {
             ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[] {}, JsonHelper.encodeAsBytes(ImmutableMap.of(
@@ -40,14 +44,16 @@ public class TestKafkaRakamJsonDeserializer extends TestKafkaJsonDeserializer {
     }
 
     @Override
-    protected ConsumerRecord<byte[], byte[]> getDuplicateFieldRecord() {
+    protected ConsumerRecord<byte[], byte[]> getDuplicateFieldRecord()
+    {
         byte[] data = "{\"project\": \"testproject\", \"collection\": \"testcollection\", \"properties\": {\"testcolumn\": \"1\", \"testcolumn\": \"2\"}}".getBytes(StandardCharsets.UTF_8);
-        ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[]{}, data);
+        ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[] {}, data);
         return record;
     }
 
     public List<ConsumerRecord<byte[], byte[]>> getRecordsForEvents(String project, String collection, Optional<int[]> columnIdx)
-            throws IOException {
+            throws IOException
+    {
         ImmutableList.Builder<ConsumerRecord<byte[], byte[]>> builder = ImmutableList.builder();
         for (Map<String, Object> event : EVENTS) {
             if (columnIdx.isPresent()) {
@@ -61,7 +67,7 @@ public class TestKafkaRakamJsonDeserializer extends TestKafkaJsonDeserializer {
                     }
                 }
             }
-            ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[]{}, JsonHelper.encodeAsBytes(ImmutableMap.of(
+            ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[] {}, JsonHelper.encodeAsBytes(ImmutableMap.of(
                     "project", project,
                     "collection", collection,
                     "properties", event)));

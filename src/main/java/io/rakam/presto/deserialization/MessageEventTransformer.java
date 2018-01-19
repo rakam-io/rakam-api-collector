@@ -10,8 +10,8 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.type.TimestampType;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
-import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.FieldNameConfig;
 import org.rakam.util.NotExistsException;
 
 import javax.annotation.Nullable;

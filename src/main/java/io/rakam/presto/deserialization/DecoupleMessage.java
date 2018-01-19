@@ -11,7 +11,8 @@ public interface DecoupleMessage<T>
     void read(T record, RecordData recordData)
             throws IOException;
 
-    class RecordData {
+    class RecordData
+    {
         public String collection;
         public int date;
     }

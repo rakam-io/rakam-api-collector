@@ -34,7 +34,8 @@ public abstract class TestKafkaJsonDeserializer
     }
 
     public abstract JsonDeserializer getJsonDeserializer(DatabaseHandler databaseHandler);
-    protected abstract ImmutableList<ConsumerRecord<byte[],byte[]>> getSampleData();
+
+    protected abstract ImmutableList<ConsumerRecord<byte[], byte[]>> getSampleData();
 
     @Test
     public void testBasicAlterSchema()
@@ -89,7 +90,7 @@ public abstract class TestKafkaJsonDeserializer
                 BlockAssertions.createStringsBlock("1"));
     }
 
-    protected abstract ConsumerRecord<byte[],byte[]> getDuplicateFieldRecord();
+    protected abstract ConsumerRecord<byte[], byte[]> getDuplicateFieldRecord();
 
     @Test
     public void testNewCollection()

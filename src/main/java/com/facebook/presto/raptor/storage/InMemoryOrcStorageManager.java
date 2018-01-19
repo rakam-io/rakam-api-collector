@@ -67,12 +67,12 @@ import static io.airlift.json.JsonCodec.jsonCodec;
 import static io.airlift.units.DataSize.Unit.PETABYTE;
 import static java.lang.Math.min;
 import static java.util.Objects.requireNonNull;
-import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.stream.Collectors.toList;
 
 public class InMemoryOrcStorageManager
-        implements StorageManager {
+        implements StorageManager
+{
     private static final long MAX_ROWS = 1_000_000_000;
     // TODO: do not limit the max size of blocks to read for now; enable the limit when the Hive connector is ready
     private static final DataSize HUGE_MAX_READ_BLOCK_SIZE = new DataSize(1, PETABYTE);
@@ -100,7 +100,8 @@ public class InMemoryOrcStorageManager
             RemoteBackupManager backgroundBackupManager,
             ShardRecorder shardRecorder,
             TypeManager typeManager,
-            InMemoryFileSystem inMemoryFileSystem) {
+            InMemoryFileSystem inMemoryFileSystem)
+    {
         this(
                 storageService,
                 backupStore,
@@ -128,7 +129,8 @@ public class InMemoryOrcStorageManager
             long maxShardRows,
             DataSize maxShardSize,
             DataSize minAvailableSpace,
-            InMemoryFileSystem inMemoryFileSystem) {
+            InMemoryFileSystem inMemoryFileSystem)
+    {
         this.storageService = requireNonNull(storageService, "storageService is null");
         this.backupStore = requireNonNull(backupStore, "backupStore is null");
         this.defaultReaderAttributes = requireNonNull(readerAttributes, "readerAttributes is null");
@@ -145,8 +147,15 @@ public class InMemoryOrcStorageManager
         this.inMemoryFileSystem = requireNonNull(inMemoryFileSystem, "inMemoryFileSystem is null");
     }
 
+    private static Optional<OrcFileMetadata> getOrcFileMetadata(OrcReader reader)
+    {
+        return Optional.ofNullable(reader.getFooter().getUserMetadata().get(OrcFileMetadata.KEY))
+                .map(slice -> METADATA_CODEC.fromJson(slice.getBytes()));
+    }
+
     @PreDestroy
-    public void shutdown() {
+    public void shutdown()
+    {
         deletionExecutor.shutdownNow();
     }
 
@@ -158,25 +167,30 @@ public class InMemoryOrcStorageManager
             List<Type> columnTypes,
             TupleDomain<RaptorColumnHandle> effectivePredicate,
             ReaderAttributes readerAttributes,
-            OptionalLong transactionId) {
+            OptionalLong transactionId)
+    {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public StoragePageSink createStoragePageSink(long transactionId, OptionalInt bucketNumber, List<Long> columnIds, List<Type> columnTypes, boolean checkSpace) {
+    public StoragePageSink createStoragePageSink(long transactionId, OptionalInt bucketNumber, List<Long> columnIds, List<Type> columnTypes, boolean checkSpace)
+    {
         return new OrcStoragePageSink(transactionId, columnIds, columnTypes, bucketNumber);
     }
 
     private MemoryOrcDataSource fileOrcDataSource(ReaderAttributes readerAttributes, File file)
-            throws FileNotFoundException {
+            throws FileNotFoundException
+    {
         return new MemoryOrcDataSource(file.getName(), inMemoryFileSystem.get(file.getName()).getInput(), readerAttributes.getMaxMergeDistance(), readerAttributes.getMaxReadSize(), readerAttributes.getStreamBufferSize());
     }
 
-    private ShardInfo createShardInfo(UUID shardUuid, OptionalInt bucketNumber, File file, Set<String> nodes, long rowCount, long uncompressedSize) {
+    private ShardInfo createShardInfo(UUID shardUuid, OptionalInt bucketNumber, File file, Set<String> nodes, long rowCount, long uncompressedSize)
+    {
         return new ShardInfo(shardUuid, bucketNumber, nodes, computeShardStats(file), rowCount, length(file), uncompressedSize, xxhash64(file));
     }
 
-    private List<ColumnStats> computeShardStats(File file) {
+    private List<ColumnStats> computeShardStats(File file)
+    {
         try (OrcDataSource dataSource = fileOrcDataSource(defaultReaderAttributes, file)) {
             OrcReader reader = new OrcReader(dataSource, new OrcMetadataReader(), defaultReaderAttributes.getMaxMergeDistance(), defaultReaderAttributes.getMaxReadSize(), HUGE_MAX_READ_BLOCK_SIZE);
 
@@ -185,12 +199,14 @@ public class InMemoryOrcStorageManager
                 computeColumnStats(reader, info.getColumnId(), info.getType()).ifPresent(list::add);
             }
             return list.build();
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             throw new PrestoException(RAPTOR_ERROR, "Failed to read file: " + file, e);
         }
     }
 
-    private List<ColumnInfo> getColumnInfo(OrcReader reader) {
+    private List<ColumnInfo> getColumnInfo(OrcReader reader)
+    {
         Optional<OrcFileMetadata> metadata = getOrcFileMetadata(reader);
         if (metadata.isPresent()) {
             return getColumnInfoFromOrcUserMetadata(metadata.get());
@@ -200,7 +216,8 @@ public class InMemoryOrcStorageManager
         return getColumnInfoFromOrcColumnTypes(reader.getColumnNames(), reader.getFooter().getTypes());
     }
 
-    private List<ColumnInfo> getColumnInfoFromOrcColumnTypes(List<String> orcColumnNames, List<OrcType> orcColumnTypes) {
+    private List<ColumnInfo> getColumnInfoFromOrcColumnTypes(List<String> orcColumnNames, List<OrcType> orcColumnTypes)
+    {
         Type rowType = getType(orcColumnTypes, 0);
         if (orcColumnNames.size() != rowType.getTypeParameters().size()) {
             throw new PrestoException(RAPTOR_ERROR, "Column names and types do not match");
@@ -213,25 +230,23 @@ public class InMemoryOrcStorageManager
         return list.build();
     }
 
-    long xxhash64(File file) {
+    long xxhash64(File file)
+    {
         try (InputStream in = inMemoryFileSystem.get(file.getName()).getInput()) {
             return XxHash64.hash(in);
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             throw new PrestoException(RAPTOR_ERROR, "Failed to read file: " + file, e);
         }
     }
 
-
-    long length(File file) {
+    long length(File file)
+    {
         return inMemoryFileSystem.get(file.getName()).length();
     }
 
-    private static Optional<OrcFileMetadata> getOrcFileMetadata(OrcReader reader) {
-        return Optional.ofNullable(reader.getFooter().getUserMetadata().get(OrcFileMetadata.KEY))
-                .map(slice -> METADATA_CODEC.fromJson(slice.getBytes()));
-    }
-
-    private List<ColumnInfo> getColumnInfoFromOrcUserMetadata(OrcFileMetadata orcFileMetadata) {
+    private List<ColumnInfo> getColumnInfoFromOrcUserMetadata(OrcFileMetadata orcFileMetadata)
+    {
         return orcFileMetadata.getColumnTypes().entrySet()
                 .stream()
                 .sorted(Map.Entry.comparingByKey())
@@ -239,7 +254,8 @@ public class InMemoryOrcStorageManager
                 .collect(toList());
     }
 
-    private Type getType(List<OrcType> types, int index) {
+    private Type getType(List<OrcType> types, int index)
+    {
         OrcType type = types.get(index);
         switch (type.getOrcTypeKind()) {
             case BOOLEAN:
@@ -273,7 +289,8 @@ public class InMemoryOrcStorageManager
     }
 
     private class OrcStoragePageSink
-            implements StoragePageSink {
+            implements StoragePageSink
+    {
         private final long transactionId;
         private final List<Long> columnIds;
         private final List<Type> columnTypes;
@@ -287,7 +304,8 @@ public class InMemoryOrcStorageManager
         private InMemoryOrcFileWriter writer;
         private UUID shardUuid;
 
-        public OrcStoragePageSink(long transactionId, List<Long> columnIds, List<Type> columnTypes, OptionalInt bucketNumber) {
+        public OrcStoragePageSink(long transactionId, List<Long> columnIds, List<Type> columnTypes, OptionalInt bucketNumber)
+        {
             this.transactionId = transactionId;
             this.columnIds = ImmutableList.copyOf(requireNonNull(columnIds, "columnIds is null"));
             this.columnTypes = ImmutableList.copyOf(requireNonNull(columnTypes, "columnTypes is null"));
@@ -295,25 +313,29 @@ public class InMemoryOrcStorageManager
         }
 
         @Override
-        public void appendPages(List<Page> pages) {
+        public void appendPages(List<Page> pages)
+        {
             createWriterIfNecessary();
             writer.appendPages(pages);
         }
 
         @Override
-        public void appendPages(List<Page> inputPages, int[] pageIndexes, int[] positionIndexes) {
+        public void appendPages(List<Page> inputPages, int[] pageIndexes, int[] positionIndexes)
+        {
             createWriterIfNecessary();
             writer.appendPages(inputPages, pageIndexes, positionIndexes);
         }
 
         @Override
-        public void appendRow(Row row) {
+        public void appendRow(Row row)
+        {
             createWriterIfNecessary();
             writer.appendRow(row);
         }
 
         @Override
-        public boolean isFull() {
+        public boolean isFull()
+        {
             if (writer == null) {
                 return false;
             }
@@ -321,7 +343,8 @@ public class InMemoryOrcStorageManager
         }
 
         @Override
-        public void flush() {
+        public void flush()
+        {
             if (writer != null) {
                 writer.close();
 
@@ -342,7 +365,8 @@ public class InMemoryOrcStorageManager
         }
 
         @Override
-        public CompletableFuture<List<ShardInfo>> commit() {
+        public CompletableFuture<List<ShardInfo>> commit()
+        {
             checkState(!committed, "already committed");
             committed = true;
 
@@ -358,17 +382,20 @@ public class InMemoryOrcStorageManager
         }
 
         @Override
-        public void rollback() {
+        public void rollback()
+        {
             try {
                 if (writer != null) {
                     writer.close();
                     writer = null;
                 }
-            } finally {
+            }
+            finally {
                 for (File file : stagingFiles) {
                     try {
                         Files.deleteIfExists(file.toPath());
-                    } catch (IOException e) {
+                    }
+                    catch (IOException e) {
                         throw new RuntimeException(e);
                     }
                 }
@@ -385,7 +412,8 @@ public class InMemoryOrcStorageManager
             }
         }
 
-        private void createWriterIfNecessary() {
+        private void createWriterIfNecessary()
+        {
             if (writer == null) {
                 shardUuid = UUID.randomUUID();
                 File stagingFile = storageService.getStagingFile(shardUuid);

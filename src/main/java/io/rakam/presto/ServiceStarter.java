@@ -8,8 +8,6 @@ import com.facebook.presto.block.BlockEncodingManager;
 import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.raptor.backup.BackupConfig;
 import com.facebook.presto.raptor.util.RebindSafeMBeanServer;
-import com.facebook.presto.spi.NodeManager;
-import com.facebook.presto.spi.PageSorter;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
@@ -21,12 +19,10 @@ import com.google.inject.Scopes;
 import com.google.inject.multibindings.OptionalBinder;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
-import io.airlift.jmx.JmxModule;
 import io.airlift.log.Logger;
 import io.airlift.log.Logging;
 import io.airlift.log.LoggingConfiguration;
 import io.rakam.presto.connector.raptor.RaptorModule;
-import io.rakam.presto.kafka.KafkaHistoricalDataHandler;
 import io.rakam.presto.kafka.KafkaStreamSourceModule;
 import io.rakam.presto.kinesis.KinesisStreamSourceModule;
 import org.weakref.jmx.guice.MBeanModule;
@@ -40,7 +36,6 @@ import java.io.UncheckedIOException;
 import java.net.URL;
 import java.util.Properties;
 
-import static com.google.common.io.ByteStreams.nullOutputStream;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.rakam.presto.ConditionalModule.installIfPropertyEquals;
 import static java.lang.management.ManagementFactory.getPlatformMBeanServer;
@@ -49,32 +44,8 @@ import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
 public final class ServiceStarter
 {
-    public static String RAKAM_VERSION;
     private final static Logger LOGGER = Logger.get(ServiceStarter.class);
-
-    static {
-        Properties properties = new Properties();
-        InputStream inputStream;
-        try {
-            URL resource = ServiceStarter.class.getResource("/git.properties");
-            if (resource == null) {
-                LOGGER.warn("git.properties doesn't exist.");
-            }
-            else {
-                inputStream = resource.openStream();
-                properties.load(inputStream);
-            }
-        }
-        catch (IOException e) {
-            LOGGER.warn(e, "Error while reading git.properties");
-        }
-        try {
-            RAKAM_VERSION = properties.get("git.commit.id.describe-short").toString().split("-", 2)[0];
-        }
-        catch (Exception e) {
-            LOGGER.warn(e, "Error while parsing git.properties");
-        }
-    }
+    public static String RAKAM_VERSION;
 
     private ServiceStarter()
             throws InstantiationException
@@ -122,6 +93,31 @@ public final class ServiceStarter
         LOGGER.info("======== SERVER STARTED ========");
     }
 
+    public static void initializeLogging(String logLevelsFile)
+    {
+        // unhook out and err while initializing logging or logger will print to them
+        PrintStream out = System.out;
+        PrintStream err = System.err;
+
+        try {
+            LoggingConfiguration config = new LoggingConfiguration();
+
+            if (logLevelsFile != null) {
+                config.setLevelsFile(logLevelsFile);
+            }
+
+            Logging logging = Logging.initialize();
+            logging.configure(config);
+        }
+        catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        finally {
+            System.setOut(out);
+            System.setErr(err);
+        }
+    }
+
     public static class StreamSourceModule
             extends AbstractConfigurationAwareModule
     {
@@ -148,28 +144,27 @@ public final class ServiceStarter
         }
     }
 
-    public static void initializeLogging(String logLevelsFile)
-    {
-        // unhook out and err while initializing logging or logger will print to them
-        PrintStream out = System.out;
-        PrintStream err = System.err;
-
+    static {
+        Properties properties = new Properties();
+        InputStream inputStream;
         try {
-            LoggingConfiguration config = new LoggingConfiguration();
-
-            if (logLevelsFile != null) {
-                config.setLevelsFile(logLevelsFile);
+            URL resource = ServiceStarter.class.getResource("/git.properties");
+            if (resource == null) {
+                LOGGER.warn("git.properties doesn't exist.");
             }
-
-            Logging logging = Logging.initialize();
-            logging.configure(config);
+            else {
+                inputStream = resource.openStream();
+                properties.load(inputStream);
+            }
         }
         catch (IOException e) {
-            throw new UncheckedIOException(e);
+            LOGGER.warn(e, "Error while reading git.properties");
         }
-        finally {
-            System.setOut(out);
-            System.setErr(err);
+        try {
+            RAKAM_VERSION = properties.get("git.commit.id.describe-short").toString().split("-", 2)[0];
+        }
+        catch (Exception e) {
+            LOGGER.warn(e, "Error while parsing git.properties");
         }
     }
 }

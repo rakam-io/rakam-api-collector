@@ -14,7 +14,6 @@ import io.rakam.presto.deserialization.json.FabricJsonDeserializer;
 import io.rakam.presto.deserialization.json.JsonDeserializer;
 import io.rakam.presto.kafka.KafkaJsonMessageTransformer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.rakam.collection.FieldType;
 import org.rakam.util.JsonHelper;
 import org.testng.annotations.Test;
 
@@ -27,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static org.testng.Assert.assertEquals;
 
 public class TestKafkaFabricJsonDeserializer

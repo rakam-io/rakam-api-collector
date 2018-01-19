@@ -40,27 +40,6 @@ public class PageBuilder
         this(initialExpectedEntries, types, Optional.empty(), 0);
     }
 
-    public PageBuilder newPageBuilderWithType(Type type)
-    {
-        int newLength = types.size() + 1;
-        BlockBuilder[] newBlockBuilders = new BlockBuilder[newLength];
-        for (int i = 0; i < blockBuilders.length; i++) {
-            newBlockBuilders[i] = blockBuilders[i];
-        }
-
-        BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), declaredPositions * 2);
-        newBlockBuilders[newBlockBuilders.length - 1] = blockBuilder;
-        int oldIterations = declaredPositions - 1;
-        for (int i = 0; i < oldIterations; i++) {
-            blockBuilder.appendNull();
-        }
-
-        PageBuilder pageBuilder = new PageBuilder(Integer.MAX_VALUE,
-                ImmutableList.<Type>builder().addAll(types).add(type).build(),
-                Optional.of(newBlockBuilders), declaredPositions);
-        return pageBuilder;
-    }
-
     public PageBuilder(int initialExpectedEntries, List<? extends Type> types, Optional<BlockBuilder[]> templateBlockBuilders, Integer declaredPositions)
     {
         this.types = unmodifiableList(new ArrayList<>(requireNonNull(types, "types is null")));
@@ -106,6 +85,34 @@ public class PageBuilder
                         pageBuilderStatus.getMaxBlockSizeInBytes() / expectedEntries);
             }
         }
+    }
+
+    private static void checkArgument(boolean expression, String errorMessage)
+    {
+        if (!expression) {
+            throw new IllegalArgumentException(errorMessage);
+        }
+    }
+
+    public PageBuilder newPageBuilderWithType(Type type)
+    {
+        int newLength = types.size() + 1;
+        BlockBuilder[] newBlockBuilders = new BlockBuilder[newLength];
+        for (int i = 0; i < blockBuilders.length; i++) {
+            newBlockBuilders[i] = blockBuilders[i];
+        }
+
+        BlockBuilder blockBuilder = type.createBlockBuilder(new BlockBuilderStatus(), declaredPositions * 2);
+        newBlockBuilders[newBlockBuilders.length - 1] = blockBuilder;
+        int oldIterations = declaredPositions - 1;
+        for (int i = 0; i < oldIterations; i++) {
+            blockBuilder.appendNull();
+        }
+
+        PageBuilder pageBuilder = new PageBuilder(Integer.MAX_VALUE,
+                ImmutableList.<Type>builder().addAll(types).add(type).build(),
+                Optional.of(newBlockBuilders), declaredPositions);
+        return pageBuilder;
     }
 
     public void reset()
@@ -182,12 +189,5 @@ public class PageBuilder
         }
 
         return new Page(blocks);
-    }
-
-    private static void checkArgument(boolean expression, String errorMessage)
-    {
-        if (!expression) {
-            throw new IllegalArgumentException(errorMessage);
-        }
     }
 }

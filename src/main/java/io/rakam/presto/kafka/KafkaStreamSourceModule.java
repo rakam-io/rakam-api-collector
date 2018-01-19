@@ -51,7 +51,7 @@ public class KafkaStreamSourceModule
 
         binder.bind(DecoupleMessage.class).to(KafkaDecoupleMessage.class).in(Scopes.SINGLETON);
         OptionalBinder<HistoricalDataHandler> historical = OptionalBinder.newOptionalBinder(binder, HistoricalDataHandler.class);
-        if(config.getHistoricalDataTopic() != null) {
+        if (config.getHistoricalDataTopic() != null) {
             historical.setBinding().to(KafkaHistoricalDataHandler.class).in(Scopes.SINGLETON);
         }
 

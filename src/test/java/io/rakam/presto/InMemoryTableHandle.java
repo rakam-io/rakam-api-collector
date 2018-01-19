@@ -12,7 +12,8 @@ public class InMemoryTableHandle
 {
     private final SchemaTableName tableName;
 
-    public InMemoryTableHandle(SchemaTableName tableName) {
+    public InMemoryTableHandle(SchemaTableName tableName)
+    {
         this.tableName = tableName;
     }
 

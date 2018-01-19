@@ -10,7 +10,6 @@ import com.google.inject.Scopes;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.deserialization.MessageEventTransformer;
-import io.rakam.presto.kafka.KafkaRecordSizeCalculator;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
 

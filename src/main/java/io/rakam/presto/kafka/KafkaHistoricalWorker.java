@@ -53,29 +53,22 @@ public class KafkaHistoricalWorker
 
     private final MemoryTracker memoryTracker;
     private final HistoricalDataConfig historicalDataConfig;
-
-    protected KafkaConsumer<byte[], byte[]> consumer;
-
     private final StreamWorkerContext<ConsumerRecord> context;
-    protected KafkaConfig config;
-
     private final TargetConnectorCommitter committer;
-
-    private Thread workerThread;
-    private boolean working;
-
     private final CounterStat databaseFlushStats = new CounterStat();
     private final CounterStat recordStats = new CounterStat();
     private final CounterStat errorStats = new CounterStat();
     private final DistributionStat databaseFlushDistribution = new DistributionStat();
-
+    private final Map<Integer, Long> currentKafkaOffsets;
+    private final BasicMemoryBuffer buffer;
+    protected KafkaConsumer<byte[], byte[]> consumer;
+    protected KafkaConfig config;
+    private Thread workerThread;
+    private boolean working;
     private Map<Status, LongHolder> statusSpentTime = new HashMap<>();
     private long lastStatusChangeTime;
     private Status currentStatus;
-
-    private final Map<Integer, Long> currentKafkaOffsets;
     private long lastPollInMillis;
-    private final BasicMemoryBuffer buffer;
 
     @Inject
     public KafkaHistoricalWorker(KafkaConfig config, MemoryTracker memoryTracker, HistoricalDataConfig historicalDataConfig, StreamWorkerContext<ConsumerRecord> context, TargetConnectorCommitter committer)
@@ -332,13 +325,13 @@ public class KafkaHistoricalWorker
         return errorStats;
     }
 
-    private static class LongHolder
-    {
-        long value;
-    }
-
     private enum Status
     {
         POLLING, FLUSHING_MIDDLEWARE, CHECKPOINTING, SLEEPING, WAITING_FOR_MEMORY;
+    }
+
+    private static class LongHolder
+    {
+        long value;
     }
 }

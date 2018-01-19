@@ -11,8 +11,11 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 
 import java.util.Properties;
 
-public class KafkaIntegrationTest {
-    public void testProducer() throws Exception {
+public class KafkaIntegrationTest
+{
+    public void testProducer()
+            throws Exception
+    {
         Properties props = new Properties();
         props.put("bootstrap.servers", "localhost:9092");
         props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");

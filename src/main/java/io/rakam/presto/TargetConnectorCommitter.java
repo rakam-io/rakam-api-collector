@@ -22,9 +22,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TargetConnectorCommitter
 {
     private final int executorPoolSize;
-    private AtomicInteger activeFlushCount = new AtomicInteger();
     private final DatabaseHandler databaseHandler;
     private final AsyncFailsafe<Void> executor;
+    private AtomicInteger activeFlushCount = new AtomicInteger();
 
     @Inject
     public TargetConnectorCommitter(DatabaseHandler databaseHandler)

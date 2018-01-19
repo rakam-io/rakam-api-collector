@@ -121,91 +121,11 @@ public class InMemoryOrcFileWriter
         orcRow = tableInspector.create();
     }
 
-    public void appendPages(List<Page> pages)
-    {
-        for (Page page : pages) {
-            for (int position = 0; position < page.getPositionCount(); position++) {
-                appendRow(extractRow(page, position, columnTypes));
-            }
-        }
-    }
-
-    public void appendPages(List<Page> inputPages, int[] pageIndexes, int[] positionIndexes)
-    {
-        checkArgument(pageIndexes.length == positionIndexes.length, "pageIndexes and positionIndexes do not match");
-        for (int i = 0; i < pageIndexes.length; i++) {
-            Page page = inputPages.get(pageIndexes[i]);
-            appendRow(extractRow(page, positionIndexes[i], columnTypes));
-        }
-    }
-
-    public void appendRow(Row row)
-    {
-        List<Object> columns = row.getColumns();
-        checkArgument(columns.size() == columnTypes.size());
-        for (int channel = 0; channel < columns.size(); channel++) {
-            tableInspector.setStructFieldData(orcRow, structFields.get(channel), columns.get(channel));
-        }
-        try {
-            recordWriter.write(serializer.serialize(orcRow, tableInspector));
-        }
-        catch (IOException e) {
-            throw new PrestoException(RAPTOR_ERROR, "Failed to write record", e);
-        }
-        rowCount++;
-        uncompressedSize += row.getSizeInBytes();
-    }
-
-    @Override
-    public void close()
-    {
-        if (closed) {
-            return;
-        }
-        closed = true;
-
-        try {
-            recordWriter.close(false);
-        }
-        catch (IOException e) {
-            throw new PrestoException(RAPTOR_ERROR, "Failed to close writer", e);
-        }
-    }
-
-    public long getRowCount()
-    {
-        return rowCount;
-    }
-
-    public long getUncompressedSize()
-    {
-        return uncompressedSize;
-    }
-
     private static OrcSerde createSerializer(Properties properties)
     {
         OrcSerde serde = new OrcSerde();
         serde.initialize(CONFIGURATION, properties);
         return serde;
-    }
-
-    private FileSinkOperator.RecordWriter createRecordWriter(Path target, List<Long> columnIds, List<Type> columnTypes, boolean writeMetadata)
-    {
-        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(FileSystem.class.getClassLoader())) {
-            OrcFile.WriterOptions options = new OrcWriterOptions(CONFIGURATION)
-                    .memory(new NullMemoryManager(CONFIGURATION))
-                    .fileSystem(inMemoryFileSystem)
-                    .compress(SNAPPY);
-
-            if (writeMetadata) {
-                options.callback(createFileMetadataCallback(columnIds, columnTypes));
-            }
-
-            return WRITER_CONSTRUCTOR.newInstance(target, options);
-        }
-        catch (ReflectiveOperationException e) {
-            throw new PrestoException(RAPTOR_ERROR, "Failed to create writer", e);
-        }
     }
 
     private static OrcFile.WriterCallback createFileMetadataCallback(List<Long> columnIds, List<Type> columnTypes)
@@ -315,5 +235,85 @@ public class InMemoryOrcFileWriter
             return mapOf(toStorageType(type.getTypeParameters().get(0)), toStorageType(type.getTypeParameters().get(1)));
         }
         throw new PrestoException(NOT_SUPPORTED, "No storage type for type: " + type);
+    }
+
+    public void appendPages(List<Page> pages)
+    {
+        for (Page page : pages) {
+            for (int position = 0; position < page.getPositionCount(); position++) {
+                appendRow(extractRow(page, position, columnTypes));
+            }
+        }
+    }
+
+    public void appendPages(List<Page> inputPages, int[] pageIndexes, int[] positionIndexes)
+    {
+        checkArgument(pageIndexes.length == positionIndexes.length, "pageIndexes and positionIndexes do not match");
+        for (int i = 0; i < pageIndexes.length; i++) {
+            Page page = inputPages.get(pageIndexes[i]);
+            appendRow(extractRow(page, positionIndexes[i], columnTypes));
+        }
+    }
+
+    public void appendRow(Row row)
+    {
+        List<Object> columns = row.getColumns();
+        checkArgument(columns.size() == columnTypes.size());
+        for (int channel = 0; channel < columns.size(); channel++) {
+            tableInspector.setStructFieldData(orcRow, structFields.get(channel), columns.get(channel));
+        }
+        try {
+            recordWriter.write(serializer.serialize(orcRow, tableInspector));
+        }
+        catch (IOException e) {
+            throw new PrestoException(RAPTOR_ERROR, "Failed to write record", e);
+        }
+        rowCount++;
+        uncompressedSize += row.getSizeInBytes();
+    }
+
+    @Override
+    public void close()
+    {
+        if (closed) {
+            return;
+        }
+        closed = true;
+
+        try {
+            recordWriter.close(false);
+        }
+        catch (IOException e) {
+            throw new PrestoException(RAPTOR_ERROR, "Failed to close writer", e);
+        }
+    }
+
+    public long getRowCount()
+    {
+        return rowCount;
+    }
+
+    public long getUncompressedSize()
+    {
+        return uncompressedSize;
+    }
+
+    private FileSinkOperator.RecordWriter createRecordWriter(Path target, List<Long> columnIds, List<Type> columnTypes, boolean writeMetadata)
+    {
+        try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(FileSystem.class.getClassLoader())) {
+            OrcFile.WriterOptions options = new OrcWriterOptions(CONFIGURATION)
+                    .memory(new NullMemoryManager(CONFIGURATION))
+                    .fileSystem(inMemoryFileSystem)
+                    .compress(SNAPPY);
+
+            if (writeMetadata) {
+                options.callback(createFileMetadataCallback(columnIds, columnTypes));
+            }
+
+            return WRITER_CONSTRUCTOR.newInstance(target, options);
+        }
+        catch (ReflectiveOperationException e) {
+            throw new PrestoException(RAPTOR_ERROR, "Failed to create writer", e);
+        }
     }
 }
