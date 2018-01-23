@@ -73,8 +73,6 @@ public class KafkaUtil
         props.put("heartbeat.interval.ms", "1000");
         props.put("request.timeout.ms", requestTimeOut);
         props.put("max.poll.records", config.getMaxPollRecords());
-
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         return props;
     }
 
@@ -115,7 +113,7 @@ public class KafkaUtil
             for (Map.Entry<String, Int2LongOpenHashMap> entry : offsets.entrySet()) {
                 String topic = entry.getKey();
                 for (Int2LongMap.Entry offsetList : entry.getValue().int2LongEntrySet()) {
-                    offsetsForKafka.put(new TopicPartition(topic, offsetList.getIntKey()), new OffsetAndMetadata(offsetList.getLongValue()));
+                    offsetsForKafka.put(new TopicPartition(topic, offsetList.getIntKey()), new OffsetAndMetadata(offsetList.getLongValue() + 1));
                 }
             }
 

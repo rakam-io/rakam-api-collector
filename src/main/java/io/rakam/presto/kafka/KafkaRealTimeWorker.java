@@ -5,7 +5,6 @@
 package io.rakam.presto.kafka;
 
 import com.facebook.presto.spi.SchemaTableName;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterators;
@@ -13,7 +12,6 @@ import com.google.common.primitives.Ints;
 import io.airlift.log.Logger;
 import io.airlift.stats.CounterStat;
 import io.airlift.stats.DistributionStat;
-import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.BatchRecords;
@@ -32,9 +30,12 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntListIterator;
+import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
 
@@ -45,6 +46,7 @@ import javax.inject.Inject;
 
 import java.time.LocalDate;
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -56,8 +58,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import static io.airlift.units.DataSize.succinctBytes;
 import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
 import static io.rakam.presto.kafka.KafkaUtil.findLatestOffsets;
+import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -124,6 +128,9 @@ public class KafkaRealTimeWorker
                 String message = statusSpentTime.entrySet().stream().sorted(Comparator.comparingLong(o -> -o.getValue().value))
                         .map(entry -> entry.getKey().name() + ":" + Duration.succinctDuration(entry.getValue().value, MILLISECONDS).toString())
                         .collect(Collectors.joining(", "));
+                message += format(" %s (%s%%) memory available",
+                        succinctBytes(memoryTracker.availableMemory()).toString(),
+                        memoryTracker.availableMemoryInPercentage() * 100);
                 log.debug(message);
             }, 5, 5, SECONDS);
         }
@@ -132,7 +139,25 @@ public class KafkaRealTimeWorker
     public void subscribe()
     {
         consumer = new KafkaConsumer(createConsumerConfig(config));
-        consumer.subscribe(config.getTopic());
+        consumer.subscribe(config.getTopic(), new ConsumerRebalanceListener()
+        {
+
+            @Override
+            public void onPartitionsRevoked(Collection<TopicPartition> partitions)
+            {
+                log.info("Revoked topicPartitions : {}", partitions);
+            }
+
+            @Override
+            public void onPartitionsAssigned(Collection<TopicPartition> partitions)
+            {
+                for (TopicPartition tp : partitions) {
+                    OffsetAndMetadata offsetAndMetaData = consumer.committed(tp);
+                    long startOffset = offsetAndMetaData != null ? offsetAndMetaData.offset() : -1L;
+                    log.info("Assigned topicPartition : %s offset : %s", tp, startOffset);
+                }
+            }
+        });
     }
 
     public void execute()
@@ -207,12 +232,15 @@ public class KafkaRealTimeWorker
         try {
             BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records = buffer.getRecords();
 
-            if (!records.bulkBuffer.isEmpty() || !records.buffer.isEmpty()) {
+            boolean notEmpty = !records.bulkBuffer.isEmpty() || !records.buffer.isEmpty();
+
+            if (notEmpty) {
+                consumer.pause(consumer.assignment());
                 changeType(Status.FLUSHING_MIDDLEWARE);
 
                 long now = System.currentTimeMillis();
                 log.info("Flushing records (%s) from stream buffer, it's been %s since last flush.",
-                        DataSize.succinctBytes(buffer.getTotalBytes()).toString(),
+                        succinctBytes(buffer.getTotalBytes()).toString(),
                         Duration.succinctDuration(now - buffer.getPreviousFlushTimeMillisecond(), MILLISECONDS).toString());
 
                 Map.Entry<Iterable<ConsumerRecord<byte[], byte[]>>, CompletableFuture<Void>> extractedData = extract(records);
@@ -230,7 +258,7 @@ public class KafkaRealTimeWorker
                 long totalDataSize = data.entrySet().stream().mapToLong(e -> e.getValue().page.getRetainedSizeInBytes()).sum();
                 log.info("Flushed records to middleware buffer in %s, the data size is %s",
                         Duration.succinctDuration(System.currentTimeMillis() - now, MILLISECONDS).toString(),
-                        DataSize.succinctBytes(totalDataSize));
+                        succinctBytes(totalDataSize));
             }
 
             if (!committer.isFull()) {
@@ -240,6 +268,10 @@ public class KafkaRealTimeWorker
                     KafkaUtil.flush(map, committer, checkpointQueue, memoryTracker,
                             log, databaseFlushStats, databaseFlushDistribution, realTimeRecordsStats, errorStats);
                 }
+            }
+
+            if (notEmpty) {
+                consumer.resume(consumer.assignment());
             }
         }
         catch (Throwable e) {
@@ -251,10 +283,6 @@ public class KafkaRealTimeWorker
     private Map.Entry<Iterable<ConsumerRecord<byte[], byte[]>>, CompletableFuture<Void>> extract(BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records)
     {
         CompletableFuture<Void> historicalDataAction = BatchRecords.COMPLETED_FUTURE;
-
-        /*if (historicalDataHandler == null) {
-            return new SimpleImmutableEntry<>(records.buffer, historicalDataAction);
-        }*/
 
         ProcessedRecords processedRecords = processRecords(records);
         int totalRecords = records.buffer.size();
@@ -285,7 +313,6 @@ public class KafkaRealTimeWorker
             historicalRecordsStats.update(historicalRecordCount);
         }
 
-        log.info("realTimeRecords: "+ processedRecords.realTimeRecordCount);
         return new SimpleImmutableEntry<>(realTimeRecords, historicalDataAction);
     }
 
@@ -333,7 +360,7 @@ public class KafkaRealTimeWorker
         for (Int2ObjectMap.Entry<IntArrayList> entry : recordsIndexedByDay.int2ObjectEntrySet()) {
             int day = entry.getIntKey();
             IntArrayList recordIndexes = entry.getValue();
-            if (recordIndexes.size() > 1000 && (recordIndexes.size() * 100.0 / records.buffer.size()) > .25) {
+            if (recordIndexes.size() > 1000 && (recordIndexes.size() * 1.0 / records.buffer.size()) > .25) {
                 IntListIterator iterator = recordIndexes.iterator();
                 while (iterator.hasNext()) {
                     int i = iterator.nextInt();
