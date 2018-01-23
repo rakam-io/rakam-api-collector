@@ -37,7 +37,8 @@ public class TargetConnectorCommitter
                 .withMaxDuration(1, TimeUnit.MINUTES)
                 .withMaxRetries(3);
 
-        executorPoolSize = Runtime.getRuntime().availableProcessors() * 2;
+//        executorPoolSize = Runtime.getRuntime().availableProcessors() * 2;
+        executorPoolSize = 2;
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(executorPoolSize,
                 new ThreadFactoryBuilder().setNameFormat("target-committer").build());
 
