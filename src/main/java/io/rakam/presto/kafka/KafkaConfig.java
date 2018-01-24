@@ -34,6 +34,7 @@ public class KafkaConfig
     private String sessionTimeOut = "12000";
     private String requestTimeOut = "15000";
     private String historicalDataTopic;
+    private int outdatedDayIndex = 1;
 
     private static HostAddress toKafkaHostAddress(String value)
     {
@@ -60,10 +61,22 @@ public class KafkaConfig
         return maxPollRecords;
     }
 
+    public int getOutdatedDayIndex()
+    {
+        return outdatedDayIndex;
+    }
+
+    @Config("outdated.day.index")
+    public KafkaConfig setOutdatedDayIndex(int outdatedDayIndex)
+    {
+        this.outdatedDayIndex = outdatedDayIndex;
+        return this;
+    }
+
     @Config("max.poll.records")
     public KafkaConfig setMaxPollRecords(String maxPollRecords)
     {
-        if (Strings.isNullOrEmpty(maxPollRecords)) {
+        if (!Strings.isNullOrEmpty(maxPollRecords)) {
             this.maxPollRecords = maxPollRecords;
         }
         return this;

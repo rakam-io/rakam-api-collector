@@ -26,9 +26,11 @@ public class TargetConnectorCommitter
     private final AsyncFailsafe<Void> executor;
     private AtomicInteger activeFlushCount = new AtomicInteger();
 
+
     @Inject
-    public TargetConnectorCommitter(DatabaseHandler databaseHandler)
+    public TargetConnectorCommitter(DatabaseHandler databaseHandler, CommitterConfig committerConfig)
     {
+
         this.databaseHandler = databaseHandler;
 
         RetryPolicy retryPolicy = new RetryPolicy()
@@ -38,7 +40,7 @@ public class TargetConnectorCommitter
                 .withMaxRetries(3);
 
 //        executorPoolSize = Runtime.getRuntime().availableProcessors() * 2;
-        executorPoolSize = 2;
+        executorPoolSize = committerConfig.getCommitterThreadCount();
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(executorPoolSize,
                 new ThreadFactoryBuilder().setNameFormat("target-committer").build());
 

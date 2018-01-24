@@ -4,12 +4,16 @@
 
 package io.rakam.presto;
 
+import io.airlift.log.Logger;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class BasicMemoryBuffer<T>
         implements MemoryBuffer<T>
 {
+    private static final Logger log = Logger.get(BasicMemoryBuffer.class);
+
     private final long millisecondsToBuffer;
     private final ArrayList<T> buffer;
     private final ArrayList<T> bulkBuffer;
@@ -76,8 +80,8 @@ public class BasicMemoryBuffer<T>
 
     public boolean shouldFlush()
     {
-        return ((System.currentTimeMillis() - previousFlushTimeMillisecond) >= getMillisecondsToBuffer())
-                || memoryTracker.availableMemory() - (totalBytes * memoryMultiplier) < 0;
+        return ((System.currentTimeMillis() - previousFlushTimeMillisecond) >= getMillisecondsToBuffer()
+                || (memoryTracker.availableMemory() - (totalBytes * memoryMultiplier) < 0));
     }
 
     public Records getRecords()

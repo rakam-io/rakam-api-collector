@@ -24,7 +24,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class InMemoryFileSystem
         extends FileSystem
 {
-
     private final MemoryTracker memoryTracker;
     Map<String, DynamicSliceOutput> files;
 
@@ -111,7 +110,6 @@ public final class InMemoryFileSystem
     public boolean mkdirs(Path path, FsPermission fsPermission)
             throws IOException
     {
-
         throw new UnsupportedOperationException();
     }
 

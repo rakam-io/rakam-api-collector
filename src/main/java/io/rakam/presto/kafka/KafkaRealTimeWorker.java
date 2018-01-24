@@ -12,6 +12,7 @@ import com.google.common.primitives.Ints;
 import io.airlift.log.Logger;
 import io.airlift.stats.CounterStat;
 import io.airlift.stats.DistributionStat;
+import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.BatchRecords;
@@ -90,6 +91,7 @@ public class KafkaRealTimeWorker
     private Map<Status, LongHolder> statusSpentTime = new HashMap<>();
     private long lastStatusChangeTime;
     private Status currentStatus;
+    private int outdatedRecordIndex;
 
     @Inject
     public KafkaRealTimeWorker(KafkaConfig config, MemoryTracker memoryTracker, FieldNameConfig fieldNameConfig, Optional<HistoricalDataHandler> historicalDataHandler, DecoupleMessage decoupleMessage, MiddlewareConfig middlewareConfig, StreamWorkerContext<ConsumerRecord<byte[], byte[]>> context, TargetConnectorCommitter committer)
@@ -99,7 +101,7 @@ public class KafkaRealTimeWorker
         this.decoupleMessage = decoupleMessage;
         Set<String> whitelistedCollections = fieldNameConfig.getWhitelistedCollections();
         this.whiteListCollections = whitelistedCollections == null ? input -> true : input -> whitelistedCollections.contains(input);
-
+        this.outdatedRecordIndex = config.getOutdatedDayIndex();
         this.historicalDataHandler = historicalDataHandler.orNull();
         this.committer = committer;
         this.memoryTracker = memoryTracker;
@@ -173,6 +175,9 @@ public class KafkaRealTimeWorker
                     buffer.consumeRecords(records);
                     realTimeRecordsStats.update(records.count());
 
+                    changeType(Status.FLUSHING_STREAM);
+                    flushDataSafe();
+
                     if (buffer.shouldFlush()) {
                         changeType(Status.FLUSHING_STREAM);
                         flushDataSafe();
@@ -180,14 +185,15 @@ public class KafkaRealTimeWorker
 
                     checkpoint();
 
-                    if (memoryTracker.availableMemoryInPercentage() < .3) {
+                    if (memoryTracker.availableMemoryInPercentage() < .30) {
                         changeType(Status.FLUSHING_STREAM);
                         flushDataSafe();
 
-                        while (memoryTracker.availableMemoryInPercentage() < .3) {
+                        while (memoryTracker.availableMemoryInPercentage() < .30) {
                             changeType(Status.WAITING_FOR_MEMORY);
 
                             try {
+                                log.info("Not enough memory (%s)to process records sleeping for 1s", memoryTracker.availableMemoryInPercentage());
                                 SECONDS.sleep(1);
                             }
                             catch (InterruptedException e) {
@@ -239,8 +245,8 @@ public class KafkaRealTimeWorker
                 changeType(Status.FLUSHING_MIDDLEWARE);
 
                 long now = System.currentTimeMillis();
-                log.info("Flushing records (%s) from stream buffer, it's been %s since last flush.",
-                        succinctBytes(buffer.getTotalBytes()).toString(),
+                log.debug("Flushing %s records of size (%s) from stream buffer, it's been %s since last flush.", buffer.getTotalRecords(),
+                        DataSize.succinctBytes(buffer.getTotalBytes()).toString(),
                         Duration.succinctDuration(now - buffer.getPreviousFlushTimeMillisecond(), MILLISECONDS).toString());
 
                 Map.Entry<Iterable<ConsumerRecord<byte[], byte[]>>, CompletableFuture<Void>> extractedData = extract(records);
@@ -256,7 +262,7 @@ public class KafkaRealTimeWorker
                 middlewareBuffer.add(new BatchRecords(data, historicalDataAction, () -> commitSyncOffset(consumer, latestOffsets)));
 
                 long totalDataSize = data.entrySet().stream().mapToLong(e -> e.getValue().page.getRetainedSizeInBytes()).sum();
-                log.info("Flushed records to middleware buffer in %s, the data size is %s",
+                log.debug("Flushed records to middleware buffer in %s, the data size is %s",
                         Duration.succinctDuration(System.currentTimeMillis() - now, MILLISECONDS).toString(),
                         succinctBytes(totalDataSize));
             }
@@ -283,10 +289,9 @@ public class KafkaRealTimeWorker
     private Map.Entry<Iterable<ConsumerRecord<byte[], byte[]>>, CompletableFuture<Void>> extract(BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records)
     {
         CompletableFuture<Void> historicalDataAction = BatchRecords.COMPLETED_FUTURE;
-
         ProcessedRecords processedRecords = processRecords(records);
         int totalRecords = records.buffer.size();
-
+        int historicalRecordCount = 0;
         Iterable<ConsumerRecord<byte[], byte[]>> realTimeRecords;
         if (processedRecords.recordsIndexedByDay.isEmpty()) {
             realTimeRecords = () -> Iterators.filter(records.buffer.iterator(), new BitMapRecordPredicate(processedRecords.bitmapForRecords));
@@ -298,7 +303,7 @@ public class KafkaRealTimeWorker
         else {
             realTimeRecords = () -> Iterators.filter(records.buffer.iterator(), new BitMapRecordPredicate(processedRecords.bitmapForRecords));
 
-            int historicalRecordCount = totalRecords - processedRecords.realTimeRecordCount;
+            historicalRecordCount = totalRecords - processedRecords.realTimeRecordCount;
 
             Iterable<ConsumerRecord<byte[], byte[]>> filter = () -> Iterators.filter(records.buffer.iterator(), new NegateBitMapRecordPredicate(processedRecords.bitmapForRecords));
             changeType(Status.FLUSHING_HISTORICAL);
@@ -313,6 +318,7 @@ public class KafkaRealTimeWorker
             historicalRecordsStats.update(historicalRecordCount);
         }
 
+        log.info("realTimeRecords: " + processedRecords.realTimeRecordCount + " historicalRecordCount: " + historicalRecordCount);
         return new SimpleImmutableEntry<>(realTimeRecords, historicalDataAction);
     }
 
@@ -320,7 +326,6 @@ public class KafkaRealTimeWorker
     {
         Int2ObjectArrayMap<IntArrayList> recordsIndexedByDay = new Int2ObjectArrayMap<>();
         int todayInDate = Ints.checkedCast(LocalDate.now().toEpochDay());
-        int previousDay = todayInDate - 1;
         DecoupleMessage.RecordData recordData = new DecoupleMessage.RecordData();
         int realtimeRecordCount = 0;
         boolean[] bitmapForRecords = new boolean[records.buffer.size()];
@@ -343,7 +348,7 @@ public class KafkaRealTimeWorker
                 continue;
             }
 
-            if (dayOfRecord == previousDay || dayOfRecord == todayInDate || historicalDataHandler == null) {
+            if (historicalDataHandler == null || (dayOfRecord >= (todayInDate - outdatedRecordIndex) && dayOfRecord <= todayInDate)) {
                 bitmapForRecords[i] = true;
                 realtimeRecordCount++;
             }
@@ -357,17 +362,19 @@ public class KafkaRealTimeWorker
             }
         }
 
-        for (Int2ObjectMap.Entry<IntArrayList> entry : recordsIndexedByDay.int2ObjectEntrySet()) {
-            int day = entry.getIntKey();
-            IntArrayList recordIndexes = entry.getValue();
-            if (recordIndexes.size() > 1000 && (recordIndexes.size() * 1.0 / records.buffer.size()) > .25) {
-                IntListIterator iterator = recordIndexes.iterator();
-                while (iterator.hasNext()) {
-                    int i = iterator.nextInt();
-                    bitmapForRecords[i] = true;
-                    realtimeRecordCount++;
+        if (config.getHistoricalWorkerEnabled()) {
+            for (Int2ObjectMap.Entry<IntArrayList> entry : recordsIndexedByDay.int2ObjectEntrySet()) {
+                int day = entry.getIntKey();
+                IntArrayList recordIndexes = entry.getValue();
+                if (recordIndexes.size() > 1000 && (recordIndexes.size() * 100.0 / records.buffer.size()) > 25) {
+                    IntListIterator iterator = recordIndexes.iterator();
+                    while (iterator.hasNext()) {
+                        int i = iterator.nextInt();
+                        bitmapForRecords[i] = true;
+                        realtimeRecordCount++;
+                    }
+                    recordsIndexedByDay.remove(day);
                 }
-                recordsIndexedByDay.remove(day);
             }
         }
 

@@ -16,6 +16,7 @@ RUN useradd -ms /bin/bash rakam
 ARG CACHEBUST=1
 
 COPY src/main/resources/config_* /home/rakam/
+COPY log.properties /home/rakam
 COPY *.sh /home/rakam/
 COPY target/rakam-data-collector.jar /home/rakam
 

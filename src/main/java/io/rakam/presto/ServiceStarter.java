@@ -19,6 +19,7 @@ import com.google.inject.Scopes;
 import com.google.inject.multibindings.OptionalBinder;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
+import io.airlift.log.Level;
 import io.airlift.log.Logger;
 import io.airlift.log.Logging;
 import io.airlift.log.LoggingConfiguration;
@@ -128,6 +129,7 @@ public final class ServiceStarter
             configBinder(binder).bindConfig(BackupConfig.class);
             configBinder(binder).bindConfig(FieldNameConfig.class);
             configBinder(binder).bindConfig(S3MiddlewareConfig.class);
+            configBinder(binder).bindConfig(CommitterConfig.class);
             configBinder(binder).bindConfig(MiddlewareConfig.class);
             binder.bind(StreamWorkerContext.class).in(Scopes.SINGLETON);
             binder.bind(TargetConnectorCommitter.class).in(Scopes.SINGLETON);

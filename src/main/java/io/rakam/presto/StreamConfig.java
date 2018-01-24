@@ -39,5 +39,4 @@ public class StreamConfig
             this.memoryMultiplier = Integer.parseInt(memoryMultiplier);
         }
     }
-
 }

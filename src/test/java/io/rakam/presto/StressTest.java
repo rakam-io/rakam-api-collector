@@ -46,6 +46,7 @@ import static java.time.ZoneOffset.UTC;
 public class StressTest
 {
     private static final Logger log = Logger.get(StressTest.class);
+
     public static void main(String[] args)
             throws Exception
     {
@@ -84,12 +85,12 @@ public class StressTest
         MiddlewareConfig middlewareConfig = new MiddlewareConfig()
 //                .setMaxFlushDuration(Duration.succinctNanos(0))
                 ;
-
+        CommitterConfig committerConfig = new CommitterConfig();
         JsonDeserializer deserializer = new FabricJsonDeserializer(databaseHandler, fieldNameConfig);
         KafkaJsonMessageTransformer transformer = new KafkaJsonMessageTransformer(fieldNameConfig, databaseHandler, deserializer);
         final MemoryTracker memoryTracker = new MemoryTracker();
         StreamWorkerContext context = new StreamWorkerContext(transformer, new KafkaRecordSizeCalculator(), memoryTracker, streamConfig);
-        TargetConnectorCommitter targetConnectorCommitter = new TargetConnectorCommitter(databaseHandler);
+        TargetConnectorCommitter targetConnectorCommitter = new TargetConnectorCommitter(databaseHandler, committerConfig);
 
         AtomicLong totalRecord = new AtomicLong(-1);
         AtomicLong lastPoll = new AtomicLong(System.currentTimeMillis());
