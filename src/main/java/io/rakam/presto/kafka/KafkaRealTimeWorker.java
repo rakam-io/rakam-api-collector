@@ -184,6 +184,8 @@ public class KafkaRealTimeWorker
                         changeType(Status.FLUSHING_STREAM);
                         flushDataSafe();
 
+                        Set<TopicPartition> assignment = consumer.assignment();
+                        consumer.pause(assignment);
                         while (memoryTracker.availableMemoryInPercentage() < .3) {
                             changeType(Status.WAITING_FOR_MEMORY);
 
@@ -196,6 +198,7 @@ public class KafkaRealTimeWorker
 
                             checkpoint();
                         }
+                        consumer.resume(assignment);
                     }
                 }
                 catch (Throwable e) {
@@ -232,10 +235,7 @@ public class KafkaRealTimeWorker
         try {
             BasicMemoryBuffer<ConsumerRecord<byte[], byte[]>>.Records records = buffer.getRecords();
 
-            boolean notEmpty = !records.bulkBuffer.isEmpty() || !records.buffer.isEmpty();
-
-            if (notEmpty) {
-                consumer.pause(consumer.assignment());
+            if (!records.bulkBuffer.isEmpty() || !records.buffer.isEmpty()) {
                 changeType(Status.FLUSHING_MIDDLEWARE);
 
                 long now = System.currentTimeMillis();
@@ -264,14 +264,15 @@ public class KafkaRealTimeWorker
             if (!committer.isFull()) {
                 Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();
                 if (!map.isEmpty()) {
+                    Set<TopicPartition> assignment = consumer.assignment();
+                    consumer.pause(assignment);
+
                     changeType(Status.FLUSHING_MIDDLEWARE);
                     KafkaUtil.flush(map, committer, checkpointQueue, memoryTracker,
                             log, databaseFlushStats, databaseFlushDistribution, realTimeRecordsStats, errorStats);
-                }
-            }
 
-            if (notEmpty) {
-                consumer.resume(consumer.assignment());
+                    consumer.resume(assignment);
+                }
             }
         }
         catch (Throwable e) {
