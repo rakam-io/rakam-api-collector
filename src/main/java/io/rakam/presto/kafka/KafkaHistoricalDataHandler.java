@@ -52,7 +52,7 @@ public class KafkaHistoricalDataHandler
                     log.error(exception);
                 }
                 if (latch.decrementAndGet() == 0) {
-                    log.info("%d records are sent to Kafka historical topic in %s.", totalRecords.value,
+                    log.debug("%d records are sent to Kafka historical topic in %s.", totalRecords.value,
                             Duration.succinctDuration(System.currentTimeMillis() - now, MILLISECONDS).toString());
                     future.complete(null);
                 }

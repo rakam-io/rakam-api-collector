@@ -4,14 +4,16 @@
 
 package io.rakam.presto;
 
+import io.airlift.log.Logger;
 import org.weakref.jmx.Managed;
 
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MemoryTracker
 {
+    private static final Logger log = Logger.get(MemoryTracker.class);
     private static final long HEAP_MAX_SIZE = (long) (Runtime.getRuntime().maxMemory() - Runtime.getRuntime().totalMemory());
-    private static final double AVAILABLE_RATIO = .4;
+    private static final double AVAILABLE_RATIO = .7;
     private static final long AVAILABLE_HEAP_SIZE = (long) (HEAP_MAX_SIZE * AVAILABLE_RATIO);
 
     private AtomicLong reservedMemory;

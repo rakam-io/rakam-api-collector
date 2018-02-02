@@ -10,6 +10,7 @@ import io.airlift.log.Logger;
 import io.airlift.stats.CounterStat;
 import io.airlift.stats.DistributionStat;
 import io.airlift.units.Duration;
+import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.MemoryTracker;
 import io.rakam.presto.MiddlewareBuffer.TableCheckpoint;
 import io.rakam.presto.StreamWorkerContext;
@@ -36,6 +37,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class KafkaUtil
 {
+    private static final Logger log = Logger.get(KafkaUtil.class);
 
     public static Properties createConsumerConfig(KafkaConfig config)
     {
@@ -68,13 +70,11 @@ public class KafkaUtil
         props.put("bootstrap.servers", kafkaNodes);
         props.put("group.id", groupId);
         props.put("enable.auto.commit", "false");
-        props.put("auto.offset.reset", offset);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, offset);
         props.put("session.timeout.ms", sessionTimeOut);
         props.put("heartbeat.interval.ms", "1000");
         props.put("request.timeout.ms", requestTimeOut);
         props.put("max.poll.records", config.getMaxPollRecords());
-
-        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         return props;
     }
 
@@ -115,7 +115,7 @@ public class KafkaUtil
             for (Map.Entry<String, Int2LongOpenHashMap> entry : offsets.entrySet()) {
                 String topic = entry.getKey();
                 for (Int2LongMap.Entry offsetList : entry.getValue().int2LongEntrySet()) {
-                    offsetsForKafka.put(new TopicPartition(topic, offsetList.getIntKey()), new OffsetAndMetadata(offsetList.getLongValue()));
+                    offsetsForKafka.put(new TopicPartition(topic, offsetList.getIntKey()), new OffsetAndMetadata(offsetList.getLongValue() + 1));
                 }
             }
 
@@ -140,10 +140,11 @@ public class KafkaUtil
         long totalRecords = map.entrySet().stream().mapToLong(e -> e.getValue().stream()
                 .mapToLong(v -> v.getTable().page.getPositionCount()).sum()).sum();
 
-        log.info("Saving data, %d collections and %d events in total.", map.size(), totalRecords);
-        long now = System.currentTimeMillis();
+        log.debug("Saving data, %d collections and %d events in total.", map.size(), totalRecords);
+
 
         for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
+            long now = System.currentTimeMillis();
             CompletableFuture<Void> dbWriteWork = committer.process(entry.getKey(), entry.getValue());
             dbWriteWork.whenComplete((aVoid, throwable) -> {
                 long totalRecordCount = entry.getValue().stream()
@@ -176,7 +177,6 @@ public class KafkaUtil
 
                 databaseFlushStats.update(totalRecordCount);
                 databaseFlushDistribution.add(totalDuration.toMillis());
-
                 memoryTracker.freeMemory(totalDataSize);
             });
         }

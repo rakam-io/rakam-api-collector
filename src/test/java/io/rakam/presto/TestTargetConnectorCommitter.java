@@ -103,7 +103,7 @@ public class TestTargetConnectorCommitter
             throws Exception
     {
         CountDownLatch latch = new CountDownLatch(3);
-
+        CommitterConfig committerConfig = new CommitterConfig();
         TestingMetadata connectorMetadata = new TestingMetadata();
 
         catalogManager.registerCatalog(createTestingCatalog("testconnector", new ConnectorId("testconnector"),
@@ -115,7 +115,7 @@ public class TestTargetConnectorCommitter
 
         TestDatabaseHandler databaseHandler = new TestDatabaseHandler("test", "test", ImmutableList.of());
         databaseHandler.setLatchForInsert(latch);
-        TargetConnectorCommitter committer = new TargetConnectorCommitter(databaseHandler);
+        TargetConnectorCommitter committer = new TargetConnectorCommitter(databaseHandler,committerConfig);
 
         SchemaTableName table = new SchemaTableName("test", "test");
         TableData tableData = new TableData(new Page(1), ImmutableList.of());
@@ -131,7 +131,7 @@ public class TestTargetConnectorCommitter
             throws Exception
     {
         CountDownLatch latch = new CountDownLatch(4);
-
+        CommitterConfig committerConfig = new CommitterConfig();
         TestingMetadata connectorMetadata = new TestingMetadata();
         connectorMetadata.createTable(session.toConnectorSession(),
                 new ConnectorTableMetadata(new SchemaTableName("test", "test0"), ImmutableList.of()), false);
@@ -144,7 +144,7 @@ public class TestTargetConnectorCommitter
 
         TestDatabaseHandler databaseHandler = new TestDatabaseHandler("test", "test", ImmutableList.of());
         databaseHandler.setLatchForInsert(latch);
-        TargetConnectorCommitter committer = new TargetConnectorCommitter(databaseHandler);
+        TargetConnectorCommitter committer = new TargetConnectorCommitter(databaseHandler,committerConfig);
 
         SchemaTableName table0 = new SchemaTableName("test", "test0");
         SchemaTableName table1 = new SchemaTableName("test", "test1");
@@ -167,7 +167,7 @@ public class TestTargetConnectorCommitter
     {
         CountDownLatch latch = new CountDownLatch(4);
         TestingMetadata connectorMetadata = new TestingMetadata();
-
+        CommitterConfig committerConfig = new CommitterConfig();
         catalogManager.registerCatalog(createTestingCatalog("testconnector", new ConnectorId("testconnector"),
                 new TestingConnector(connectorMetadata),
                 testTransactionManager, testMetadataManager));
@@ -180,7 +180,7 @@ public class TestTargetConnectorCommitter
 
         TestDatabaseHandler databaseHandler = new TestDatabaseHandler("test", "test", ImmutableList.of());
         databaseHandler.setLatchForInsert(latch);
-        TargetConnectorCommitter committer = new TargetConnectorCommitter(databaseHandler);
+        TargetConnectorCommitter committer = new TargetConnectorCommitter(databaseHandler,committerConfig);
 
         TableData page1 = new TableData(new Page(createStringsBlock("test")), ImmutableList.of(new ColumnMetadata("test1", VarcharType.VARCHAR)));
         TableData page2 = new TableData(new Page(createStringsBlock("test"), createLongsBlock(1)), schema);

@@ -23,9 +23,8 @@ public class KafkaProducerTest
             throws Exception
     {
         String timestampFormat = "yyyy-MM-dd'T'HH:mm:ss.S'Z'";
-        int topicCount = 10;
-        SimpleDateFormat dateFormat = new SimpleDateFormat(timestampFormat);
-        DateTime beginTime = new DateTime().minusDays(3);
+        int topicCount = 100;
+        DateTime beginTime = new DateTime().minusDays(60);
         DateTime endTime = new DateTime();
         Random random = new Random(10000);
 
@@ -72,7 +71,7 @@ public class KafkaProducerTest
         ObjectNode data = (ObjectNode) node.get("data");
 
         //Assign topicName to string variable
-        String topicName = "presto_test_10";
+        String topicName = "presto_test_11";
 
         // create instance for properties to access producer configs
         Properties props = new Properties();

@@ -165,8 +165,8 @@ public class RaptorDatabaseHandler
         ImmutableMap.Builder<String, String> props = ImmutableMap.<String, String>builder()
                 .put("metadata.db.type", "mysql")
                 .put("metadata.db.url", config.getMetadataUrl())
-                .put("backup.threads", String.valueOf(Runtime.getRuntime().availableProcessors() * 3))
                 // No effect
+                .put("backup.threads", String.valueOf(Runtime.getRuntime().availableProcessors() * 3))
                 .put("storage.data-directory", Files.createTempDir().getAbsolutePath())
                 .put("metadata.db.connections.max", String.valueOf(config.getMaxConnection()))
                 .put("backup.timeout", "20m");

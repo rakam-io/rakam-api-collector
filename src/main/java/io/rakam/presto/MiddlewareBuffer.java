@@ -6,6 +6,7 @@ package io.rakam.presto;
 
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.rakam.presto.deserialization.TableData;
 
 import java.util.ArrayList;
@@ -20,6 +21,8 @@ import java.util.stream.Collectors;
 
 public class MiddlewareBuffer
 {
+    private static final Logger log = Logger.get(MiddlewareBuffer.class);
+
     private final Map<SchemaTableName, List<TableCheckpoint>> batches;
     private final MiddlewareConfig config;
     private final MemoryTracker memoryTracker;
@@ -71,6 +74,7 @@ public class MiddlewareBuffer
 
         Set<SchemaTableName> tablesToBeFlushed;
         if (memoryNeedsToBeAvailable > availableMemory) {
+            log.debug("memory needed (%s) is less than available memory (%s) flushing data ", memoryNeedsToBeAvailable, availableMemory);
             List<Map.Entry<SchemaTableName, Counter>> sortedTables = bufferSize.entrySet().stream()
                     .sorted(Comparator.comparingLong(o -> -o.getValue().value))
                     .collect(Collectors.toList());

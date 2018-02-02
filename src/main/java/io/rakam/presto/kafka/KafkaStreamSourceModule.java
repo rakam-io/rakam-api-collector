@@ -26,6 +26,7 @@ public class KafkaStreamSourceModule
     protected void setup(Binder binder)
     {
         KafkaConfig config = buildConfigObject(KafkaConfig.class);
+
         configBinder(binder).bindConfig(JsonConfig.class);
 
         binder.bind(KafkaRealTimeWorker.class).asEagerSingleton();
