@@ -44,7 +44,6 @@ public class KafkaUtil
         Properties props = createConfig(config);
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
-        props.put("max.poll.records",10000);
         return props;
     }
 
