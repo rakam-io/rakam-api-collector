@@ -56,6 +56,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static io.airlift.units.DataSize.succinctBytes;
@@ -128,7 +129,10 @@ public class KafkaRealTimeWorker
                 String message = statusSpentTime.entrySet().stream().sorted(Comparator.comparingLong(o -> -o.getValue().value))
                         .map(entry -> entry.getKey().name() + ":" + Duration.succinctDuration(entry.getValue().value, MILLISECONDS).toString())
                         .collect(Collectors.joining(", "));
-                message += format(" %s (%s%%) memory available",
+                message += format(" - in %s phase for %s ",
+                        currentStatus.name(),
+                        Duration.succinctDuration(System.currentTimeMillis() - lastStatusChangeTime, TimeUnit.MILLISECONDS).toString());
+                message += format("[%s (%s%%) memory available]",
                         succinctBytes(memoryTracker.availableMemory()).toString(),
                         memoryTracker.availableMemoryInPercentage() * 100);
                 log.debug(message);

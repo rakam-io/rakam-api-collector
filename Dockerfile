@@ -1,26 +1,16 @@
-FROM artifactory.corp.olacabs.com:5000/ubuntu-java8:14.04.1
-RUN \
-  apt-get update \
-  && apt-get install -y --no-install-recommends software-properties-common \
-  && apt-get update \
-  && rm -rf /var/lib/apt/lists/*
+FROM maven:3.5.2-jdk-8-alpine
+MAINTAINER Burak Emre Kabakci "emre@rakam.io"
 
-VOLUME /var/log/rakam_data_collector
-VOLUME /var/presto/data
-VOLUME /data/presto/var/data
+WORKDIR /var/app
 
-RUN chmod -R 777 /var/log/rakam_data_collector
-RUN chmod -R 777 /var/presto/data
-RUN useradd -ms /bin/bash rakam
+COPY . /var/app/
 
-ARG CACHEBUST=1
+ENV MAVEN_HOME /usr/share/maven
+ENV MAVEN_CONFIG "$USER_HOME_DIR/.m2"
 
-COPY src/main/resources/config_* /home/rakam/
-COPY *.sh /home/rakam/
-COPY target/rakam-data-collector.jar /home/rakam
+RUN cd /var/app && mvn clean install -DskipTests && tar -xvzf target/collector-*-bundle.tar.gz && mv collector-* collector && touch collector/etc/config.properties
 
-RUN java -version
+RUN echo "http://dl-8.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+RUN apk --no-cache --update-cache add python python-dev
 
-WORKDIR /home/rakam
-RUN chmod +x /home/rakam/start.sh
-CMD bash -x /home/rakam/start.sh 2>&1
+ENTRYPOINT [ "/var/app/entrypoint.sh" ]

@@ -14,20 +14,18 @@ public class BasicMemoryBuffer<T>
     private final ArrayList<T> buffer;
     private final ArrayList<T> bulkBuffer;
     private final SizeCalculator<T> sizeCalculator;
-    private final MemoryTracker memoryTracker;
+    private final double maxBytes;
     private long previousFlushTimeMillisecond;
     private int totalBytes;
-    private int memoryMultiplier;
 
-    public BasicMemoryBuffer(StreamConfig config, MemoryTracker memoryTracker, SizeCalculator<T> sizeCalculator)
+    public BasicMemoryBuffer(StreamConfig config, SizeCalculator<T> sizeCalculator)
     {
         this.sizeCalculator = sizeCalculator;
-        this.memoryTracker = memoryTracker;
         millisecondsToBuffer = config.getMaxFlushDuration().toMillis();
         previousFlushTimeMillisecond = System.currentTimeMillis();
-        memoryMultiplier = config.getMemoryMultiplier();
         buffer = new ArrayList<>(1000);
         bulkBuffer = new ArrayList<>(1000);
+        maxBytes = MemoryTracker.getAvailableHeapSize() * config.getMaxFlushTotalMemoryRatio();
         totalBytes = 0;
     }
 
@@ -55,12 +53,10 @@ public class BasicMemoryBuffer<T>
     {
         buffer.add(record);
         totalBytes += size;
-        memoryTracker.reserveMemory(size);
     }
 
     public void consumeBatch(T record, long size)
     {
-        memoryTracker.reserveMemory(size);
         bulkBuffer.add(record);
         totalBytes += size;
     }
@@ -70,14 +66,14 @@ public class BasicMemoryBuffer<T>
         buffer.clear();
         bulkBuffer.clear();
         previousFlushTimeMillisecond = System.currentTimeMillis();
-        memoryTracker.freeMemory(totalBytes);
         totalBytes = 0;
     }
 
     public boolean shouldFlush()
     {
-        return ((System.currentTimeMillis() - previousFlushTimeMillisecond) >= getMillisecondsToBuffer())
-                || memoryTracker.availableMemory() - (totalBytes * memoryMultiplier) < 0;
+        boolean timeThreshold = System.currentTimeMillis() - previousFlushTimeMillisecond >= getMillisecondsToBuffer();
+        boolean dataThreshold = totalBytes >= maxBytes;
+        return timeThreshold || dataThreshold;
     }
 
     public Records getRecords()
@@ -87,15 +83,12 @@ public class BasicMemoryBuffer<T>
 
     public void consumeRecords(Iterable<T> records)
     {
-        long initialSize = totalBytes;
         for (T record : records) {
             buffer.add(record);
 
             long size = sizeCalculator.calculate(record);
             totalBytes += size;
         }
-
-        memoryTracker.reserveMemory(totalBytes - initialSize);
     }
 
     public interface SizeCalculator<T>

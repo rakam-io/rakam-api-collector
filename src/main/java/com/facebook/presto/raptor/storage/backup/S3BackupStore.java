@@ -13,7 +13,7 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.facebook.presto.rakam.S3BackupConfig;
 import com.facebook.presto.raptor.RaptorErrorCode;
 import com.facebook.presto.raptor.backup.BackupStore;
-import com.facebook.presto.raptor.storage.InMemoryFileSystem;
+import com.facebook.presto.raptor.storage.InMemoryBuffer;
 import com.facebook.presto.spi.PrestoException;
 import io.airlift.slice.BasicSliceInput;
 import io.airlift.slice.Slice;
@@ -34,10 +34,10 @@ public class S3BackupStore
     private static final int TRY_COUNT = 5;
     private final AmazonS3 s3Client;
     private final S3BackupConfig config;
-    private final InMemoryFileSystem inMemoryFileSystem;
+    private final InMemoryBuffer buffer;
 
     @Inject
-    public S3BackupStore(S3BackupConfig config, InMemoryFileSystem inMemoryFileSystem)
+    public S3BackupStore(S3BackupConfig config, InMemoryBuffer buffer)
     {
         this.config = config;
         AmazonS3ClientBuilder amazonS3ClientBuilder = AmazonS3ClientBuilder.standard()
@@ -52,12 +52,12 @@ public class S3BackupStore
         }
 
         s3Client = amazonS3ClientBuilder.build();
-        this.inMemoryFileSystem = inMemoryFileSystem;
+        this.buffer = buffer;
     }
 
     public void backupShard(UUID uuid, File source)
     {
-        Slice slice = inMemoryFileSystem.remove(source.getName());
+        Slice slice = buffer.remove(source.getName());
         if (slice == null) {
             throw new IllegalStateException();
         }

@@ -98,11 +98,6 @@
             <version>${dep.airlift.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.facebook.presto.hive</groupId>
-            <artifactId>hive-apache</artifactId>
-            <version>1.2.0-2</version>
-        </dependency>
-        <dependency>
             <groupId>com.getsentry.raven</groupId>
             <artifactId>raven</artifactId>
             <version>8.0.2</version>
@@ -199,7 +194,7 @@
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-rakam-raptor</artifactId>
-            <version>0.190.1</version>
+            <version>0.190.2</version>
         </dependency>
 
         <dependency>

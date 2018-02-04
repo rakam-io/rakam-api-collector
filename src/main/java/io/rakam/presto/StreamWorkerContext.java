@@ -17,15 +17,13 @@ public class StreamWorkerContext<T>
 {
     private final MessageEventTransformer transformer;
     private final StreamConfig streamConfig;
-    private final MemoryTracker memoryTracker;
     private final BasicMemoryBuffer.SizeCalculator<T> sizeCalculator;
 
     @Inject
-    public StreamWorkerContext(MessageEventTransformer transformer, BasicMemoryBuffer.SizeCalculator sizeCalculator, MemoryTracker memoryTracker, StreamConfig streamConfig)
+    public StreamWorkerContext(MessageEventTransformer transformer, BasicMemoryBuffer.SizeCalculator sizeCalculator, StreamConfig streamConfig)
     {
         this.transformer = transformer;
         this.streamConfig = streamConfig;
-        this.memoryTracker = memoryTracker;
         this.sizeCalculator = sizeCalculator;
     }
 
@@ -41,6 +39,6 @@ public class StreamWorkerContext<T>
 
     public BasicMemoryBuffer createBuffer()
     {
-        return new BasicMemoryBuffer(streamConfig, memoryTracker, sizeCalculator);
+        return new BasicMemoryBuffer(streamConfig, sizeCalculator);
     }
 }

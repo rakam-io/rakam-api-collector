@@ -10,6 +10,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
+import io.airlift.units.Duration;
 import io.rakam.presto.connector.raptor.RaptorConfig;
 import io.rakam.presto.connector.raptor.RaptorDatabaseHandler;
 import io.rakam.presto.connector.raptor.S3BackupConfig;
@@ -46,6 +47,7 @@ import static java.time.ZoneOffset.UTC;
 public class StressTest
 {
     private static final Logger log = Logger.get(StressTest.class);
+
     public static void main(String[] args)
             throws Exception
     {
@@ -66,9 +68,9 @@ public class StressTest
         S3BackupConfig s3BackupConfig = new S3BackupConfig();
         s3BackupConfig.setS3Bucket("test");
 
-        TestBackupStoreModule backupStoreModule = new TestBackupStoreModule((uuid, file) -> {
+        TestBackupStoreModule backupStoreModule = new TestBackupStoreModule((uuid, slice) -> {
             try {
-                Thread.sleep(500);
+                Thread.sleep(1000);
             }
             catch (InterruptedException e) {
                 e.printStackTrace();
@@ -88,7 +90,7 @@ public class StressTest
         JsonDeserializer deserializer = new FabricJsonDeserializer(databaseHandler, fieldNameConfig);
         KafkaJsonMessageTransformer transformer = new KafkaJsonMessageTransformer(fieldNameConfig, databaseHandler, deserializer);
         final MemoryTracker memoryTracker = new MemoryTracker();
-        StreamWorkerContext context = new StreamWorkerContext(transformer, new KafkaRecordSizeCalculator(), memoryTracker, streamConfig);
+        StreamWorkerContext context = new StreamWorkerContext(transformer, new KafkaRecordSizeCalculator(), streamConfig);
         TargetConnectorCommitter targetConnectorCommitter = new TargetConnectorCommitter(databaseHandler);
 
         AtomicLong totalRecord = new AtomicLong(-1);

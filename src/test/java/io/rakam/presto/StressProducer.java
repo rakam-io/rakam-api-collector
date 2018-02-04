@@ -9,18 +9,22 @@ import com.google.common.collect.ImmutableMap;
 import io.rakam.presto.kafka.KafkaConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.rakam.util.JsonHelper;
 
 import java.time.Instant;
 import java.util.Random;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import static io.rakam.presto.kafka.KafkaUtil.createProducerConfig;
 
 public class StressProducer
 {
     public static void main(String[] args)
+            throws ExecutionException, InterruptedException
     {
-        KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(createProducerConfig(new KafkaConfig().setNodes("127.0.0.1:9092").setTopic("stress"), null));
+        KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(createProducerConfig(new KafkaConfig().setNodes("78.47.94.214:9092").setTopic("stress"), null));
 
         long now = Instant.now().toEpochMilli();
         Random random1 = new Random();
@@ -35,7 +39,7 @@ public class StressProducer
             }
 
             i++;
-            producer.send(new ProducerRecord<>("stress", JsonHelper.encodeAsBytes(ImmutableMap.of(
+            Future<RecordMetadata> send = producer.send(new ProducerRecord<>("stress", JsonHelper.encodeAsBytes(ImmutableMap.of(
                     "id", "test",
                     "metadata", ImmutableMap.builder().build(),
                     "data", ImmutableMap.builder()
@@ -60,7 +64,7 @@ public class StressProducer
                             .put("is_reply", false)
                             .put("latitude", 432342 + i)
                             .put("is_positive", false).build()))));
-
+            send.get();
             if (i % 10000 == 0) {
                 System.out.println(i);
             }

@@ -18,6 +18,8 @@ public class KafkaRecordSizeCalculator
     @Override
     public long calculate(ConsumerRecord<byte[], byte[]> record)
     {
-        return record.key().length + record.value().length + TOTAL + record.topic().length();
+        byte[] key = record.key();
+        int keyLength = key == null ? 0 : key.length;
+        return keyLength + record.value().length + TOTAL + record.topic().length();
     }
 }

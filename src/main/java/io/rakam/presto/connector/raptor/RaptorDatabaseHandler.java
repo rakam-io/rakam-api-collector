@@ -16,7 +16,7 @@ import com.facebook.presto.raptor.RaptorConnectorFactory;
 import com.facebook.presto.raptor.RaptorModule;
 import com.facebook.presto.raptor.backup.BackupModule;
 import com.facebook.presto.raptor.metadata.DatabaseMetadataModule;
-import com.facebook.presto.raptor.storage.InMemoryFileSystem;
+import com.facebook.presto.raptor.storage.InMemoryBuffer;
 import com.facebook.presto.raptor.storage.IngestOnlyStorageModule;
 import com.facebook.presto.raptor.storage.backup.RemoteBackupManager;
 import com.facebook.presto.raptor.storage.backup.S3BackupStoreModule;
@@ -144,7 +144,7 @@ public class RaptorDatabaseHandler
                             new IngestOnlyStorageModule(connectorId),
                             new RaptorModule(connectorId),
                             binder -> binder.bind(MemoryTracker.class).asEagerSingleton(),
-                            binder -> binder.bind(InMemoryFileSystem.class).asEagerSingleton(),
+                            binder -> binder.bind(InMemoryBuffer.class).asEagerSingleton(),
                             binder -> binder.bind(RemoteBackupManager.class).in(Scopes.SINGLETON)
                     );
 
@@ -269,6 +269,11 @@ public class RaptorDatabaseHandler
         }
 
         return columnMetadatas;
+    }
+
+    public PrestoRakamRaptorMetastore getMetastore()
+    {
+        return metastore;
     }
 
     @Override

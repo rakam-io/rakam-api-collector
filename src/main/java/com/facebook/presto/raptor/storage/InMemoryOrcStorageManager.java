@@ -32,6 +32,7 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.json.JsonCodec;
 import io.airlift.slice.XxHash64;
 import io.airlift.units.DataSize;
+import io.rakam.presto.MemoryTracker;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
@@ -88,7 +89,8 @@ public class InMemoryOrcStorageManager
     private final DataSize minAvailableSpace;
     private final TypeManager typeManager;
     private final ExecutorService deletionExecutor;
-    private final InMemoryFileSystem inMemoryFileSystem;
+    private final InMemoryBuffer buffer;
+    private final MemoryTracker memoryTracker;
 
     @Inject
     public InMemoryOrcStorageManager(
@@ -100,7 +102,8 @@ public class InMemoryOrcStorageManager
             RemoteBackupManager backgroundBackupManager,
             ShardRecorder shardRecorder,
             TypeManager typeManager,
-            InMemoryFileSystem inMemoryFileSystem)
+            MemoryTracker memoryTracker,
+            InMemoryBuffer buffer)
     {
         this(
                 storageService,
@@ -114,7 +117,8 @@ public class InMemoryOrcStorageManager
                 config.getMaxShardRows(),
                 config.getMaxShardSize(),
                 config.getMinAvailableSpace(),
-                inMemoryFileSystem);
+                buffer,
+                memoryTracker);
     }
 
     public InMemoryOrcStorageManager(
@@ -129,7 +133,8 @@ public class InMemoryOrcStorageManager
             long maxShardRows,
             DataSize maxShardSize,
             DataSize minAvailableSpace,
-            InMemoryFileSystem inMemoryFileSystem)
+            InMemoryBuffer buffer,
+            MemoryTracker memoryTracker)
     {
         this.storageService = requireNonNull(storageService, "storageService is null");
         this.backupStore = requireNonNull(backupStore, "backupStore is null");
@@ -144,7 +149,8 @@ public class InMemoryOrcStorageManager
         this.shardRecorder = requireNonNull(shardRecorder, "shardRecorder is null");
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.deletionExecutor = newFixedThreadPool(deletionThreads, daemonThreadsNamed("raptor-delete-" + connectorId + "-%s"));
-        this.inMemoryFileSystem = requireNonNull(inMemoryFileSystem, "inMemoryFileSystem is null");
+        this.buffer = requireNonNull(buffer, "buffer is null");
+        this.memoryTracker = requireNonNull(memoryTracker, "memoryTracker is null");
     }
 
     private static Optional<OrcFileMetadata> getOrcFileMetadata(OrcReader reader)
@@ -181,7 +187,7 @@ public class InMemoryOrcStorageManager
     private MemoryOrcDataSource fileOrcDataSource(ReaderAttributes readerAttributes, File file)
             throws FileNotFoundException
     {
-        return new MemoryOrcDataSource(file.getName(), inMemoryFileSystem.get(file.getName()).getInput(), readerAttributes.getMaxMergeDistance(), readerAttributes.getMaxReadSize(), readerAttributes.getStreamBufferSize());
+        return new MemoryOrcDataSource(file.getName(), buffer.get(file.getName()).getInput(), readerAttributes.getMaxMergeDistance(), readerAttributes.getMaxReadSize(), readerAttributes.getStreamBufferSize());
     }
 
     private ShardInfo createShardInfo(UUID shardUuid, OptionalInt bucketNumber, File file, Set<String> nodes, long rowCount, long uncompressedSize)
@@ -232,7 +238,7 @@ public class InMemoryOrcStorageManager
 
     long xxhash64(File file)
     {
-        try (InputStream in = inMemoryFileSystem.get(file.getName()).getInput()) {
+        try (InputStream in = buffer.get(file.getName()).getInput()) {
             return XxHash64.hash(in);
         }
         catch (IOException e) {
@@ -242,7 +248,7 @@ public class InMemoryOrcStorageManager
 
     long length(File file)
     {
-        return inMemoryFileSystem.get(file.getName()).length();
+        return buffer.get(file.getName()).length();
     }
 
     private List<ColumnInfo> getColumnInfoFromOrcUserMetadata(OrcFileMetadata orcFileMetadata)
@@ -329,8 +335,7 @@ public class InMemoryOrcStorageManager
         @Override
         public void appendRow(Row row)
         {
-            createWriterIfNecessary();
-            writer.appendRow(row);
+            throw new UnsupportedOperationException();
         }
 
         @Override
@@ -419,7 +424,7 @@ public class InMemoryOrcStorageManager
                 File stagingFile = storageService.getStagingFile(shardUuid);
                 storageService.createParents(stagingFile);
                 stagingFiles.add(stagingFile);
-                writer = new InMemoryOrcFileWriter(inMemoryFileSystem, columnIds, columnTypes, stagingFile);
+                writer = new InMemoryOrcFileWriter(columnIds, columnTypes, stagingFile, memoryTracker, typeManager, buffer);
             }
         }
     }

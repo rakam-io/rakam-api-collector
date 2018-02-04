@@ -42,17 +42,6 @@ public class RaptorConfig
         return this;
     }
 
-    public String getDbMaxConnections() {return dbMaxConnections;}
-
-    @Config("metadata.db.connections.max")
-    public RaptorConfig setDbMaxConnections(String connections)
-    {
-        if (connections != null) {
-            this.dbMaxConnections = connections;
-        }
-        return this;
-    }
-
     public int getMaxConnection()
     {
         return maxConnection;
