@@ -44,6 +44,7 @@ public class KafkaUtil
         Properties props = createConfig(config);
         props.put("key.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
         props.put("value.deserializer", "org.apache.kafka.common.serialization.ByteArrayDeserializer");
+        props.put("max.poll.records",10000);
         return props;
     }
 
@@ -166,7 +167,7 @@ public class KafkaUtil
                     }
                 }
                 else {
-                    log.debug("Saved data in buffer (%s - %d records) for collection %s in %s.",
+                    log.info("Saved data in buffer (%s - %d records) for collection %s in %s.",
                             succinctBytes(totalDataSize).toString(), totalRecordCount,
                             entry.getKey().toString(),
                             totalDuration.toString());

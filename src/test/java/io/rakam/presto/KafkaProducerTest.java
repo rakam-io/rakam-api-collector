@@ -23,7 +23,7 @@ public class KafkaProducerTest
             throws Exception
     {
         String timestampFormat = "yyyy-MM-dd'T'HH:mm:ss.S'Z'";
-        int topicCount = 100;
+        int topicCount = 10;
         DateTime beginTime = new DateTime().minusDays(60);
         DateTime endTime = new DateTime();
         Random random = new Random(10000);
@@ -46,8 +46,6 @@ public class KafkaProducerTest
                 "      \"sender\": null\n" +
                 "   },\n" +
                 "   \"data\": {\n" +
-                "      \"_collection\": \"dapi_pushmessage_event_from_app_rakam\",\n" +
-                "      \"_project\": \"dapi\",\n" +
                 "      \"event\": \"PushMessage\",\n" +
                 "      \"_actor\": \"8609050301499\",\n" +
                 "      \"imei\": \"8609050301499\",\n" +
@@ -70,8 +68,7 @@ public class KafkaProducerTest
         ObjectNode node = (ObjectNode) mapper.readTree(fabricEvent);
         ObjectNode data = (ObjectNode) node.get("data");
 
-        //Assign topicName to string variable
-        String topicName = "presto_test_11";
+        String topicName = "presto_test_9";
 
         // create instance for properties to access producer configs
         Properties props = new Properties();
@@ -104,20 +101,23 @@ public class KafkaProducerTest
 
         boolean flag = true;
 
-        for (int i = 0; i >= 0; i++) {
+        for (int i = 0; i <= 100; i++) {
             int randInt = random.nextInt();
             int index = Math.abs(randInt) % topicCount;
             Timestamp randomDate = new Timestamp(ThreadLocalRandom.current().nextLong(beginTime.getMillis(), endTime.getMillis()));
 
             data.put("_actor", String.valueOf(randInt));
-            data.put("_collection", collection + "_" + index);
-            data.put("_time", randomDate.toString());
+            data.put("_collection", collection + "_" + Math.abs(random.nextInt(20) + 1));
+            data.put("_time", endTime.toString());
             data.put("_shard_time", randomDate.toString());
 
             node.put("data", data);
             producer.send(new ProducerRecord<String, String>(topicName,
                     Integer.toString(randInt), mapper.writeValueAsString(node)));
-            Thread.sleep(1);
+//            Thread.sleep(1);
+            if (i % 100 == 0) {
+                System.out.println("produced:" + i);
+            }
         }
 
         System.out.println("Message sent successfully");

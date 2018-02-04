@@ -226,7 +226,7 @@ public class KafkaHistoricalWorker
             changeType(Status.FLUSHING_MIDDLEWARE);
 
             long now = System.currentTimeMillis();
-            log.debug("Flushing records (%s) from stream buffer, it's been %s since last flush.",
+            log.info("Flushing records (%s) from stream buffer, it's been %s since last flush.",
                     DataSize.succinctBytes(buffer.getTotalBytes()).toString(),
                     Duration.succinctDuration(now - buffer.getPreviousFlushTimeMillisecond(), MILLISECONDS).toString());
 
@@ -244,7 +244,7 @@ public class KafkaHistoricalWorker
             }
 
             long totalDataSize = data.entrySet().stream().mapToLong(e -> e.getValue().page.getRetainedSizeInBytes()).sum();
-            log.debug("Flushed records to middleware buffer in %s, the data size is %s",
+            log.info("Flushed records to middleware buffer in %s, the data size is %s",
                     Duration.succinctDuration(System.currentTimeMillis() - now, MILLISECONDS).toString(),
                     DataSize.succinctBytes(totalDataSize));
 
