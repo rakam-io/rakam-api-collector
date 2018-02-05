@@ -48,6 +48,7 @@ import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.fasterxml.jackson.core.JsonToken.END_ARRAY;
 import static com.fasterxml.jackson.core.JsonToken.END_OBJECT;
+import static com.fasterxml.jackson.core.JsonToken.FIELD_NAME;
 import static com.fasterxml.jackson.core.JsonToken.START_OBJECT;
 import static com.fasterxml.jackson.core.JsonToken.VALUE_NULL;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -73,7 +74,7 @@ import static org.rakam.presto.analysis.PrestoRakamRaptorMetastore.toType;
 public class FabricJsonDeserializer
         implements JsonDeserializer
 {
-    private static final Set<String> EXCLUDED_COLUMNS = ImmutableSet.of("_project", "_collection","_shard_time");
+    private static final Set<String> EXCLUDED_COLUMNS = ImmutableSet.of("_project", "_collection", "_shard_time");
     private static final JsonFactory READER = new ObjectMapper().getFactory();
     private final DatabaseHandler databaseHandler;
     private final FieldNameConfig fieldNameConfig;
@@ -128,52 +129,56 @@ public class FabricJsonDeserializer
 
         JsonToken t = jp.nextToken();
         if (t == JsonToken.START_OBJECT) {
-            t = jp.nextToken();
+//            t = jp.nextToken();
         }
         else {
             throw new IllegalArgumentException("Invalid json");
         }
-        for (; ; t = jp.nextToken()) {
+        for (t = jp.nextToken(); t == FIELD_NAME; t = jp.nextToken()) {
 
-            if (JsonToken.FIELD_NAME.equals(t)) {
+            if ("metadata".equals(jp.getCurrentName())) {
                 t = jp.nextToken();
+                boolean foundCollection = false;
+                boolean foundProject = false;
+
+                for (t = jp.nextToken(); t == FIELD_NAME; t = jp.nextToken()) {
+                    String fieldData = jp.getCurrentName();
+
+                    if (fieldData.equals("tenant")) {
+                        jp.nextToken();
+                        foundProject = true;
+                        project = jp.getValueAsString();
+                        if (foundCollection) {
+                            jp.skipChildren();
+                        }
+                    }
+                    else if (fieldData.equals("schema")) {
+                        jp.nextToken();
+                        foundCollection = true;
+                        collection = checkCollectionValid(jp.getValueAsString());
+                        if (foundProject) {
+                            jp.skipChildren();
+                        }
+                    }
+                    else {
+                        jp.nextToken();
+                        jp.skipChildren();
+                    }
+                }
             }
 
-            if (jp.getCurrentName().equals("data")) {
+            else if (jp.getCurrentName().equals("data")) {
+                t = jp.nextToken();
                 if (t != START_OBJECT) {
                     throw new IllegalArgumentException("data must be an object");
                 }
                 propertiesBuffer = jp.readValueAs(TokenBuffer.class);
-                break;
+            }
+            else {
+                jp.nextToken();
             }
         }
         jp = propertiesBuffer.asParser(jp);
-
-        t = jp.nextToken();
-        //Extract project and collection
-        for (t = jp.nextToken(); t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
-            if (project != null && collection != null) {
-                break;
-            }
-
-            t = jp.nextToken();
-            String fieldName = jp.getCurrentName();
-            switch (fieldName) {
-                case "_project":
-                    project = jp.getValueAsString();
-                    if (project == null || project.isEmpty()) {
-                        throw new RuntimeException("Project can't be null");
-                    }
-                    project = project.toLowerCase();
-                    break;
-                case "_collection":
-                    collection = checkCollectionValid(jp.getValueAsString());
-                    break;
-                default:
-                    // TODO: what to do?
-                    break;
-            }
-        }
     }
 
     private void parseProperties(PageReader pageReader)

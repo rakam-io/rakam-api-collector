@@ -166,7 +166,7 @@ public class KafkaUtil
                     }
                 }
                 else {
-                    log.debug("Saved data in buffer (%s - %d records) for collection %s in %s.",
+                    log.info("Saved data in buffer (%s - %d records) for collection %s in %s.",
                             succinctBytes(totalDataSize).toString(), totalRecordCount,
                             entry.getKey().toString(),
                             totalDuration.toString());

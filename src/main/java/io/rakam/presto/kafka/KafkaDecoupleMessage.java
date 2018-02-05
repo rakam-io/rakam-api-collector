@@ -23,7 +23,6 @@ import java.time.temporal.ChronoUnit;
 
 import static com.fasterxml.jackson.core.JsonToken.FIELD_NAME;
 import static com.fasterxml.jackson.core.JsonToken.START_OBJECT;
-import static java.lang.String.format;
 
 public class KafkaDecoupleMessage
         implements DecoupleMessage<ConsumerRecord<byte[], byte[]>>
@@ -51,46 +50,63 @@ public class KafkaDecoupleMessage
         if (t != START_OBJECT) {
             throw new JsonParseException(parser, "Must be an object");
         }
+        boolean foundCollection = false;
+        boolean foundProject = false;
         for (t = parser.nextToken(); t == FIELD_NAME; t = parser.nextToken()) {
             String rootFieldName = parser.getCurrentName();
-            if (!"data".equals(rootFieldName)) {
+
+            if ("metadata".equals(rootFieldName)) {
+                t = parser.nextToken();
+
+                for (t = parser.nextToken(); t == FIELD_NAME; t = parser.nextToken()) {
+                    String fieldData = parser.getCurrentName();
+
+                    if (fieldData.equals("schema")) {
+                        parser.nextToken();
+                        recordData.project = parser.getValueAsString();
+                        foundProject = true;
+                        if (foundCollection) {
+                            parser.skipChildren();
+                        }
+                    }
+                    else if (fieldData.equals("tenant")) {
+                        parser.nextToken();
+                        recordData.collection = parser.getValueAsString();
+                        foundCollection = true;
+                        if (foundProject) {
+                            parser.skipChildren();
+                        }
+                    }
+                    else {
+                        parser.nextToken();
+                        parser.skipChildren();
+                    }
+                }
+            }
+            else if ("data".equals(rootFieldName)) {
+                t = parser.nextToken();
+                if (t != START_OBJECT) {
+                    throw new JsonParseException(parser, "Data object must be an object");
+                }
+
+                for (t = parser.nextToken(); t == FIELD_NAME; t = parser.nextToken()) {
+                    String fieldData = parser.getCurrentName();
+                    if (fieldData.equals(timeColumn)) {
+                        recordData.date = findData(parser);
+                        if (foundCollection) {
+                            return;
+                        }
+                    }
+                    else {
+                        parser.nextToken();
+                        parser.skipChildren();
+                    }
+                }
+            }
+            else {
                 parser.nextToken();
-                parser.skipChildren();
-                continue;
             }
-            t = parser.nextToken();
-            if (t != START_OBJECT) {
-                throw new JsonParseException(parser, "Data object must be an object");
-            }
-
-            boolean foundCollection = false;
-            boolean foundDate = false;
-            for (t = parser.nextToken(); t == FIELD_NAME; t = parser.nextToken()) {
-                String fieldData = parser.getCurrentName();
-                if (fieldData.equals(timeColumn)) {
-                    recordData.date = findData(parser);
-                    if (foundCollection) {
-                        return;
-                    }
-                    foundDate = true;
-                }
-                else if (fieldData.equals("_collection")) {
-                    parser.nextToken();
-                    recordData.collection = parser.getValueAsString();
-                    if (foundDate) {
-                        return;
-                    }
-                    foundCollection = true;
-                }
-                else {
-                    parser.nextToken();
-                    parser.skipChildren();
-                }
-            }
-
-            throw new JsonParseException(parser, format("Event time property `%s` doesn't exist in JSON", timeColumn));
         }
-        throw new JsonParseException(parser, "data property doesn't exist in JSON");
     }
 
     public int findData(JsonParser parser)

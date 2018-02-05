@@ -14,6 +14,7 @@ public interface DecoupleMessage<T>
     class RecordData
     {
         public String collection;
+        public String project;
         public int date;
     }
 }
