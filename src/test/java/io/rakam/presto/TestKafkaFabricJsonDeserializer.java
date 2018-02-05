@@ -43,11 +43,15 @@ public class TestKafkaFabricJsonDeserializer
     {
         ImmutableList.Builder<ConsumerRecord<byte[], byte[]>> builder = ImmutableList.builder();
         for (int i = 0; i < ITERATION_COUNT; i++) {
-            ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[] {}, JsonHelper.encodeAsBytes(ImmutableMap.of("data", ImmutableMap.of(
-                    "_project", "testproject",
-                    "_collection", "testcollection",
+            ImmutableMap<String, String> metadata = ImmutableMap.of(
+                    "schema", "testcollection",
+                    "tenant", "testproject");
+            ImmutableMap<String, String> data = ImmutableMap.of(
                     "newcolumn1", "test1",
-                    "newcolumn2", "test2"))));
+                    "newcolumn2", "test2");
+            ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[] {}, JsonHelper.encodeAsBytes(ImmutableMap.of(
+                    "metadata", metadata,
+                    "data", data)));
             builder.add(record);
         }
         return builder.build();
@@ -56,7 +60,8 @@ public class TestKafkaFabricJsonDeserializer
     @Override
     protected ConsumerRecord<byte[], byte[]> getDuplicateFieldRecord()
     {
-        byte[] data = "{\"data\": {\"_project\": \"testproject\", \"_collection\": \"testcollection\", \"testcolumn\": \"1\", \"testcolumn\": \"2\"}}".getBytes(StandardCharsets.UTF_8);
+
+        byte[] data = "{\"metadata\":{\"schema\":\"testcollection\",\"tenant\":\"testproject\"},\"data\":{\"testcolumn\": \"1\", \"testcolumn\": \"2\"}}".getBytes(StandardCharsets.UTF_8);
         ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[] {}, data);
         return record;
     }
@@ -65,7 +70,7 @@ public class TestKafkaFabricJsonDeserializer
     public void testOrdering()
             throws IOException
     {
-        byte[] data = "{\"data\": {\"testcolumn\": \"1\", \"testcolumn\": \"2\", \"_project\": \"testproject\", \"_collection\": \"testcollection\"}}".getBytes(StandardCharsets.UTF_8);
+        byte[] data = "{\"data\":{\"testcolumn\": \"1\", \"testcolumn\": \"2\"},\"metadata\":{\"schema\":\"testcollection\",\"tenant\":\"testproject\"}}".getBytes(StandardCharsets.UTF_8);
         ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[] {}, data);
 
         TestDatabaseHandler databaseHandler = new TestDatabaseHandler();
@@ -100,17 +105,18 @@ public class TestKafkaFabricJsonDeserializer
                     }
                 }
             }
-
-            ImmutableMap.Builder<Object, Object> data = ImmutableMap.builder()
-                    .put("_project", project)
-                    .put("_collection", collection);
-
+            ImmutableMap.Builder<Object, Object> data = ImmutableMap.builder();
+            ImmutableMap<String, String> metadata = ImmutableMap.of(
+                    "schema", collection,
+                    "tenant", project);
             event.forEach((s, o) -> data.put(s, o));
 
-            ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[] {}, JsonHelper.encodeAsBytes(ImmutableMap.of("data", data.build())));
+            ConsumerRecord<byte[], byte[]> record = new ConsumerRecord<>("test", -1, -1, new byte[] {}, JsonHelper.encodeAsBytes(ImmutableMap.of(
+                    "metadata", metadata,
+                    "data", data.build())));
             builder.add(record);
         }
-
+        //{"metadata":{"schema":"testcollection2","tenant":"testproject"},"data":{"colstring":"0"}}
         return builder.build();
     }
 }

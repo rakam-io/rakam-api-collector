@@ -173,7 +173,6 @@ public class FabricJsonDeserializer
                     throw new IllegalArgumentException("data must be an object");
                 }
                 propertiesBuffer = jp.readValueAs(TokenBuffer.class);
-                break;
             }
             else {
                 jp.nextToken();
