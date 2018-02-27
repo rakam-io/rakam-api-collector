@@ -30,7 +30,7 @@ public class KafkaConfig
     private String offset = "latest";
     private String groupId = "presto_streaming";
 
-    private String maxPollRecords = "50000";
+    private String maxPollRecords = "300000";
     private String sessionTimeOut = "12000";
     private String requestTimeOut = "15000";
     private String historicalDataTopic;
