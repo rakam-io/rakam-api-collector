@@ -8,16 +8,13 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.rakam.presto.kafka.KafkaConfig;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.joda.time.DateTime;
 
 import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
 import java.util.Properties;
 import java.util.Random;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static io.rakam.presto.kafka.KafkaUtil.createProducerConfig;
@@ -28,7 +25,9 @@ public class KafkaProducerTest
     public static void main(String[] args)
             throws Exception
     {
-        DateTime beginTime = new DateTime().minusDays(3);
+        String timestampFormat = "yyyy-MM-dd'T'HH:mm:ss.S'Z'";
+        int topicCount = 100;
+        DateTime beginTime = new DateTime().minusDays(60);
         DateTime endTime = new DateTime();
         Random random = new Random(10000);
 
@@ -75,11 +74,28 @@ public class KafkaProducerTest
 
         String topic = "stress_test";
         KafkaProducer<byte[], byte[]> producer = new KafkaProducer<>(createProducerConfig(new KafkaConfig().setNodes("78.47.94.214:9092").setTopic(topic), null));
+        //Assign topicName to string variable
+        String topicName = "presto_test_11";
+
+        // create instance for properties to access producer configs
+        Properties props = new Properties();
+
+        //Assign localhost id
+        props.put("bootstrap.servers", "localhost:9092");
+
+        //Set acknowledgements for producer requests.
+        props.put("acks", "all");
+
+        //If the request fails, the producer can automatically retry,
+        props.put("retries", 0);
+
+        //Specify buffer size in config
+        props.put("batch.size", 16384);
 
         String collection = "event";
 
         int i = 0;
-        while(true) {
+        while (true) {
             int randInt = random.nextInt();
             Timestamp randomDate = new Timestamp(ThreadLocalRandom.current().nextLong(beginTime.getMillis(), endTime.getMillis()));
 
@@ -89,11 +105,12 @@ public class KafkaProducerTest
             data.put("_shard_time", randomDate.toString());
 
             node.put("data", data);
-            producer.send(new ProducerRecord<>(topic, null, mapper.writeValueAsBytes(node)), new Callback() {
+            producer.send(new ProducerRecord<>(topic, null, mapper.writeValueAsBytes(node)), new Callback()
+            {
                 @Override
                 public void onCompletion(RecordMetadata metadata, Exception exception)
                 {
-                    if(exception != null) {
+                    if (exception != null) {
                         exception.printStackTrace();
                     }
                 }

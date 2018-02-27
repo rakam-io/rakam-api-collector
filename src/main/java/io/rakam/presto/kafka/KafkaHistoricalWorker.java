@@ -92,8 +92,8 @@ public class KafkaHistoricalWorker
     @PostConstruct
     public void start()
     {
-        if (config.getHistoricalDataTopic() == null || !config.getHistoricalWorkerEnabled()) {
-            log.warn("The config `kafka.historical-data-topic` is not set. Ignoring historical processing..");
+        if (!config.getHistoricalWorkerEnabled()) {
+            log.warn("Historical Worker is turned off. All the historical records will be pushed to topic: %s", config.getHistoricalDataTopic());
             return;
         }
         workerThread = new Thread(this::execute);
