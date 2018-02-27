@@ -55,7 +55,7 @@ import static java.lang.String.format;
 import static org.rakam.collection.FieldType.ARRAY_STRING;
 import static org.rakam.collection.FieldType.MAP_STRING;
 import static org.rakam.collection.FieldType.STRING;
-import static org.rakam.presto.analysis.PrestoRakamRaptorMetastore.toType;
+import static org.rakam.presto.PrestoType.toType;
 
 /**
  * Support for https://github.com/olacabs/fabric document structure.

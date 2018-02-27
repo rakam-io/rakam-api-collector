@@ -49,6 +49,7 @@ import java.util.Optional;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static org.rakam.presto.PrestoType.toType;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
@@ -105,6 +106,13 @@ public abstract class TestDeserializer<T>
         }
     }
 
+    public static MapType mapType(Type keyType, Type valueType)
+    {
+        return (MapType) TYPE_MANAGER.getParameterizedType(StandardTypes.MAP, ImmutableList.of(
+                TypeSignatureParameter.of(keyType.getTypeSignature()),
+                TypeSignatureParameter.of(valueType.getTypeSignature())));
+    }
+
     public static Block getBlock(FieldType fieldType)
     {
         switch (fieldType) {
@@ -132,8 +140,8 @@ public abstract class TestDeserializer<T>
                 return BlockAssertions.createTimestampSequenceBlock(0, 3);
             default:
                 if (fieldType.isArray()) {
-                    ArrayType arrayType = new ArrayType(toType(fieldType.getArrayElementType()));
-                    BlockBuilder builder = arrayType.createBlockBuilder(new BlockBuilderStatus(), 100);
+                    Type arrayType = toType(fieldType);
+                    BlockBuilder builder = toType(fieldType).createBlockBuilder(new BlockBuilderStatus(), 100);
 
                     for (int i = 0; i < ITERATION_COUNT; i++) {
                         arrayType.writeObject(builder, getBlock(fieldType.getArrayElementType()));
@@ -143,7 +151,7 @@ public abstract class TestDeserializer<T>
                 }
 
                 if (fieldType.isMap()) {
-                    MapType mapType = mapType(VARCHAR, toType(fieldType.getMapValueType()));
+                    Type mapType = toType(fieldType);
                     BlockBuilder builder = mapType.createBlockBuilder(new BlockBuilderStatus(), 100);
 
                     Block key = getBlock(FieldType.STRING);
@@ -167,45 +175,6 @@ public abstract class TestDeserializer<T>
 
                 throw new IllegalStateException();
         }
-    }
-
-    public static Type toType(FieldType type)
-    {
-        switch (type) {
-            case DOUBLE:
-                return DoubleType.DOUBLE;
-            case LONG:
-                return BigintType.BIGINT;
-            case BOOLEAN:
-                return BooleanType.BOOLEAN;
-            case STRING:
-                return VARCHAR;
-            case INTEGER:
-                return IntegerType.INTEGER;
-            case DATE:
-                return DateType.DATE;
-            case TIMESTAMP:
-                return TimestampType.TIMESTAMP;
-            case TIME:
-                return TimeType.TIME;
-            case BINARY:
-                return VarbinaryType.VARBINARY;
-            default:
-                if (type.isArray()) {
-                    return new ArrayType(toType(type.getArrayElementType()));
-                }
-                if (type.isMap()) {
-                    return mapType(VARCHAR, toType(type.getMapValueType()));
-                }
-                throw new IllegalStateException();
-        }
-    }
-
-    public static MapType mapType(Type keyType, Type valueType)
-    {
-        return (MapType) TYPE_MANAGER.getParameterizedType(StandardTypes.MAP, ImmutableList.of(
-                TypeSignatureParameter.of(keyType.getTypeSignature()),
-                TypeSignatureParameter.of(valueType.getTypeSignature())));
     }
 
     public abstract MessageEventTransformer getMessageEventTransformer();
