@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -10,7 +10,7 @@
 
     <groupId>io.rakam.presto</groupId>
     <artifactId>collector</artifactId>
-    <version>0.190.4-SNAPSHOT</version>
+    <version>0.190.3-SNAPSHOT</version>
 
     <properties>
         <presto.version>0.190</presto.version>
@@ -18,7 +18,7 @@
         <aws-java-sdk.version>1.11.115</aws-java-sdk.version>
         <dep.airlift.version>0.158</dep.airlift.version>
         <dep.slice.version>0.32</dep.slice.version>
-        <skip.deploy.s3>false</skip.deploy.s3>
+        <skip.deploy.s3>true</skip.deploy.s3>
         <air.check.skip-duplicate-finder>true</air.check.skip-duplicate-finder>
         <air.check.skip-jacoco>true</air.check.skip-jacoco>
         <kafka.client.version>0.10.2.0</kafka.client.version>
@@ -499,41 +499,7 @@
                     <failOnViolations>false</failOnViolations>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>wagon-maven-plugin</artifactId>
-                <version>1.0</version>
-                <executions>
-                    <execution>
-                        <id>deploy-release</id>
-                        <phase>deploy</phase>
-                        <goals>
-                            <goal>upload-single</goal>
-                        </goals>
-                        <configuration>
-                            <skip>${skip.deploy.s3}</skip>
-                            <serverId>aws-release</serverId>
-                            <toFile>${project.artifactId}-${project.version}-bundle.tar.gz</toFile>
-                            <url>s3://rakam-private-code/rakam-presto-builds/${presto.version}</url>
-                            <fromFile>${project.build.directory}/${project.artifactId}-${project.version}-bundle.tar.gz</fromFile>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>deploy-release-latest</id>
-                        <phase>deploy</phase>
-                        <goals>
-                            <goal>upload-single</goal>
-                        </goals>
-                        <configuration>
-                            <skip>${skip.deploy.s3}</skip>
-                            <serverId>aws-release</serverId>
-                            <toFile>latest.tar.gz</toFile>
-                            <url>s3://rakam-private-code/rakam-presto-builds/${presto.version}</url>
-                            <fromFile>${project.build.directory}/${project.artifactId}-${project.version}-bundle.tar.gz</fromFile>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
