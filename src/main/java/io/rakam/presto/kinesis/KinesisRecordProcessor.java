@@ -69,6 +69,7 @@ public class KinesisRecordProcessor
     {
         for (Record record : records) {
             ByteBuffer data = record.getData();
+
             byte type = data.get(0);
             switch (type) {
                 case 0:
@@ -106,7 +107,7 @@ public class KinesisRecordProcessor
                             log.error(throwable, "Error while processing records");
                         }
 
-                        // TODO: What should we do if we can't isRecentData the data?
+                        // TODO: What should we do if we can't commit the data?
                         checkpoint(entry.getValue());
                     });
                 }

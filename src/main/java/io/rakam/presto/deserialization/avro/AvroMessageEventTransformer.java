@@ -102,17 +102,25 @@ public abstract class AvroMessageEventTransformer<T>
                     expectedSchemaBuilder.add(column.get());
                 }
 
+                List<ColumnMetadata> actualSchema = pageBuilder.getActualSchema();
+
                 ImmutableList<ColumnMetadata> build = expectedSchemaBuilder.build();
                 if (build.size() > pageBuilder.getExpectedSchema().size()) {
                     throw new IllegalStateException();
                 }
-                else if (build.size() < pageBuilder.getExpectedSchema().size()) {
+
+                boolean schemaChange = build.size() < pageBuilder.getExpectedSchema().size();
+                if (schemaChange) {
                     pageBuilder.setActualSchema(build);
                 }
 
                 int recordCount = decoder.readInt();
                 for (int i = 0; i < recordCount; i++) {
                     pageBuilder.read(decoder);
+                }
+
+                if (schemaChange) {
+                    pageBuilder.setActualSchema(actualSchema);
                 }
             }
             catch (Exception e) {

@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -188,7 +189,7 @@ public class FabricJsonDeserializer
 
         JsonToken t = jp.nextToken();
         for (t = jp.nextToken(); t == JsonToken.FIELD_NAME; t = jp.nextToken()) {
-            String fieldName = jp.getCurrentName();
+            String fieldName = jp.getCurrentName().toLowerCase(Locale.ENGLISH);
 
             int idx = -1;
             for (int i = 0; i < columns.size(); i++) {
