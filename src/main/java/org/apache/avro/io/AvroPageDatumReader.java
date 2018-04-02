@@ -113,6 +113,7 @@ public class AvroPageDatumReader
         for (Schema.Field field : in.readFieldOrder()) {
             BlockBuilder blockBuilder = builder.getBlockBuilder(field.pos());
 
+            // the data may be missing since it's written in a distributed manner
             if (binaryDecoder.isEnd()) {
                 fill(blockBuilder.getPositionCount() + 1);
                 break;

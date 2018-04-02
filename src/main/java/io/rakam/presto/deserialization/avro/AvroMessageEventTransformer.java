@@ -89,38 +89,10 @@ public abstract class AvroMessageEventTransformer<T>
                 decoder = DecoderFactory.get().binaryDecoder(input, decoder);
 
                 int countOfColumns = decoder.readInt();
-                ImmutableList.Builder<ColumnMetadata> expectedSchemaBuilder = ImmutableList.builder();
-
-                for (int i = 0; i < countOfColumns; i++) {
-                    String columnName = decoder.readString();
-                    Optional<ColumnMetadata> column = pageBuilder.getExpectedSchema().stream()
-                            .filter((Predicate<ColumnMetadata>) o -> o.getName().equals(columnName))
-                            .findAny();
-                    if (!column.isPresent()) {
-                        throw new PrestoException(GENERIC_INTERNAL_ERROR, "Unknown column: " + columnName);
-                    }
-                    expectedSchemaBuilder.add(column.get());
-                }
-
-                List<ColumnMetadata> actualSchema = pageBuilder.getActualSchema();
-
-                ImmutableList<ColumnMetadata> build = expectedSchemaBuilder.build();
-                if (build.size() > pageBuilder.getExpectedSchema().size()) {
-                    throw new IllegalStateException();
-                }
-
-                boolean schemaChange = build.size() < pageBuilder.getExpectedSchema().size();
-                if (schemaChange) {
-                    pageBuilder.setActualSchema(build);
-                }
 
                 int recordCount = decoder.readInt();
                 for (int i = 0; i < recordCount; i++) {
                     pageBuilder.read(decoder);
-                }
-
-                if (schemaChange) {
-                    pageBuilder.setActualSchema(actualSchema);
                 }
             }
             catch (Exception e) {

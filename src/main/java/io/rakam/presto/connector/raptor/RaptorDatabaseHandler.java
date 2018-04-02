@@ -271,11 +271,6 @@ public class RaptorDatabaseHandler
         return columnMetadatas;
     }
 
-    public PrestoRakamRaptorMetastore getMetastore()
-    {
-        return metastore;
-    }
-
     @Override
     public List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns)
     {
