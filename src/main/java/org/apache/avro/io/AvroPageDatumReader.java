@@ -10,17 +10,20 @@ import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.rakam.presto.deserialization.PageBuilder;
 import io.rakam.presto.deserialization.PageReaderDeserializer;
+import io.rakam.presto.deserialization.avro.AvroUtil;
 import org.apache.avro.AvroRuntimeException;
 import org.apache.avro.Schema;
 import org.apache.avro.util.WeakIdentityHashMap;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-import static com.facebook.presto.rakam.AvroUtil.convertAvroSchema;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkState;
+import static io.rakam.presto.deserialization.avro.AvroUtil.convertAvroSchema;
 import static java.lang.Double.doubleToLongBits;
 import static java.lang.Float.floatToIntBits;
 
@@ -28,13 +31,7 @@ public class AvroPageDatumReader
         implements DatumReader<Void>, PageReaderDeserializer<BinaryDecoder>
 {
     private static final ThreadLocal<Map<Schema, Map<Schema, ResolvingDecoder>>> RESOLVER_CACHE =
-            new ThreadLocal<Map<Schema, Map<Schema, ResolvingDecoder>>>()
-            {
-                protected Map<Schema, Map<Schema, ResolvingDecoder>> initialValue()
-                {
-                    return new WeakIdentityHashMap<>();
-                }
-            };
+            ThreadLocal.withInitial(() -> new WeakIdentityHashMap<>());
     private final PageBuilder builder;
     private final Thread creator = Thread.currentThread();
     // original data layout

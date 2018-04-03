@@ -99,5 +99,16 @@ public class AvroUtil
             throw Throwables.propagate(e);
         }
     }
+
+    public static Schema convertAvroSchema(Collection<ColumnMetadata> fields)
+    {
+        List<Schema.Field> avroFields = fields.stream()
+                .map(AvroUtil::generateAvroSchema).collect(Collectors.toList());
+
+        Schema schema = Schema.createRecord("collection", null, null, false);
+        schema.setFields(avroFields);
+
+        return schema;
+    }
 }
 
