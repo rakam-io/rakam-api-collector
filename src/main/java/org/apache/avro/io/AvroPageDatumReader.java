@@ -4,6 +4,7 @@
 
 package org.apache.avro.io;
 
+import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.block.BlockBuilder;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
@@ -14,8 +15,10 @@ import org.apache.avro.Schema;
 import org.apache.avro.util.WeakIdentityHashMap;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
+import static com.facebook.presto.rakam.AvroUtil.convertAvroSchema;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.doubleToLongBits;
@@ -34,8 +37,10 @@ public class AvroPageDatumReader
             };
     private final PageBuilder builder;
     private final Thread creator = Thread.currentThread();
+    // original data layout
     private Schema actualSchema;
-    private Schema expectedSchema;
+    // the expected output
+    private final Schema expectedSchema;
     private ResolvingDecoder creatorResolver = null;
 
     public AvroPageDatumReader(PageBuilder pageBuilder, Schema schema)
@@ -53,26 +58,32 @@ public class AvroPageDatumReader
     protected final ResolvingDecoder getResolver(Schema actual, Schema expected)
             throws IOException
     {
-        Thread currThread = Thread.currentThread();
         ResolvingDecoder resolver;
-        if (currThread == creator && creatorResolver != null) {
-            return creatorResolver;
-        }
 
-        Map<Schema, ResolvingDecoder> cache = RESOLVER_CACHE.get().get(actual);
-        if (cache == null) {
-            cache = new WeakIdentityHashMap<>();
-            RESOLVER_CACHE.get().put(actual, cache);
-        }
+        // if we use temporary `actual`, we should not cache it
+        if(actual == expected) {
+            Thread currThread = Thread.currentThread();
+            if (currThread == creator && creatorResolver != null) {
+                return creatorResolver;
+            }
 
-        resolver = cache.get(expected);
-        if (resolver == null) {
+            Map<Schema, ResolvingDecoder> cache = RESOLVER_CACHE.get().get(actual);
+            if (cache == null) {
+                cache = new WeakIdentityHashMap<>();
+                RESOLVER_CACHE.get().put(actual, cache);
+            }
+
+            resolver = cache.get(expected);
+            if (resolver == null) {
+                resolver = DecoderFactory.get().resolvingDecoder(Schema.applyAliases(actual, expected), expected, null);
+                cache.put(expected, resolver);
+            }
+
+            if (currThread == creator) {
+                creatorResolver = resolver;
+            }
+        } else {
             resolver = DecoderFactory.get().resolvingDecoder(Schema.applyAliases(actual, expected), expected, null);
-            cache.put(expected, resolver);
-        }
-
-        if (currThread == creator) {
-            creatorResolver = resolver;
         }
 
         return resolver;
@@ -81,11 +92,7 @@ public class AvroPageDatumReader
     @Override
     public void setSchema(Schema schema)
     {
-        this.actualSchema = schema;
-        if (expectedSchema == null) {
-            expectedSchema = actualSchema;
-        }
-        creatorResolver = null;
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -213,9 +220,17 @@ public class AvroPageDatumReader
     }
 
     @Override
-    public void read(BinaryDecoder in)
+    public void read(BinaryDecoder in, List<ColumnMetadata> tempActualSchema)
             throws IOException
     {
-        read(null, in);
+        if (tempActualSchema == null) {
+            read(null, in);
+        }
+        else {
+            Schema realSchema = this.actualSchema;
+            this.actualSchema = convertAvroSchema(tempActualSchema);
+            read(null, in);
+            this.actualSchema = realSchema;
+        }
     }
 }

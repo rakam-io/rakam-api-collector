@@ -36,7 +36,7 @@ public class JsonPageReader
         }
 
         @Override
-        public void read(JsonDeserializer in)
+        public void read(JsonDeserializer in, List<ColumnMetadata> expectedSchema)
                 throws IOException
         {
             in.deserialize(jsonPageReader);

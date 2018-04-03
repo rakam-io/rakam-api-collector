@@ -89,10 +89,19 @@ public abstract class AvroMessageEventTransformer<T>
                 decoder = DecoderFactory.get().binaryDecoder(input, decoder);
 
                 int countOfColumns = decoder.readInt();
+                for (int i = 0; i < countOfColumns; i++) {
+                    String columnName = decoder.readString();
+                    List<ColumnMetadata> expectedSchema = pageBuilder.getExpectedSchema();
+                    if(!expectedSchema.get(i).getName().equals(columnName)) {
+                        System.out.println(1);
+                    }
+                }
+
+                List<ColumnMetadata> metadata = countOfColumns < pageBuilder.getExpectedSchema().size() ? pageBuilder.getExpectedSchema().subList(0, countOfColumns) : null;
 
                 int recordCount = decoder.readInt();
                 for (int i = 0; i < recordCount; i++) {
-                    pageBuilder.read(decoder);
+                    pageBuilder.read(decoder, metadata);
                 }
             }
             catch (Exception e) {
