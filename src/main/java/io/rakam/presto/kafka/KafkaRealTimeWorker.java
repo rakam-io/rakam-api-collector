@@ -187,7 +187,7 @@ public class KafkaRealTimeWorker
                         flushDataSafe();
                     }
 
-                    checkpoint();
+                    flushCheckpointQueue();
 
                     if (memoryTracker.availableMemoryInPercentage() < .30) {
                         changeType(Status.FLUSHING_STREAM);
@@ -206,7 +206,7 @@ public class KafkaRealTimeWorker
                                 break;
                             }
 
-                            checkpoint();
+                            flushCheckpointQueue();
                         }
                         consumer.resume(assignment);
                     }
@@ -221,7 +221,7 @@ public class KafkaRealTimeWorker
         }
     }
 
-    private void checkpoint()
+    private void flushCheckpointQueue()
     {
         List<TableCheckpoint> poll = checkpointQueue.poll();
         if (poll != null) {
