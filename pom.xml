@@ -15,7 +15,7 @@
     <properties>
         <presto.version>0.190</presto.version>
         <rakam.version>0.12</rakam.version>
-        <aws-java-sdk.version>1.11.115</aws-java-sdk.version>
+        <aws-java-sdk.version>1.11.272</aws-java-sdk.version>
         <dep.airlift.version>0.158</dep.airlift.version>
         <dep.slice.version>0.32</dep.slice.version>
         <skip.deploy.s3>true</skip.deploy.s3>
@@ -252,7 +252,7 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>amazon-kinesis-client</artifactId>
-            <version>1.7.3</version>
+            <version>1.9.0</version>
             <exclusions>
                 <exclusion>
                     <groupId>joda-time</groupId>

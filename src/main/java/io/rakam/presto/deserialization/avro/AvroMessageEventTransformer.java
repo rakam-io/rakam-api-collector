@@ -91,10 +91,6 @@ public abstract class AvroMessageEventTransformer<T>
                 int countOfColumns = decoder.readInt();
                 for (int i = 0; i < countOfColumns; i++) {
                     String columnName = decoder.readString();
-                    List<ColumnMetadata> expectedSchema = pageBuilder.getExpectedSchema();
-                    if(!expectedSchema.get(i).getName().equals(columnName)) {
-                        System.out.println(1);
-                    }
                 }
 
                 List<ColumnMetadata> metadata = countOfColumns < pageBuilder.getExpectedSchema().size() ? pageBuilder.getExpectedSchema().subList(0, countOfColumns) : null;

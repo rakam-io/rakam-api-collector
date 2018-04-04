@@ -99,7 +99,7 @@ public class KinesisRecordProcessor
             flushDataSafe(checkpointer);
         }
 
-        if (memoryTracker.availableMemoryInPercentage() < .30) {
+        if (memoryTracker.availableMemoryInPercentage() < .3) {
             flushDataSafe(checkpointer);
 
             while (memoryTracker.availableMemoryInPercentage() < .3) {

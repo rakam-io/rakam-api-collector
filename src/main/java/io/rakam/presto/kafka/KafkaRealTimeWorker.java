@@ -189,7 +189,7 @@ public class KafkaRealTimeWorker
 
                     flushCheckpointQueue();
 
-                    if (memoryTracker.availableMemoryInPercentage() < .30) {
+                    if (memoryTracker.availableMemoryInPercentage() < .3) {
                         changeType(Status.FLUSHING_STREAM);
                         flushDataSafe();
 
