@@ -6,9 +6,7 @@ package io.rakam.presto.deserialization.avro;
 
 import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.ColumnMetadata;
-import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
@@ -25,14 +23,11 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.Predicate;
 
-import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 public abstract class AvroMessageEventTransformer<T>
-        extends MessageEventTransformer<T,BinaryDecoder>
+        extends MessageEventTransformer<T, BinaryDecoder>
 {
     private final static Logger LOGGER = Logger.get(AvroMessageEventTransformer.class);
     private final String checkpointColumn;
