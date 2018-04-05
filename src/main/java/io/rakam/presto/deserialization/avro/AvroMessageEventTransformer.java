@@ -85,26 +85,24 @@ public abstract class AvroMessageEventTransformer<T>
                 memoryTracker.reserveMemory(totalSize);
 
                 try {
-                    SchemaTableName table = extractCollection(record, null);
-
-                    PageReader pageBuilder = getReader(builderMap, table);
-                    if (pageBuilder == null) {
-                        continue;
-                    }
-
                     decoder = DecoderFactory.get().binaryDecoder(input, decoder);
+                    String project = decoder.readString();
 
-                    int countOfColumns = decoder.readInt();
-                    for (int i = 0; i < countOfColumns; i++) {
-                        // parsing the column name, but we're not using it right now
-                        decoder.readString();
-                    }
+                    while (!decoder.isEnd()) {
+                        String collection = decoder.readString();
+                        PageReader pageBuilder = getReader(builderMap, new SchemaTableName(project, collection));
+                        if (pageBuilder == null) {
+                            continue;
+                        }
 
-                    List<ColumnMetadata> metadata = countOfColumns < pageBuilder.getExpectedSchema().size() ? pageBuilder.getExpectedSchema().subList(0, countOfColumns) : null;
+                        int countOfColumns = decoder.readInt();
 
-                    int recordCount = decoder.readInt();
-                    for (int i = 0; i < recordCount; i++) {
-                        pageBuilder.read(decoder, metadata);
+                        List<ColumnMetadata> metadata = countOfColumns < pageBuilder.getExpectedSchema().size() ? pageBuilder.getExpectedSchema().subList(0, countOfColumns) : null;
+
+                        int recordCount = decoder.readInt();
+                        for (int i = 0; i < recordCount; i++) {
+                            pageBuilder.read(decoder, metadata);
+                        }
                     }
                 }
                 finally {
