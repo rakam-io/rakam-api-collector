@@ -8,6 +8,7 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.SchemaTableName;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.MemoryTracker;
 import io.rakam.presto.deserialization.avro.AvroMessageEventTransformer;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DecoderFactory;
@@ -21,9 +22,9 @@ public class KafkaAvroMessageTransformer
         extends AvroMessageEventTransformer<ConsumerRecord<byte[], byte[]>>
 {
     @Inject
-    public KafkaAvroMessageTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler databaseHandler)
+    public KafkaAvroMessageTransformer(FieldNameConfig fieldNameConfig, MemoryTracker memoryTracker, DatabaseHandler databaseHandler)
     {
-        super(fieldNameConfig, databaseHandler);
+        super(fieldNameConfig, memoryTracker, databaseHandler);
     }
 
     @Override

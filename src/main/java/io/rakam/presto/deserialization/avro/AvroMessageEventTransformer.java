@@ -14,6 +14,7 @@ import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
+import io.rakam.presto.MemoryTracker;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
@@ -35,13 +36,15 @@ public abstract class AvroMessageEventTransformer<T>
 {
     private final static Logger LOGGER = Logger.get(AvroMessageEventTransformer.class);
     private final String checkpointColumn;
+    private final MemoryTracker memoryTracker;
 
     private BinaryDecoder decoder;
 
-    public AvroMessageEventTransformer(FieldNameConfig fieldNameConfig, DatabaseHandler database)
+    public AvroMessageEventTransformer(FieldNameConfig fieldNameConfig, MemoryTracker memoryTracker, DatabaseHandler database)
     {
         super(fieldNameConfig, database);
         this.checkpointColumn = fieldNameConfig.getCheckpointField();
+        this.memoryTracker = memoryTracker;
     }
 
     @Override
@@ -78,26 +81,34 @@ public abstract class AvroMessageEventTransformer<T>
                 bulkKey = new String(data, 9, data.length - 9, UTF_8);
                 object = getBulkObject(bulkKey);
                 InputStreamSliceInput input = new InputStreamSliceInput(object.getObjectContent());
+                int totalSize = input.available();
+                memoryTracker.reserveMemory(totalSize);
 
-                SchemaTableName table = extractCollection(record, null);
+                try {
+                    SchemaTableName table = extractCollection(record, null);
 
-                PageReader pageBuilder = getReader(builderMap, table);
-                if (pageBuilder == null) {
-                    continue;
+                    PageReader pageBuilder = getReader(builderMap, table);
+                    if (pageBuilder == null) {
+                        continue;
+                    }
+
+                    decoder = DecoderFactory.get().binaryDecoder(input, decoder);
+
+                    int countOfColumns = decoder.readInt();
+                    for (int i = 0; i < countOfColumns; i++) {
+                        // parsing the column name, but we're not using it right now
+                        decoder.readString();
+                    }
+
+                    List<ColumnMetadata> metadata = countOfColumns < pageBuilder.getExpectedSchema().size() ? pageBuilder.getExpectedSchema().subList(0, countOfColumns) : null;
+
+                    int recordCount = decoder.readInt();
+                    for (int i = 0; i < recordCount; i++) {
+                        pageBuilder.read(decoder, metadata);
+                    }
                 }
-
-                decoder = DecoderFactory.get().binaryDecoder(input, decoder);
-
-                int countOfColumns = decoder.readInt();
-                for (int i = 0; i < countOfColumns; i++) {
-                    String columnName = decoder.readString();
-                }
-
-                List<ColumnMetadata> metadata = countOfColumns < pageBuilder.getExpectedSchema().size() ? pageBuilder.getExpectedSchema().subList(0, countOfColumns) : null;
-
-                int recordCount = decoder.readInt();
-                for (int i = 0; i < recordCount; i++) {
-                    pageBuilder.read(decoder, metadata);
+                finally {
+                    memoryTracker.freeMemory(totalSize);
                 }
             }
             catch (Exception e) {
