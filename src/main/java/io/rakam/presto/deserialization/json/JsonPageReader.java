@@ -36,10 +36,22 @@ public class JsonPageReader
         }
 
         @Override
-        public void read(JsonDeserializer in, List<ColumnMetadata> expectedSchema)
+        public void read(JsonDeserializer in)
                 throws IOException
         {
             in.deserialize(jsonPageReader);
+        }
+
+        @Override
+        public void setLastColumnIndex(int lastColumnIdx)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void resetLastColumnIndex()
+        {
+            throw new UnsupportedOperationException();
         }
     }
 }

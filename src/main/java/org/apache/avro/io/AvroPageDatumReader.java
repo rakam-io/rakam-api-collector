@@ -4,86 +4,48 @@
 
 package org.apache.avro.io;
 
-import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.block.BlockBuilder;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.rakam.presto.deserialization.PageBuilder;
 import io.rakam.presto.deserialization.PageReaderDeserializer;
-import io.rakam.presto.deserialization.avro.AvroUtil;
 import org.apache.avro.AvroRuntimeException;
 import org.apache.avro.Schema;
-import org.apache.avro.util.WeakIdentityHashMap;
 
 import java.io.IOException;
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
-import static com.google.common.base.Preconditions.checkState;
-import static io.rakam.presto.deserialization.avro.AvroUtil.convertAvroSchema;
 import static java.lang.Double.doubleToLongBits;
 import static java.lang.Float.floatToIntBits;
 
 public class AvroPageDatumReader
         implements DatumReader<Void>, PageReaderDeserializer<BinaryDecoder>
 {
-    private static final ThreadLocal<Map<Schema, Map<Schema, ResolvingDecoder>>> RESOLVER_CACHE =
-            ThreadLocal.withInitial(() -> new WeakIdentityHashMap<>());
     private final PageBuilder builder;
-    private final Thread creator = Thread.currentThread();
     // original data layout
     private Schema actualSchema;
-    // the expected output
-    private final Schema expectedSchema;
     private ResolvingDecoder creatorResolver = null;
+    private ResolvingDecoder temporaryResolver = null;
+    private int temporaryResolverIndex;
 
     public AvroPageDatumReader(PageBuilder pageBuilder, Schema schema)
     {
-        this(pageBuilder, schema, schema);
-    }
-
-    private AvroPageDatumReader(PageBuilder pageBuilder, Schema actualSchema, Schema expectedSchema)
-    {
         this.builder = pageBuilder;
-        this.actualSchema = actualSchema;
-        this.expectedSchema = expectedSchema;
+        this.actualSchema = schema;
+        creatorResolver = generateResolver(schema);
     }
 
-    protected final ResolvingDecoder getResolver(Schema actual, Schema expected)
+    protected final ResolvingDecoder getResolver()
             throws IOException
     {
-        ResolvingDecoder resolver;
-
-        // if we use temporary `actual`, we should not cache it
-        if(actual == expected) {
-            Thread currThread = Thread.currentThread();
-            if (currThread == creator && creatorResolver != null) {
-                return creatorResolver;
-            }
-
-            Map<Schema, ResolvingDecoder> cache = RESOLVER_CACHE.get().get(actual);
-            if (cache == null) {
-                cache = new WeakIdentityHashMap<>();
-                RESOLVER_CACHE.get().put(actual, cache);
-            }
-
-            resolver = cache.get(expected);
-            if (resolver == null) {
-                resolver = DecoderFactory.get().resolvingDecoder(Schema.applyAliases(actual, expected), expected, null);
-                cache.put(expected, resolver);
-            }
-
-            if (currThread == creator) {
-                creatorResolver = resolver;
-            }
-        } else {
-            resolver = DecoderFactory.get().resolvingDecoder(Schema.applyAliases(actual, expected), expected, null);
+        if (temporaryResolver != null) {
+            return temporaryResolver;
         }
-
-        return resolver;
+        else {
+            return creatorResolver;
+        }
     }
 
     @Override
@@ -97,27 +59,37 @@ public class AvroPageDatumReader
     public Void read(Void reuse, Decoder in)
             throws IOException
     {
-        ResolvingDecoder resolver = getResolver(actualSchema, expectedSchema);
+        ResolvingDecoder resolver = getResolver();
         resolver.configure(in);
 
-        checkState(actualSchema.getFields() != null, "Not a record");
         builder.declarePosition();
-        readRecord(resolver);
-        if (!((BinaryDecoder) in).isEnd()) {
-            resolver.drain();
+        BinaryDecoder binaryDecoder = (BinaryDecoder) in;
+
+        readRecord(resolver, binaryDecoder);
+
+        if (temporaryResolver != null) {
+            int totalColumns = actualSchema.getFields().size();
+            for(int currentPos = temporaryResolverIndex; currentPos < totalColumns; currentPos++) {
+                builder.getBlockBuilder(currentPos).appendNull();
+            }
         }
+        else {
+            if (!binaryDecoder.isEnd()) {
+                resolver.drain();
+            }
+        }
+
         return null;
     }
 
-    protected void readRecord(ResolvingDecoder in)
+    protected void readRecord(ResolvingDecoder in, BinaryDecoder binaryDecoder)
             throws IOException
     {
-        BinaryDecoder binaryDecoder = (BinaryDecoder) in.in;
-
         for (Schema.Field field : in.readFieldOrder()) {
             BlockBuilder blockBuilder = builder.getBlockBuilder(field.pos());
 
             // the data may be missing since it's written in a distributed manner
+            // if the stream contains multiple records, this approach doesn't work so use temporaryResolver for that use-case.
             if (binaryDecoder.isEnd()) {
                 fill(blockBuilder.getPositionCount() + 1);
                 break;
@@ -129,7 +101,7 @@ public class AvroPageDatumReader
 
     public void fill(int currentPosition)
     {
-        for (int i = 0; i < this.expectedSchema.getFields().size(); i++) {
+        for (int i = 0; i < this.actualSchema.getFields().size(); i++) {
             BlockBuilder blockBuilder = builder.getBlockBuilder(i);
             if (blockBuilder.getPositionCount() < currentPosition) {
                 blockBuilder.appendNull();
@@ -217,17 +189,38 @@ public class AvroPageDatumReader
     }
 
     @Override
-    public void read(BinaryDecoder in, List<ColumnMetadata> tempActualSchema)
+    public void read(BinaryDecoder in)
             throws IOException
     {
-        if (tempActualSchema == null) {
-            read(null, in);
+        read(null, in);
+    }
+
+    @Override
+    public void setLastColumnIndex(int lastColumnIndex)
+    {
+        List<Schema.Field> actualFields = actualSchema.getFields();
+        List<Schema.Field> fields = new ArrayList<>(lastColumnIndex);
+        for (int i = 0; i < lastColumnIndex; i++) {
+            Schema.Field field = actualFields.get(i);
+            fields.add(new Schema.Field(field.name(), field.schema(), field.doc(), field.defaultValue()));
         }
-        else {
-            Schema realSchema = this.actualSchema;
-            this.actualSchema = convertAvroSchema(tempActualSchema);
-            read(null, in);
-            this.actualSchema = realSchema;
+        this.temporaryResolver = generateResolver(Schema.createRecord(fields));
+        this.temporaryResolverIndex = lastColumnIndex;
+    }
+
+    @Override
+    public void resetLastColumnIndex()
+    {
+        this.temporaryResolver = null;
+    }
+
+    private ResolvingDecoder generateResolver(Schema schema)
+    {
+        try {
+            return DecoderFactory.get().resolvingDecoder(Schema.applyAliases(schema, schema), schema, null);
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 }

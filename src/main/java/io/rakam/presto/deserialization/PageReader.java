@@ -97,17 +97,21 @@ public abstract class PageReader<T>
     public void read(T decoder)
             throws IOException
     {
-        datumReader.read(decoder, null);
-    }
-
-    public void read(T decoder, List<ColumnMetadata> expectedSchema)
-            throws IOException
-    {
-        datumReader.read(decoder, expectedSchema);
+        datumReader.read(decoder);
     }
 
     public List<ColumnMetadata> getExpectedSchema()
     {
         return expectedSchema;
+    }
+
+    public void setTemporarySchema(int lastColumnIndex)
+    {
+        datumReader.setLastColumnIndex(lastColumnIndex);
+    }
+
+    public void resetTemporarySchema()
+    {
+        datumReader.resetLastColumnIndex();
     }
 }
