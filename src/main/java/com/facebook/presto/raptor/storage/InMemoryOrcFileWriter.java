@@ -181,7 +181,7 @@ public class InMemoryOrcFileWriter
                 .map(Object::toString)
                 .collect(toImmutableList());
 
-        TrackedDynamicSliceOutput output = buffer.create(target.getName(), columnIds.size() * 5000);
+        TrackedDynamicSliceOutput output = buffer.create(target.getName(), columnIds.size() * 50);
 
         return OrcWriter.createOrcWriter(
                 output,

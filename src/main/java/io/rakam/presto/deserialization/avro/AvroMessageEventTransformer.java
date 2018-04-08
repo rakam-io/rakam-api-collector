@@ -10,6 +10,7 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
+import io.airlift.units.DataSize;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.MemoryTracker;
@@ -77,6 +78,7 @@ public abstract class AvroMessageEventTransformer<T>
                 object = getBulkObject(bulkKey);
                 InputStreamSliceInput input = new InputStreamSliceInput(object.getObjectContent());
                 int totalSize = input.available();
+                LOGGER.debug("Reading bulk file %s, total size is %s", bulkKey, DataSize.succinctBytes(totalSize).toString());
                 memoryTracker.reserveMemory(totalSize);
 
                 try {
@@ -92,7 +94,7 @@ public abstract class AvroMessageEventTransformer<T>
 
                         int countOfColumns = decoder.readInt();
 
-                        if(countOfColumns < pageBuilder.getExpectedSchema().size()) {
+                        if (countOfColumns < pageBuilder.getExpectedSchema().size()) {
                             pageBuilder.setTemporarySchema(countOfColumns);
                         }
 

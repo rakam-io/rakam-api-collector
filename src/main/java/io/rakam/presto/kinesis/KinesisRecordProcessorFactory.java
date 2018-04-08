@@ -8,6 +8,7 @@ import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessor;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorFactory;
 import io.airlift.log.Logger;
 import io.rakam.presto.MemoryTracker;
+import io.rakam.presto.MiddlewareBuffer;
 import io.rakam.presto.MiddlewareConfig;
 import io.rakam.presto.StreamWorkerContext;
 import io.rakam.presto.TargetConnectorCommitter;
@@ -26,9 +27,9 @@ public class KinesisRecordProcessorFactory
     private static final Logger log = Logger.get(KinesisRecordProcessorFactory.class);
 
     private final TargetConnectorCommitter committer;
-    private final MiddlewareConfig middlewareConfig;
     private final StreamWorkerContext context;
     private final MemoryTracker memoryTracker;
+    private final MiddlewareBuffer middlewareBuffer;
 
     @Inject
     public KinesisRecordProcessorFactory(StreamWorkerContext context,
@@ -36,15 +37,18 @@ public class KinesisRecordProcessorFactory
             MiddlewareConfig middlewareConfig, TargetConnectorCommitter committer)
     {
         this.context = context;
-        this.middlewareConfig = middlewareConfig;
         this.memoryTracker = memoryTracker;
         this.committer = committer;
+        middlewareBuffer = new MiddlewareBuffer(middlewareConfig, memoryTracker);
 
         if (log.isDebugEnabled()) {
             Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
-                String message = format("[%s (%s%%) memory available]",
+                String message = format("[%s (%s%%) memory available] Active flush count is %d (%s), Middleware buffer is %s",
                         succinctBytes(memoryTracker.availableMemory()).toString(),
-                        memoryTracker.availableMemoryInPercentage() * 100);
+                        memoryTracker.availableMemoryInPercentage() * 100,
+                        committer.getActiveFlushCount(),
+                        committer.isFull() ? "full" : "not full",
+                        middlewareBuffer.calculateSize().toString());
                 log.debug(message);
             }, 5, 5, SECONDS);
         }
@@ -53,6 +57,6 @@ public class KinesisRecordProcessorFactory
     @Override
     public IRecordProcessor createProcessor()
     {
-        return new KinesisRecordProcessor(context, middlewareConfig, memoryTracker, committer);
+        return new KinesisRecordProcessor(context, middlewareBuffer, memoryTracker, committer);
     }
 }

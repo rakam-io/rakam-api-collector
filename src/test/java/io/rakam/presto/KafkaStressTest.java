@@ -10,7 +10,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
-import io.airlift.units.Duration;
 import io.rakam.presto.connector.raptor.RaptorConfig;
 import io.rakam.presto.connector.raptor.RaptorDatabaseHandler;
 import io.rakam.presto.connector.raptor.S3BackupConfig;
@@ -44,9 +43,9 @@ import static io.rakam.presto.kafka.KafkaConfig.DataFormat.JSON;
 import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
 import static java.time.ZoneOffset.UTC;
 
-public class StressTest
+public class KafkaStressTest
 {
-    private static final Logger log = Logger.get(StressTest.class);
+    private static final Logger log = Logger.get(KafkaStressTest.class);
 
     public static void main(String[] args)
             throws Exception

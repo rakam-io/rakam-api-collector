@@ -7,6 +7,7 @@ package io.rakam.presto;
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
+import io.airlift.units.DataSize;
 import io.rakam.presto.deserialization.TableData;
 
 import java.util.ArrayList;
@@ -54,6 +55,12 @@ public class MiddlewareBuffer
             memoryTracker.reserveMemory(entry.getValue().page.getRetainedSizeInBytes());
             bufferLastFlushed.putIfAbsent(tableName, now);
         }
+    }
+
+    public DataSize calculateSize() {
+        return DataSize.succinctBytes(batches.values().stream()
+                .mapToLong(t -> t.stream().mapToLong(e -> e.getTable().page.getRetainedSizeInBytes()).sum())
+                .sum());
     }
 
     private boolean shouldFlush(long now, SchemaTableName name)

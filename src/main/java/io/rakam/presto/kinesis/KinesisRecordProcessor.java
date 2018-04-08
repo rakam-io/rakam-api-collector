@@ -55,7 +55,7 @@ public class KinesisRecordProcessor
     private String shardId;
 
     public KinesisRecordProcessor(StreamWorkerContext context,
-            MiddlewareConfig middlewareConfig,
+            MiddlewareBuffer middlewareBuffer,
             MemoryTracker memoryTracker,
             TargetConnectorCommitter committer)
     {
@@ -63,7 +63,7 @@ public class KinesisRecordProcessor
         this.context = context;
         this.streamBuffer = context.createBuffer();
         this.memoryTracker = memoryTracker;
-        this.middlewareBuffer = new MiddlewareBuffer(middlewareConfig, memoryTracker);
+        this.middlewareBuffer = middlewareBuffer;
     }
 
     @Override
@@ -104,7 +104,8 @@ public class KinesisRecordProcessor
 
         while (memoryTracker.availableMemoryInPercentage() < .3) {
             try {
-                log.info("Not enough memory (%s) to process records sleeping for 1s", memoryTracker.availableMemoryInPercentage());
+                log.info("Not enough memory (%s) to process records, sleeping for 3s..",
+                        memoryTracker.availableMemoryInPercentage());
                 SECONDS.sleep(3);
             }
             catch (InterruptedException e) {
@@ -190,7 +191,7 @@ public class KinesisRecordProcessor
     @Override
     public void shutdown(IRecordProcessorCheckpointer iRecordProcessorCheckpointer, ShutdownReason shutdownReason)
     {
-        streamBuffer.clear();
+        streamBuffer.shutdown();
         log.error("Shutdown %s, the reason is %s", shardId, shutdownReason.name());
     }
 

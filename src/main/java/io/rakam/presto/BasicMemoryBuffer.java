@@ -15,6 +15,7 @@ public class BasicMemoryBuffer<T>
     private final ArrayList<T> bulkBuffer;
     private final SizeCalculator<T> sizeCalculator;
     private final long maxBytes;
+    private final MemoryTracker memoryTracker;
     private long previousFlushTimeMillisecond;
     private int totalBytes;
 
@@ -29,6 +30,7 @@ public class BasicMemoryBuffer<T>
         totalBytes = 0;
         // the basic memory buffer reserve the buffer memory for itself
         memoryTracker.reserveMemory(maxBytes);
+        this.memoryTracker = memoryTracker;
     }
 
     public long getMillisecondsToBuffer()
@@ -69,6 +71,11 @@ public class BasicMemoryBuffer<T>
         bulkBuffer.clear();
         previousFlushTimeMillisecond = System.currentTimeMillis();
         totalBytes = 0;
+    }
+
+    public void shutdown() {
+        clear();
+        memoryTracker.reserveMemory(maxBytes);
     }
 
     public boolean shouldFlush()
