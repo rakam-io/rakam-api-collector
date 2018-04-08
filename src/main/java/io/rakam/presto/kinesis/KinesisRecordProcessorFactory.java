@@ -44,8 +44,9 @@ public class KinesisRecordProcessorFactory
         if (log.isDebugEnabled()) {
             Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
                 try {
+                    long bytes = memoryTracker.availableMemory();
                     String message = format("[%s (%s%%) memory available] Active flush count is %d (%s), Middleware buffer is %s",
-                            succinctBytes(memoryTracker.availableMemory()).toString(),
+                            bytes > 0 ? succinctBytes(bytes).toString() : ("-" + succinctBytes(-bytes).toString()),
                             memoryTracker.availableMemoryInPercentage() * 100,
                             committer.getActiveFlushCount(),
                             committer.isFull() ? "full" : "not full",

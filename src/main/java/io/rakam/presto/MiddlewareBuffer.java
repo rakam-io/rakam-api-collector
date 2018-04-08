@@ -73,7 +73,7 @@ public class MiddlewareBuffer
     public Map<SchemaTableName, List<TableCheckpoint>> getRecordsToBeFlushed()
     {
         long now = System.currentTimeMillis();
-        long memoryNeedsToBeAvailable = (long) (memoryTracker.getAvailableHeapSize() * .3);
+        long memoryNeedsToBeAvailable = (long) (memoryTracker.getAvailableHeapSize() * .5);
         long availableMemory = memoryTracker.availableMemory();
 
         Map<SchemaTableName, List<TableCheckpoint>> map = new ConcurrentHashMap<>();
