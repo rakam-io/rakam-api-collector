@@ -85,14 +85,14 @@ public class KinesisRecordProcessor
             switch (type) {
                 case 0:
                 case 2:
-                    streamBuffer.consumeRecord(record, data.remaining());
+                    streamBuffer.consumeRecord(record);
                     break;
                 case 1:
                     log.error("Found previous version of bulk format");
                     break;
                 case 3:
-                    long dataSize = data.getLong(1);
-                    streamBuffer.consumeBatch(record, dataSize);
+                    long actualDataSize = data.getLong(1);
+                    streamBuffer.consumeBatch(record, actualDataSize);
                     break;
                 default:
                     log.warn("Invalid record. ignoring..");

@@ -4,28 +4,32 @@
 
 package io.rakam.presto;
 
+import io.airlift.configuration.Config;
 import org.weakref.jmx.Managed;
+
+import javax.validation.constraints.Max;
 
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MemoryTracker
 {
     public static final long HEAP_MAX_SIZE = (long) (Runtime.getRuntime().maxMemory() - Runtime.getRuntime().totalMemory());
-    // 0.1 is available for memory buffer
-    private static final double AVAILABLE_RATIO = .7;
-    private static final long AVAILABLE_HEAP_SIZE = (long) (HEAP_MAX_SIZE * AVAILABLE_RATIO);
+    private final double availableRatio;
+    private final long availableHeapSize;
 
     private AtomicLong reservedMemory;
 
-    public MemoryTracker()
+    public MemoryTracker(MemoryConfig memoryConfig)
     {
         reservedMemory = new AtomicLong();
+        availableRatio = memoryConfig.getHeapRatio();
+        availableHeapSize = (long) (HEAP_MAX_SIZE * availableRatio);
     }
 
     @Managed
-    public static long getAvailableHeapSize()
+    public long getAvailableHeapSize()
     {
-        return AVAILABLE_HEAP_SIZE;
+        return availableHeapSize;
     }
 
     public void reserveMemory(long bytes)
@@ -36,17 +40,37 @@ public class MemoryTracker
     @Managed
     public long availableMemory()
     {
-        return AVAILABLE_HEAP_SIZE - reservedMemory.get();
+        return availableHeapSize - reservedMemory.get();
     }
 
     @Managed
     public double availableMemoryInPercentage()
     {
-        return availableMemory() * 1.0 / AVAILABLE_HEAP_SIZE;
+        return availableMemory() * 1.0 / availableHeapSize;
     }
 
     public void freeMemory(long bytes)
     {
         reservedMemory.addAndGet(-bytes);
+    }
+
+    public static class MemoryConfig
+    {
+        private double heapRatio = .8;
+
+        @Max(1)
+        public double getHeapRatio()
+        {
+            return heapRatio;
+        }
+
+        @Config("memory.heap-ratio")
+        public void setHeapRatio(double heapRatio)
+        {
+            if (heapRatio > +1) {
+                throw new IllegalStateException("memory.heap-ratio must be a value between 0 and 1");
+            }
+            this.heapRatio = heapRatio;
+        }
     }
 }

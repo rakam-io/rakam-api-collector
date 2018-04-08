@@ -14,19 +14,21 @@ public class BasicMemoryBuffer<T>
     private final ArrayList<T> buffer;
     private final ArrayList<T> bulkBuffer;
     private final SizeCalculator<T> sizeCalculator;
-    private final double maxBytes;
+    private final long maxBytes;
     private long previousFlushTimeMillisecond;
     private int totalBytes;
 
-    public BasicMemoryBuffer(StreamConfig config, SizeCalculator<T> sizeCalculator)
+    public BasicMemoryBuffer(StreamConfig config, MemoryTracker memoryTracker, SizeCalculator<T> sizeCalculator)
     {
         this.sizeCalculator = sizeCalculator;
         millisecondsToBuffer = config.getMaxFlushDuration().toMillis();
         previousFlushTimeMillisecond = System.currentTimeMillis();
         buffer = new ArrayList<>(1000);
         bulkBuffer = new ArrayList<>(1000);
-        maxBytes = MemoryTracker.getAvailableHeapSize() * config.getMaxFlushTotalMemoryRatio();
+        maxBytes = (long) (memoryTracker.getAvailableHeapSize() * config.getMaxFlushTotalMemoryRatio());
         totalBytes = 0;
+        // the basic memory buffer reserve the buffer memory for itself
+        memoryTracker.reserveMemory(maxBytes);
     }
 
     public long getMillisecondsToBuffer()
@@ -49,10 +51,10 @@ public class BasicMemoryBuffer<T>
         return buffer.size() + bulkBuffer.size();
     }
 
-    public void consumeRecord(T record, long size)
+    public void consumeRecord(T record)
     {
         buffer.add(record);
-        totalBytes += size;
+        totalBytes += sizeCalculator.calculate(record);
     }
 
     public void consumeBatch(T record, long size)

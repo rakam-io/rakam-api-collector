@@ -13,6 +13,6 @@ public class KinesisRecordSizeCalculator
     @Override
     public long calculate(Record record)
     {
-        return record.getData().remaining();
+        return record.getData().limit();
     }
 }

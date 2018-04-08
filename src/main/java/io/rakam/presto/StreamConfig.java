@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 public class StreamConfig
 {
     private Duration maxFlushDuration = Duration.succinctDuration(5, TimeUnit.SECONDS);
-    private double maxFlushTotalMemoryRatio = .1;
+    private double maxFlushTotalMemoryRatio = .25;
 
     public Duration getMaxFlushDuration()
     {

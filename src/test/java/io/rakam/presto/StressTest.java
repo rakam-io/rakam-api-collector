@@ -76,7 +76,9 @@ public class StressTest
                 e.printStackTrace();
             }
         });
-        RaptorDatabaseHandler databaseHandler = new RaptorDatabaseHandler(raptorConfig, new TypeRegistry(), s3BackupConfig, fieldNameConfig, backupStoreModule);
+        MemoryTracker memoryTracker1 = new MemoryTracker(new MemoryTracker.MemoryConfig());
+
+        RaptorDatabaseHandler databaseHandler = new RaptorDatabaseHandler(raptorConfig, new TypeRegistry(), s3BackupConfig, fieldNameConfig, memoryTracker1, backupStoreModule);
 
         AtomicLong committedRecords = new AtomicLong(0);
 
@@ -89,9 +91,9 @@ public class StressTest
         CommitterConfig committerConfig = new CommitterConfig();
         JsonDeserializer deserializer = new FabricJsonDeserializer(databaseHandler, fieldNameConfig);
         KafkaJsonMessageTransformer transformer = new KafkaJsonMessageTransformer(fieldNameConfig, databaseHandler, deserializer);
-        final MemoryTracker memoryTracker = new MemoryTracker();
+        final MemoryTracker memoryTracker = memoryTracker1;
 
-        StreamWorkerContext context = new StreamWorkerContext(transformer, new KafkaRecordSizeCalculator(), streamConfig);
+        StreamWorkerContext context = new StreamWorkerContext(transformer, memoryTracker1, new KafkaRecordSizeCalculator(), streamConfig);
         TargetConnectorCommitter targetConnectorCommitter = new TargetConnectorCommitter(databaseHandler, committerConfig);
 
         AtomicLong totalRecord = new AtomicLong(-1);

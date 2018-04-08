@@ -6,7 +6,7 @@ package io.rakam.presto;
 
 public interface MemoryBuffer<T>
 {
-    void consumeRecord(T record, long length);
+    void consumeRecord(T record);
 
     void consumeBatch(T record, long length);
 

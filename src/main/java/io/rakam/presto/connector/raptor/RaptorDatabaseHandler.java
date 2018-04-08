@@ -51,10 +51,12 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.EventBus;
 import com.google.common.io.Files;
+import com.google.inject.Binder;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
 import io.airlift.bootstrap.Bootstrap;
+import io.airlift.configuration.AbstractConfigurationAwareModule;
 import io.airlift.json.JsonModule;
 import io.airlift.slice.Slice;
 import io.rakam.presto.DatabaseHandler;
@@ -87,6 +89,7 @@ import java.util.stream.Collectors;
 import static com.facebook.presto.spi.transaction.IsolationLevel.READ_COMMITTED;
 import static com.facebook.presto.spi.type.ParameterKind.TYPE;
 import static com.facebook.presto.spi.type.TimeZoneKey.UTC_KEY;
+import static io.airlift.configuration.ConfigBinder.configBinder;
 import static java.lang.management.ManagementFactory.getPlatformMBeanServer;
 import static java.util.Locale.ENGLISH;
 import static org.rakam.presto.analysis.PrestoQueryExecution.fromPrestoType;
@@ -103,12 +106,12 @@ public class RaptorDatabaseHandler
     private final Supplier<ConnectorMetadata> writeMetadata;
 
     @Inject
-    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig)
+    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, MemoryTracker memoryTracker)
     {
-        this(config, typeManager, s3BackupConfig, fieldNameConfig, null);
+        this(config, typeManager, s3BackupConfig, fieldNameConfig, memoryTracker, null);
     }
 
-    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, Module backupStoreModule)
+    public RaptorDatabaseHandler(RaptorConfig config, TypeManager typeManager, S3BackupConfig s3BackupConfig, FieldNameConfig fieldNameConfig, MemoryTracker memoryTracker, Module backupStoreModule)
     {
         DatabaseMetadataModule metadataModule = new DatabaseMetadataModule();
 
@@ -143,7 +146,14 @@ public class RaptorDatabaseHandler
                             new BackupModule(backupProviders),
                             new IngestOnlyStorageModule(connectorId),
                             new RaptorModule(connectorId),
-                            binder -> binder.bind(MemoryTracker.class).asEagerSingleton(),
+                            new AbstractConfigurationAwareModule()
+                            {
+                                @Override
+                                protected void setup(Binder binder)
+                                {
+                                    binder.bind(MemoryTracker.class).toInstance(memoryTracker);
+                                }
+                            },
                             binder -> binder.bind(InMemoryBuffer.class).asEagerSingleton(),
                             binder -> binder.bind(RemoteBackupManager.class).in(Scopes.SINGLETON)
                     );

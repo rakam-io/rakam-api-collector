@@ -14,12 +14,10 @@ import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Binder;
-import com.google.inject.Module;
 import com.google.inject.Scopes;
 import com.google.inject.multibindings.OptionalBinder;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
-import io.airlift.log.Level;
 import io.airlift.log.Logger;
 import io.airlift.log.Logging;
 import io.airlift.log.LoggingConfiguration;
@@ -67,13 +65,16 @@ public final class ServiceStarter
                 new StreamSourceModule(),
                 new LogModule(),
                 new MBeanModule(),
-                new RaptorModule(), new Module()
+                new RaptorModule(), new AbstractConfigurationAwareModule()
         {
             @Override
-            public void configure(Binder binder)
+            protected void setup(Binder binder)
             {
                 MBeanServer mbeanServer = new RebindSafeMBeanServer(getPlatformMBeanServer());
                 binder.bind(MBeanServer.class).toInstance(mbeanServer);
+
+                MemoryTracker.MemoryConfig memoryConfig = buildConfigObject(MemoryTracker.MemoryConfig.class);
+                binder.bind(MemoryTracker.class).toInstance(new MemoryTracker(memoryConfig));
 
                 newExporter(binder).export(MemoryTracker.class).as(generatedNameOf(MemoryTracker.class));
 
