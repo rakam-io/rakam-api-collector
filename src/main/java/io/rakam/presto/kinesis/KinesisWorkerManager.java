@@ -98,7 +98,6 @@ public class KinesisWorkerManager
         Thread middlewareWorkerThread;
         try {
             Worker worker = getWorker(recordProcessorFactory, configuration);
-
             middlewareWorkerThread = new Thread(worker);
         }
         catch (Exception e) {

@@ -104,18 +104,16 @@ public class KinesisRecordProcessor
             flushDataSafe(checkpointer);
         }
 
-        if (memoryTracker.availableMemoryInPercentage() < .3) {
-            flushDataSafe(checkpointer);
-
-            while (memoryTracker.availableMemoryInPercentage() < .3) {
-                try {
-                    log.info("Not enough memory (%s)to process records sleeping for 1s", memoryTracker.availableMemoryInPercentage());
-                    SECONDS.sleep(1);
-                }
-                catch (InterruptedException e) {
-                    break;
-                }
+        while (memoryTracker.availableMemoryInPercentage() < .3) {
+            try {
+                log.info("Not enough memory (%s) to process records sleeping for 1s", memoryTracker.availableMemoryInPercentage());
+                SECONDS.sleep(3);
             }
+            catch (InterruptedException e) {
+                break;
+            }
+
+            flushDataSafe(checkpointer);
         }
     }
 
