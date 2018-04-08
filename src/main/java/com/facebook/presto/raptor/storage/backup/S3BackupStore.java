@@ -16,7 +16,9 @@ import com.facebook.presto.raptor.backup.BackupStore;
 import com.facebook.presto.raptor.storage.InMemoryBuffer;
 import com.facebook.presto.spi.PrestoException;
 import io.airlift.slice.BasicSliceInput;
+import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
+import io.rakam.presto.MemoryTracker;
 
 import javax.inject.Inject;
 
@@ -35,9 +37,10 @@ public class S3BackupStore
     private final AmazonS3 s3Client;
     private final S3BackupConfig config;
     private final InMemoryBuffer buffer;
+    private final MemoryTracker memoryTracker;
 
     @Inject
-    public S3BackupStore(S3BackupConfig config, InMemoryBuffer buffer)
+    public S3BackupStore(S3BackupConfig config, MemoryTracker memoryTracker, InMemoryBuffer buffer)
     {
         this.config = config;
         AmazonS3ClientBuilder amazonS3ClientBuilder = AmazonS3ClientBuilder.standard()
@@ -53,35 +56,38 @@ public class S3BackupStore
 
         s3Client = amazonS3ClientBuilder.build();
         this.buffer = buffer;
+        this.memoryTracker = memoryTracker;
     }
 
     public void backupShard(UUID uuid, File source)
     {
-        Slice slice = buffer.remove(source.getName());
-        if (slice == null) {
-            throw new IllegalStateException();
-        }
-
-        MessageDigest md5;
-        try {
-            md5 = MessageDigest.getInstance("MD5");
-        }
-        catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-
-        md5.update((byte[]) slice.getBase(), 0, slice.length());
-
-
-        ObjectMetadata objectMetadata = new ObjectMetadata();
-        objectMetadata.setContentLength(slice.length());
-        objectMetadata.setContentMD5(Base64.getEncoder().encodeToString(md5.digest()));
+        DynamicSliceOutput sliceOutput = buffer.remove(source.getName());
 
         try {
-            tryUpload(slice, uuid.toString(), objectMetadata, TRY_COUNT);
+            MessageDigest md5;
+            try {
+                md5 = MessageDigest.getInstance("MD5");
+            }
+            catch (NoSuchAlgorithmException e) {
+                throw new RuntimeException(e);
+            }
+
+            Slice slice = sliceOutput.slice();
+            md5.update((byte[]) slice.getBase(), 0, slice.length());
+
+            ObjectMetadata objectMetadata = new ObjectMetadata();
+            objectMetadata.setContentLength(slice.length());
+            objectMetadata.setContentMD5(Base64.getEncoder().encodeToString(md5.digest()));
+
+            try {
+                tryUpload(slice, uuid.toString(), objectMetadata, TRY_COUNT);
+            }
+            catch (Exception ex) {
+                throw new PrestoException(RaptorErrorCode.RAPTOR_BACKUP_ERROR, "Failed to create backup shard file on S3", ex);
+            }
         }
-        catch (Exception ex) {
-            throw new PrestoException(RaptorErrorCode.RAPTOR_BACKUP_ERROR, "Failed to create backup shard file on S3", ex);
+        finally {
+            memoryTracker.freeMemory(sliceOutput.getRetainedSize());
         }
     }
 

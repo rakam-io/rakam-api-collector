@@ -31,11 +31,9 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 
 import static io.airlift.units.DataSize.succinctBytes;
 import static io.airlift.units.Duration.succinctDuration;
-import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -121,14 +119,16 @@ public class KinesisRecordProcessor
     {
         Map<SchemaTableName, TableData> pages = flushStream();
 
-        middlewareBuffer.add(new BatchRecords(pages, () -> {
-            try {
-                checkpointer.checkpoint();
-            }
-            catch (InvalidStateException | ShutdownException e) {
-                throw new RuntimeException(e);
-            }
-        }));
+        if (!pages.isEmpty()) {
+            middlewareBuffer.add(new BatchRecords(pages, () -> {
+                try {
+                    checkpointer.checkpoint();
+                }
+                catch (InvalidStateException | ShutdownException e) {
+                    throw new RuntimeException(e);
+                }
+            }));
+        }
 
         if (!committer.isFull()) {
             Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();

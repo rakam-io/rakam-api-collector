@@ -44,9 +44,8 @@ public class InMemoryBuffer
         return output.slice();
     }
 
-    public Slice remove(String name)
+    public DynamicSliceOutput remove(String name)
     {
-        DynamicSliceOutput output = files.remove(name);
-        return output.slice();
+        return files.remove(name);
     }
 }

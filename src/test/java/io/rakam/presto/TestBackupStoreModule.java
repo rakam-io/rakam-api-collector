@@ -51,7 +51,7 @@ public class TestBackupStoreModule
         @Override
         public void backupShard(UUID uuid, File source)
         {
-            function.accept(uuid, buffer.remove(source.getName()));
+            function.accept(uuid, buffer.remove(source.getName()).slice());
         }
 
         @Override
