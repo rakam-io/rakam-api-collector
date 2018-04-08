@@ -43,13 +43,18 @@ public class KinesisRecordProcessorFactory
 
         if (log.isDebugEnabled()) {
             Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
-                String message = format("[%s (%s%%) memory available] Active flush count is %d (%s), Middleware buffer is %s",
-                        succinctBytes(memoryTracker.availableMemory()).toString(),
-                        memoryTracker.availableMemoryInPercentage() * 100,
-                        committer.getActiveFlushCount(),
-                        committer.isFull() ? "full" : "not full",
-                        middlewareBuffer.calculateSize().toString());
-                log.debug(message);
+                try {
+                    String message = format("[%s (%s%%) memory available] Active flush count is %d (%s), Middleware buffer is %s",
+                            succinctBytes(memoryTracker.availableMemory()).toString(),
+                            memoryTracker.availableMemoryInPercentage() * 100,
+                            committer.getActiveFlushCount(),
+                            committer.isFull() ? "full" : "not full",
+                            middlewareBuffer.calculateSize().toString());
+                    log.debug(message);
+                }
+                catch (Exception e) {
+                    log.debug(e, "Error while printing stats");
+                }
             }, 5, 5, SECONDS);
         }
     }

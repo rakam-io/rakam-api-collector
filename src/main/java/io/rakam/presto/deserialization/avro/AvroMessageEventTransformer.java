@@ -21,6 +21,7 @@ import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DecoderFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,10 +75,11 @@ public abstract class AvroMessageEventTransformer<T>
             S3Object object = null;
             try {
                 byte[] data = getData(record);
+                long totalSize = ByteBuffer.wrap(data).getLong(1);
                 bulkKey = new String(data, 9, data.length - 9, UTF_8);
+
                 object = getBulkObject(bulkKey);
                 InputStreamSliceInput input = new InputStreamSliceInput(object.getObjectContent());
-                int totalSize = input.available();
                 LOGGER.debug("Reading bulk file %s, total size is %s", bulkKey, DataSize.succinctBytes(totalSize).toString());
                 memoryTracker.reserveMemory(totalSize);
 
