@@ -1,48 +1,32 @@
+/*
+ * Licensed under the Rakam Incorporation
+ */
+
 package io.rakam.presto;
 
 import com.facebook.presto.type.TypeRegistry;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
-import io.airlift.units.DataSize;
 import io.rakam.presto.connector.raptor.RaptorConfig;
 import io.rakam.presto.connector.raptor.RaptorDatabaseHandler;
 import io.rakam.presto.connector.raptor.S3BackupConfig;
 import io.rakam.presto.deserialization.json.FabricJsonDeserializer;
 import io.rakam.presto.deserialization.json.JsonDeserializer;
-import io.rakam.presto.kafka.KafkaConfig;
-import io.rakam.presto.kafka.KafkaDecoupleMessage;
 import io.rakam.presto.kafka.KafkaJsonMessageTransformer;
-import io.rakam.presto.kafka.KafkaRealTimeWorker;
 import io.rakam.presto.kafka.KafkaRecordSizeCalculator;
 import io.rakam.presto.kinesis.KinesisRecordProcessor;
-import it.unimi.dsi.fastutil.ints.Int2LongMap;
-import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.avro.io.BinaryEncoder;
-import org.apache.avro.io.EncoderFactory;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.TopicPartition;
 import org.rakam.util.JsonHelper;
 
-import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static io.rakam.presto.ServiceStarter.initializeLogging;
-import static io.rakam.presto.kafka.KafkaConfig.DataFormat.JSON;
-import static io.rakam.presto.kafka.KafkaUtil.createConsumerConfig;
 import static java.time.ZoneOffset.UTC;
 
 public class KinesisStressTest
