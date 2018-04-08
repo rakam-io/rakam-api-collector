@@ -22,7 +22,7 @@ public class KinesisStreamSourceConfig
     private String dynamodbEndpoint;
     private boolean enableCloudWatch = true;
     private String dynamodbTable;
-    private Integer maxKinesisRecordPerBatch;
+    private Integer maxKinesisRecordsPerBatch;
 
     public String getStreamName()
     {
@@ -41,14 +41,14 @@ public class KinesisStreamSourceConfig
     }
 
     @Config("kinesis.max-records-per-batch")
-    public void setMaxKinesisRecordPerBatch(int maxKinesisRecordPerBatch)
+    public void setMaxKinesisRecordsPerBatch(int maxKinesisRecordsPerBatch)
     {
-        this.maxKinesisRecordPerBatch = maxKinesisRecordPerBatch;
+        this.maxKinesisRecordsPerBatch = maxKinesisRecordsPerBatch;
     }
 
     public Integer getMaxKinesisRecordsPerBatch()
     {
-        return maxKinesisRecordPerBatch;
+        return maxKinesisRecordsPerBatch;
     }
 
     @Config("kinesis.consumer-dynamodb-table")
