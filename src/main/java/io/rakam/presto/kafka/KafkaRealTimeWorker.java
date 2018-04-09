@@ -272,7 +272,7 @@ public class KafkaRealTimeWorker
             }
 
             if (!committer.isFull()) {
-                Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();
+                Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed(committer.availableSlots());
                 if (!map.isEmpty()) {
                     Set<TopicPartition> assignment = consumer.assignment();
                     consumer.pause(assignment);

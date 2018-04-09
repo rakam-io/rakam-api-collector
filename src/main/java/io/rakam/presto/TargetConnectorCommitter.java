@@ -21,11 +21,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class TargetConnectorCommitter
 {
+    private static int IO_OPS_RATE = 3;
+
     private final int executorPoolSize;
     private final DatabaseHandler databaseHandler;
     private final AsyncFailsafe<Void> executor;
     private AtomicInteger activeFlushCount = new AtomicInteger();
-
 
     @Inject
     public TargetConnectorCommitter(DatabaseHandler databaseHandler, CommitterConfig committerConfig)
@@ -59,7 +60,12 @@ public class TargetConnectorCommitter
 
     public boolean isFull()
     {
-        return activeFlushCount.get() / executorPoolSize > 3;
+        return activeFlushCount.get() / executorPoolSize > IO_OPS_RATE;
+    }
+
+    public int availableSlots()
+    {
+        return (executorPoolSize * IO_OPS_RATE) - activeFlushCount.get();
     }
 
     public int getActiveFlushCount()

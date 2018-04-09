@@ -51,6 +51,9 @@ public class MemoryTracker
 
     public void freeMemory(long bytes)
     {
+        if(bytes < -1) {
+            throw new IllegalArgumentException();
+        }
         reservedMemory.addAndGet(-bytes);
     }
 

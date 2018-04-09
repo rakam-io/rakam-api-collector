@@ -75,7 +75,7 @@ public class BasicMemoryBuffer<T>
 
     public void shutdown() {
         clear();
-        memoryTracker.reserveMemory(maxBytes);
+        memoryTracker.freeMemory(maxBytes);
     }
 
     public boolean shouldFlush()

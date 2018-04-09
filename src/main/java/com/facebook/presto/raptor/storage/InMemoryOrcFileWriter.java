@@ -64,7 +64,6 @@ public class InMemoryOrcFileWriter
 
         Map<String, String> metadata = createFileMetadata(columnIds, columnTypes);
         orcWriter = createOrcFileWriter(target, columnIds, storageTypes, metadata);
-        long retainedBytes = orcWriter.getRetainedBytes();
     }
 
     public void appendPages(List<Page> pages)

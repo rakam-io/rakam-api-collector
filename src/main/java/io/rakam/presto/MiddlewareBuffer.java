@@ -5,20 +5,16 @@
 package io.rakam.presto;
 
 import com.facebook.presto.spi.SchemaTableName;
-import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.rakam.presto.deserialization.TableData;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 public class MiddlewareBuffer
 {
@@ -57,7 +53,8 @@ public class MiddlewareBuffer
         }
     }
 
-    public DataSize calculateSize() {
+    public DataSize calculateSize()
+    {
         return DataSize.succinctBytes(batches.values().stream()
                 .mapToLong(t -> t.stream().mapToLong(e -> e.getTable().page.getRetainedSizeInBytes()).sum())
                 .sum());
@@ -70,48 +67,41 @@ public class MiddlewareBuffer
         return (timeLapseMillisecond >= config.getMaxFlushDuration().toMillis());
     }
 
-    public Map<SchemaTableName, List<TableCheckpoint>> getRecordsToBeFlushed()
+    public Map<SchemaTableName, List<TableCheckpoint>> getRecordsToBeFlushed(int maximum)
     {
         long now = System.currentTimeMillis();
         long memoryNeedsToBeAvailable = (long) (memoryTracker.getAvailableHeapSize() * .5);
         long availableMemory = memoryTracker.availableMemory();
 
         Map<SchemaTableName, List<TableCheckpoint>> map = new ConcurrentHashMap<>();
-        Iterator<Map.Entry<SchemaTableName, List<TableCheckpoint>>> iterator = batches.entrySet().iterator();
 
-        Set<SchemaTableName> tablesToBeFlushed;
-        if (memoryNeedsToBeAvailable > availableMemory) {
-            log.debug("The system needs memory, (%s) is less than available memory (%s), flushing data..", memoryNeedsToBeAvailable, availableMemory);
-
-            List<Map.Entry<SchemaTableName, Counter>> sortedTables = bufferSize.entrySet().stream()
-                    .sorted(Comparator.comparingLong(o -> -o.getValue().value))
-                    .collect(Collectors.toList());
-
-            tablesToBeFlushed = new HashSet<>();
-            for (Map.Entry<SchemaTableName, Counter> table : sortedTables) {
-                if (memoryNeedsToBeAvailable < availableMemory) {
-                    break;
-                }
-
-                tablesToBeFlushed.add(table.getKey());
-                availableMemory += table.getValue().value;
-            }
-        }
-        else {
-            tablesToBeFlushed = ImmutableSet.of();
-        }
+        Iterator<Map.Entry<SchemaTableName, Counter>> iterator = bufferSize.entrySet().stream()
+                .sorted(Comparator.comparingLong(o -> -o.getValue().value))
+                .iterator();
 
         while (iterator.hasNext()) {
-            Map.Entry<SchemaTableName, List<TableCheckpoint>> entry = iterator.next();
-            SchemaTableName tableName = entry.getKey();
-            List<TableCheckpoint> value = entry.getValue();
+            Map.Entry<SchemaTableName, Counter> next = iterator.next();
+            SchemaTableName tableName = next.getKey();
 
-            if (shouldFlush(now, tableName) || tablesToBeFlushed.contains(tableName)) {
-                map.computeIfAbsent(entry.getKey(), k -> new ArrayList<>()).addAll(value);
-                iterator.remove();
+
+            boolean systemNeedsMemory = memoryNeedsToBeAvailable > availableMemory;
+
+            if (systemNeedsMemory || shouldFlush(now, tableName)) {
+
+                List<TableCheckpoint> value = batches.remove(tableName);
+                if (value == null) {
+                    continue;
+                }
+
+                map.computeIfAbsent(tableName, k -> new ArrayList<>()).addAll(value);
                 bufferLastFlushed.put(tableName, now);
                 bufferRecordCount.remove(tableName);
                 bufferSize.remove(tableName);
+                availableMemory += next.getValue().value;
+
+                if (map.size() > maximum) {
+                    break;
+                }
             }
         }
         return map;

@@ -132,7 +132,7 @@ public class KinesisRecordProcessor
         }
 
         if (!committer.isFull()) {
-            Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();
+            Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed(committer.availableSlots());
             if (!map.isEmpty()) {
                 for (Map.Entry<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> entry : map.entrySet()) {
 
