@@ -42,19 +42,16 @@ public class InMemoryOrcFileWriter
     private PageBuilder pageBuilder;
     private final OrcWriter orcWriter;
     private final InMemoryBuffer buffer;
-    private final MemoryTracker memoryTracker;
     private final ImmutableList<Type> storageTypes;
 
     private boolean closed;
     private long rowCount;
     private long uncompressedSize;
-    private long writerRetainedSize = 0;
 
     public InMemoryOrcFileWriter(
             List<Long> columnIds,
             List<Type> columnTypes,
             File target,
-            MemoryTracker memoryTracker,
             TypeManager typeManager,
             InMemoryBuffer buffer)
     {
@@ -64,13 +61,10 @@ public class InMemoryOrcFileWriter
                 .collect(toImmutableList());
 
         this.buffer = buffer;
-        this.memoryTracker = memoryTracker;
 
         Map<String, String> metadata = createFileMetadata(columnIds, columnTypes);
         orcWriter = createOrcFileWriter(target, columnIds, storageTypes, metadata);
         long retainedBytes = orcWriter.getRetainedBytes();
-        writerRetainedSize = retainedBytes;
-        memoryTracker.reserveMemory(retainedBytes);
     }
 
     public void appendPages(List<Page> pages)
@@ -125,8 +119,6 @@ public class InMemoryOrcFileWriter
         catch (IOException e) {
             throw new PrestoException(RaptorErrorCode.RAPTOR_ERROR, "Failed to close writer", e);
         }
-
-        memoryTracker.freeMemory(orcWriter.getRetainedBytes());
     }
 
     public long getRowCount()
@@ -150,9 +142,6 @@ public class InMemoryOrcFileWriter
         catch (IOException e) {
             throw new PrestoException(RaptorErrorCode.RAPTOR_ERROR, "Failed to write data", e);
         }
-
-        long retainedBytes = orcWriter.getRetainedBytes();
-        memoryTracker.reserveMemory(retainedBytes - writerRetainedSize);
     }
 
     private static final JsonCodec<OrcFileMetadata> METADATA_CODEC = jsonCodec(OrcFileMetadata.class);

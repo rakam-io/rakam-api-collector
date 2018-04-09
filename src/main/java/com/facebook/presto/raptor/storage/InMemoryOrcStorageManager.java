@@ -424,7 +424,7 @@ public class InMemoryOrcStorageManager
                 File stagingFile = storageService.getStagingFile(shardUuid);
                 storageService.createParents(stagingFile);
                 stagingFiles.add(stagingFile);
-                writer = new InMemoryOrcFileWriter(columnIds, columnTypes, stagingFile, memoryTracker, typeManager, buffer);
+                writer = new InMemoryOrcFileWriter(columnIds, columnTypes, stagingFile, typeManager, buffer);
             }
         }
     }
