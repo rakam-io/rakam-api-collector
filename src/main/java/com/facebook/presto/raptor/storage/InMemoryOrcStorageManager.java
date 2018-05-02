@@ -90,7 +90,6 @@ public class InMemoryOrcStorageManager
     private final TypeManager typeManager;
     private final ExecutorService deletionExecutor;
     private final InMemoryBuffer buffer;
-    private final MemoryTracker memoryTracker;
 
     @Inject
     public InMemoryOrcStorageManager(
@@ -102,7 +101,6 @@ public class InMemoryOrcStorageManager
             RemoteBackupManager backgroundBackupManager,
             ShardRecorder shardRecorder,
             TypeManager typeManager,
-            MemoryTracker memoryTracker,
             InMemoryBuffer buffer)
     {
         this(
@@ -117,8 +115,7 @@ public class InMemoryOrcStorageManager
                 config.getMaxShardRows(),
                 config.getMaxShardSize(),
                 config.getMinAvailableSpace(),
-                buffer,
-                memoryTracker);
+                buffer);
     }
 
     public InMemoryOrcStorageManager(
@@ -133,8 +130,7 @@ public class InMemoryOrcStorageManager
             long maxShardRows,
             DataSize maxShardSize,
             DataSize minAvailableSpace,
-            InMemoryBuffer buffer,
-            MemoryTracker memoryTracker)
+            InMemoryBuffer buffer)
     {
         this.storageService = requireNonNull(storageService, "storageService is null");
         this.backupStore = requireNonNull(backupStore, "backupStore is null");
@@ -150,7 +146,6 @@ public class InMemoryOrcStorageManager
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.deletionExecutor = newFixedThreadPool(deletionThreads, daemonThreadsNamed("raptor-delete-" + connectorId + "-%s"));
         this.buffer = requireNonNull(buffer, "buffer is null");
-        this.memoryTracker = requireNonNull(memoryTracker, "memoryTracker is null");
     }
 
     private static Optional<OrcFileMetadata> getOrcFileMetadata(OrcReader reader)

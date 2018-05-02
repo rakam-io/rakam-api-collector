@@ -82,6 +82,7 @@ public class KinesisWorkerManager
                 new VMID().toString())
                 .withInitialPositionInStream(InitialPositionInStream.TRIM_HORIZON)
                 .withUserAgent("rakam-middleware-consumer")
+                .withFailoverTimeMillis(30000)
                 .withCallProcessRecordsEvenForEmptyRecordList(true);
 
         if(config.getMaxKinesisRecordsPerBatch() != null) {

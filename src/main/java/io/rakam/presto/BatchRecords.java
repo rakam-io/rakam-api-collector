@@ -15,12 +15,10 @@ import java.util.concurrent.CompletableFuture;
 
 public class BatchRecords
 {
+    private static final Logger log = Logger.get(BatchRecords.class);
     public static final CompletableFuture COMPLETED_FUTURE = CompletableFuture.completedFuture(1);
 
-    private static final Logger log = Logger.get(BatchRecords.class);
-
     private final Map<SchemaTableName, TableData> table;
-
     private final Checkpointer checkpointer;
     private final Set<SchemaTableName> committed;
     private final CompletableFuture<Void> historicalDataHandler;
