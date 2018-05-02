@@ -16,7 +16,15 @@ import io.rakam.presto.deserialization.json.JsonDeserializer;
 import io.rakam.presto.kafka.KafkaJsonMessageTransformer;
 import io.rakam.presto.kafka.KafkaRecordSizeCalculator;
 import io.rakam.presto.kinesis.KinesisRecordProcessor;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericRecord;
+import org.rakam.collection.FieldType;
+import org.rakam.collection.SchemaField;
+import org.rakam.util.AvroUtil;
 import org.rakam.util.JsonHelper;
+
+import javax.xml.validation.SchemaFactory;
 
 import java.net.URI;
 import java.time.LocalDate;
@@ -90,6 +98,11 @@ public class KinesisStressTest
     {
         Random random = new Random();
 
+//        return IntStream.range(0, 30000).mapToObj(i -> {
+//            GenericData.Record record = new GenericData.Record(AVRO_SCHEMA);
+//            return null;
+//        }).collect(Collectors.toList());
+
         return IntStream.range(0, 30000).mapToObj(i -> JsonHelper.encodeAsBytes(ImmutableMap.of(
                 "project", "demo_stress",
                 "collection", "tweet" + (i % 100),
@@ -127,4 +140,26 @@ public class KinesisStressTest
 
 //        byte[] bytes = get(record);
     }
+
+    private final static Schema AVRO_SCHEMA = AvroUtil.convertAvroSchema(ImmutableList.<SchemaField>builder()
+            .add(new SchemaField("place", FieldType.STRING))
+            .add(new SchemaField("id", FieldType.LONG))
+            .add(new SchemaField("place_id", FieldType.LONG))
+            .add(new SchemaField("place_type", FieldType.STRING))
+            .add(new SchemaField("user_lang", FieldType.STRING))
+            .add(new SchemaField("has_media", FieldType.BOOLEAN))
+            .add(new SchemaField("_time", FieldType.TIMESTAMP))
+            .add(new SchemaField("user_mentions", FieldType.ARRAY_STRING))
+            .add(new SchemaField("is_retweet", FieldType.BOOLEAN))
+            .add(new SchemaField("country_code", FieldType.STRING))
+            .add(new SchemaField("user_followers", FieldType.LONG))
+            .add(new SchemaField("language", FieldType.STRING))
+            .add(new SchemaField("_device_id", FieldType.STRING))
+            .add(new SchemaField("user_status_count", FieldType.LONG))
+            .add(new SchemaField("user_created", FieldType.LONG))
+            .add(new SchemaField("longitude", FieldType.LONG))
+            .add(new SchemaField("is_reply", FieldType.BOOLEAN))
+            .add(new SchemaField("latitude", FieldType.LONG))
+            .add(new SchemaField("is_positive", FieldType.BOOLEAN))
+            .build());
 }
