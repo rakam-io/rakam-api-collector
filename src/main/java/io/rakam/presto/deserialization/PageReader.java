@@ -90,7 +90,7 @@ public abstract class PageReader<T>
         this.actualSchema = actualSchema;
 
         this.expectedSchema = actualSchema.stream()
-                .filter(a -> !a.getName().startsWith("$") && !a.getName().equals(checkpointColumn))
+                .filter(a -> !a.getName().equals(checkpointColumn))
                 .collect(Collectors.toList());
     }
 

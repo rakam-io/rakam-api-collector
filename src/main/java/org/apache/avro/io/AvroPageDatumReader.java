@@ -25,7 +25,7 @@ public class AvroPageDatumReader
 {
     private final PageBuilder builder;
     // original data layout
-    private Schema actualSchema;
+    private final Schema actualSchema;
     private ResolvingDecoder creatorResolver = null;
     private ResolvingDecoder temporaryResolver = null;
     private int temporaryResolverIndex;

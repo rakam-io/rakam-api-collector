@@ -24,7 +24,7 @@ public class AvroUtil
     public static Schema convertAvroSchema(Collection<ColumnMetadata> fields, String checkpointColumn)
     {
         List<Schema.Field> avroFields = fields.stream()
-                .filter(a -> !a.getName().startsWith("$") && !a.getName().equals(checkpointColumn))
+                .filter(a -> !a.getName().equals(checkpointColumn))
                 .map(AvroUtil::generateAvroSchema).collect(Collectors.toList());
 
         Schema schema = Schema.createRecord("collection", null, null, false);
