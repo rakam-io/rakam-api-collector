@@ -19,6 +19,7 @@ import io.rakam.presto.BasicMemoryBuffer;
 import io.rakam.presto.BatchRecords;
 import io.rakam.presto.MemoryTracker;
 import io.rakam.presto.MiddlewareBuffer;
+import io.rakam.presto.MiddlewareBuffer.TableCheckpoint;
 import io.rakam.presto.MiddlewareConfig;
 import io.rakam.presto.StreamWorkerContext;
 import io.rakam.presto.TargetConnectorCommitter;
@@ -132,25 +133,27 @@ public class KinesisRecordProcessor
         }
 
         if (!committer.isFull()) {
-            Map<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed(committer.availableSlots());
+            Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed(committer.availableSlots());
             if (!map.isEmpty()) {
-                for (Map.Entry<SchemaTableName, List<MiddlewareBuffer.TableCheckpoint>> entry : map.entrySet()) {
+                for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
 
                     long now = System.currentTimeMillis();
-                    CompletableFuture<Void> dbWriteWork = committer.process(entry.getKey(), entry.getValue());
+                    SchemaTableName table = entry.getKey();
+                    List<TableCheckpoint> records = entry.getValue();
+                    CompletableFuture<Void> dbWriteWork = committer.process(table, records);
 
                     dbWriteWork.whenComplete((aVoid, throwable) -> {
-                        long totalRecordCount = entry.getValue().stream()
+                        long totalRecordCount = records.stream()
                                 .mapToLong(e -> e.getTable().page.getPositionCount())
                                 .sum();
 
-                        long totalDataSize = entry.getValue().stream()
+                        long totalDataSize = records.stream()
                                 .mapToLong(e -> e.getTable().page.getRetainedSizeInBytes())
                                 .sum();
                         Duration totalDuration = succinctDuration(System.currentTimeMillis() - now, MILLISECONDS);
                         if (throwable != null) {
                             errorStats.update(totalRecordCount);
-                            log.error(throwable, "Error while processing records for collection %s", entry.getKey().toString());
+                            log.error(throwable, "Error while processing records for collection %s", table.toString());
 
                             double count = realTimeRecordsStats.getFiveMinute().getCount();
                             if (count > 100 && (errorStats.getFiveMinute().getCount() / count) > .4) {
@@ -161,11 +164,11 @@ public class KinesisRecordProcessor
                         else {
                             log.debug("Saved data in buffer (%s - %d records) for collection %s in %s.",
                                     succinctBytes(totalDataSize).toString(), totalRecordCount,
-                                    entry.getKey().toString(),
+                                    table.toString(),
                                     totalDuration.toString());
                         }
 
-                        checkpoint(entry.getValue());
+                        checkpoint(records);
 
                         databaseFlushStats.update(totalRecordCount);
                         databaseFlushDistribution.add(totalDuration.toMillis());
@@ -176,9 +179,9 @@ public class KinesisRecordProcessor
         }
     }
 
-    public void checkpoint(List<MiddlewareBuffer.TableCheckpoint> value)
+    public void checkpoint(List<TableCheckpoint> value)
     {
-        for (MiddlewareBuffer.TableCheckpoint tableCheckpoint : value) {
+        for (TableCheckpoint tableCheckpoint : value) {
             try {
                 tableCheckpoint.checkpoint();
             }

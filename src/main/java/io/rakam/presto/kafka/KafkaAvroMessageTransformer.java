@@ -6,6 +6,7 @@ package io.rakam.presto.kafka;
 
 import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.SchemaTableName;
+import io.rakam.presto.CommitterConfig;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.MemoryTracker;
@@ -22,9 +23,9 @@ public class KafkaAvroMessageTransformer
         extends AvroMessageEventTransformer<ConsumerRecord<byte[], byte[]>>
 {
     @Inject
-    public KafkaAvroMessageTransformer(FieldNameConfig fieldNameConfig, MemoryTracker memoryTracker, DatabaseHandler databaseHandler)
+    public KafkaAvroMessageTransformer(FieldNameConfig fieldNameConfig, CommitterConfig committerConfig, MemoryTracker memoryTracker, DatabaseHandler databaseHandler)
     {
-        super(fieldNameConfig, memoryTracker, databaseHandler);
+        super(fieldNameConfig, committerConfig, memoryTracker, databaseHandler);
     }
 
     @Override

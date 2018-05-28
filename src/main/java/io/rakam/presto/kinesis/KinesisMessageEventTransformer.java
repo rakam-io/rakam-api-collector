@@ -8,6 +8,7 @@ import com.amazonaws.services.kinesis.model.Record;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
 import com.facebook.presto.spi.SchemaTableName;
+import io.rakam.presto.CommitterConfig;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.MemoryTracker;
@@ -28,9 +29,9 @@ public class KinesisMessageEventTransformer
     private final S3MiddlewareConfig bulkConfig;
 
     @Inject
-    public KinesisMessageEventTransformer(FieldNameConfig fieldNameConfig, MemoryTracker memoryTracker, DatabaseHandler databaseHandler, S3MiddlewareConfig bulkConfig)
+    public KinesisMessageEventTransformer(FieldNameConfig fieldNameConfig, MemoryTracker memoryTracker, DatabaseHandler databaseHandler, CommitterConfig committerConfig, S3MiddlewareConfig bulkConfig)
     {
-        super(fieldNameConfig, memoryTracker, databaseHandler);
+        super(fieldNameConfig, committerConfig, memoryTracker, databaseHandler);
 
         this.bulkConfig = bulkConfig;
         s3Client = new AmazonS3Client(bulkConfig.getCredentials());

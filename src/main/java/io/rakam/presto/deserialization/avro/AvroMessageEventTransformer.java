@@ -11,12 +11,15 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.slice.InputStreamSliceInput;
 import io.airlift.units.DataSize;
+import io.rakam.presto.CommitterConfig;
 import io.rakam.presto.DatabaseHandler;
+import io.rakam.presto.DuplicateHandler;
 import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.MemoryTracker;
 import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.PageReader;
 import io.rakam.presto.deserialization.TableData;
+import io.rakam.presto.kinesis.AvroDuplicateHandler;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DecoderFactory;
 
@@ -34,14 +37,21 @@ public abstract class AvroMessageEventTransformer<T>
     private final static Logger LOGGER = Logger.get(AvroMessageEventTransformer.class);
     private final String checkpointColumn;
     private final MemoryTracker memoryTracker;
+    private final DuplicateHandler duplicateHandler;
 
     private BinaryDecoder decoder;
 
-    public AvroMessageEventTransformer(FieldNameConfig fieldNameConfig, MemoryTracker memoryTracker, DatabaseHandler database)
+    public AvroMessageEventTransformer(FieldNameConfig fieldNameConfig, CommitterConfig committerConfig, MemoryTracker memoryTracker, DatabaseHandler database)
     {
         super(fieldNameConfig, database);
         this.checkpointColumn = fieldNameConfig.getCheckpointField();
         this.memoryTracker = memoryTracker;
+        if (committerConfig.getDuplicateHandlerRocksdbDirectory() == null) {
+            duplicateHandler = record -> true;
+        }
+        else {
+            duplicateHandler = new AvroDuplicateHandler<T>(fieldNameConfig, this, committerConfig.getDuplicateHandlerRocksdbDirectory(), database);
+        }
     }
 
     @Override
@@ -51,6 +61,10 @@ public abstract class AvroMessageEventTransformer<T>
         Map<SchemaTableName, PageReader> builderMap = new HashMap<>();
 
         for (T record : records) {
+            if (!duplicateHandler.isUnique(record)) {
+                continue;
+            }
+
             decoder = DecoderFactory.get().binaryDecoder(getData(record), decoder);
             decoder.skipFixed(1);
 

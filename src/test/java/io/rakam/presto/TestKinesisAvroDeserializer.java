@@ -34,7 +34,8 @@ public class TestKinesisAvroDeserializer
 {
     public MessageEventTransformer getMessageEventTransformer()
     {
-        return new KinesisMessageEventTransformer(new FieldNameConfig(), new MemoryTracker(new MemoryTracker.MemoryConfig()), new TestDatabaseHandler("testproject", "testcollection", COLUMNS), new S3MiddlewareConfig());
+        TestDatabaseHandler databaseHandler = new TestDatabaseHandler("testproject", "testcollection", COLUMNS);
+        return new KinesisMessageEventTransformer(new FieldNameConfig(), new MemoryTracker(new MemoryTracker.MemoryConfig()), databaseHandler, new CommitterConfig(), new S3MiddlewareConfig());
     }
 
     public List<Record> getRecordsForEvents(String project, String collection, Optional<int[]> columnIdx)
