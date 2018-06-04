@@ -74,10 +74,11 @@ public final class ServiceStarter
                     protected void setup(Binder binder)
                     {
                         TargetConfig targetConfig = buildConfigObject(TargetConfig.class);
-                        if (targetConfig == null || targetConfig.equals(TargetConfig.Target.RAPTOR)) {
+                        TargetConfig.Target target = targetConfig.getTarget();
+                        if (targetConfig == null || target.equals(TargetConfig.Target.RAPTOR)) {
                             install(new RaptorModule());
                         }
-                        else if (targetConfig.getTarget().equals(TargetConfig.Target.REDSHIFT)) {
+                        else if (target.equals(TargetConfig.Target.REDSHIFT)) {
                             install(new RedshiftModule());
                         } else {
                             throw new IllegalArgumentException();
