@@ -75,7 +75,7 @@ public final class ServiceStarter
                     {
                         TargetConfig targetConfig = buildConfigObject(TargetConfig.class);
                         TargetConfig.Target target = targetConfig.getTarget();
-                        if (targetConfig == null || target.equals(TargetConfig.Target.RAPTOR)) {
+                        if (target == null || target.equals(TargetConfig.Target.RAPTOR)) {
                             install(new RaptorModule());
                         }
                         else if (target.equals(TargetConfig.Target.REDSHIFT)) {
