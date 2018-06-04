@@ -46,7 +46,6 @@ import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.gen.JoinCompiler;
 import com.facebook.presto.sql.gen.OrderingCompiler;
 import com.google.common.base.Supplier;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.eventbus.EventBus;
@@ -89,7 +88,6 @@ import java.util.stream.Collectors;
 import static com.facebook.presto.spi.transaction.IsolationLevel.READ_COMMITTED;
 import static com.facebook.presto.spi.type.ParameterKind.TYPE;
 import static com.facebook.presto.spi.type.TimeZoneKey.UTC_KEY;
-import static io.airlift.configuration.ConfigBinder.configBinder;
 import static java.lang.management.ManagementFactory.getPlatformMBeanServer;
 import static java.util.Locale.ENGLISH;
 import static org.rakam.presto.analysis.PrestoQueryExecution.fromPrestoType;
@@ -271,14 +269,26 @@ public class RaptorDatabaseHandler
     @Override
     public List<ColumnMetadata> getColumns(String schema, String table)
     {
-        Map<SchemaTableName, List<ColumnMetadata>> schemaTableNameListMap =
-                metadata.listTableColumns(session, new SchemaTablePrefix(schema, table));
-        List<ColumnMetadata> columnMetadatas = schemaTableNameListMap.get(new SchemaTableName(schema, table));
-        if (columnMetadatas == null) {
+        Map<SchemaTableName, List<ColumnMetadata>> map = listColumns(new SchemaTablePrefix(schema, table), 5);
+        List<ColumnMetadata> cols = map.get(new SchemaTableName(schema, table));
+        if (cols == null) {
             throw new IllegalArgumentException("Table doesn't exist");
         }
 
-        return columnMetadatas;
+        return cols;
+    }
+
+    private Map<SchemaTableName, List<ColumnMetadata>> listColumns(SchemaTablePrefix prefix, int tryCount)
+    {
+        try {
+            return metadata.listTableColumns(session, prefix);
+        }
+        catch (Exception e) {
+            if (tryCount > 0) {
+                return listColumns(prefix, tryCount - 1);
+            }
+            throw e;
+        }
     }
 
     @Override

@@ -20,9 +20,9 @@ import io.rakam.presto.deserialization.MessageEventTransformer;
 import io.rakam.presto.deserialization.avro.AvroUtil;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DecoderFactory;
+import org.apache.avro.io.GenericDatumReader0;
 import org.apache.avro.util.Utf8;
 import org.rocksdb.RocksDBException;
 
@@ -40,7 +40,7 @@ public class AvroDuplicateHandler<T>
     private final MessageEventTransformer transformer;
     private final Deduplicator deduplicator;
     private final GenericData.Record avroRecord;
-    private final GenericDatumReader genericDatumReader;
+    private final GenericDatumReader0 genericDatumReader;
     private LoadingCache<SchemaTableName, Schema> cache;
     private BinaryDecoder decoder;
     private DynamicSliceOutput dynamicSliceOutput = new DynamicSliceOutput(10);
@@ -75,7 +75,7 @@ public class AvroDuplicateHandler<T>
                 new ColumnMetadata(fieldNameConfig.getTimeField(), TimestampType.TIMESTAMP),
                 new ColumnMetadata(fieldNameConfig.getUserFieldName(), fieldNameConfig.getUserFieldType().getType())));
         avroRecord = new GenericData.Record(expectedSchema);
-        genericDatumReader = new GenericDatumReader(null, expectedSchema);
+        genericDatumReader = new GenericDatumReader0(null, expectedSchema);
     }
 
     @Override

@@ -18,10 +18,12 @@ import com.google.inject.Scopes;
 import com.google.inject.multibindings.OptionalBinder;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
+import io.airlift.configuration.Config;
 import io.airlift.log.Logger;
 import io.airlift.log.Logging;
 import io.airlift.log.LoggingConfiguration;
 import io.rakam.presto.connector.raptor.RaptorModule;
+import io.rakam.presto.connector.redshift.RedshiftModule;
 import io.rakam.presto.kafka.KafkaStreamSourceModule;
 import io.rakam.presto.kinesis.KinesisStreamSourceModule;
 import org.weakref.jmx.guice.MBeanModule;
@@ -33,6 +35,7 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.net.URL;
+import java.util.Locale;
 import java.util.Properties;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
@@ -65,7 +68,22 @@ public final class ServiceStarter
                 new StreamSourceModule(),
                 new LogModule(),
                 new MBeanModule(),
-                new RaptorModule(), new AbstractConfigurationAwareModule()
+                new AbstractConfigurationAwareModule()
+                {
+                    @Override
+                    protected void setup(Binder binder)
+                    {
+                        TargetConfig targetConfig = buildConfigObject(TargetConfig.class);
+                        if (targetConfig == null || targetConfig.equals(TargetConfig.Target.RAPTOR)) {
+                            install(new RaptorModule());
+                        }
+                        else if (targetConfig.getTarget().equals(TargetConfig.Target.REDSHIFT)) {
+                            install(new RedshiftModule());
+                        } else {
+                            throw new IllegalArgumentException();
+                        }
+                    }
+                }, new AbstractConfigurationAwareModule()
         {
             @Override
             protected void setup(Binder binder)
@@ -168,6 +186,27 @@ public final class ServiceStarter
         }
         catch (Exception e) {
             LOGGER.warn(e, "Error while parsing git.properties");
+        }
+    }
+
+    public static class TargetConfig
+    {
+        public enum Target {
+            REDSHIFT, RAPTOR
+        }
+
+        private Target target;
+
+        public Target getTarget()
+        {
+            return target;
+        }
+
+        @Config("target")
+        public TargetConfig setTarget(String target)
+        {
+            this.target = Target.valueOf(target.toUpperCase(Locale.ENGLISH));
+            return this;
         }
     }
 }
