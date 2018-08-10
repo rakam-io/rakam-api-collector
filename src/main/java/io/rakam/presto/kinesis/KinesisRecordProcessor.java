@@ -195,7 +195,17 @@ public class KinesisRecordProcessor
     public void shutdown(IRecordProcessorCheckpointer iRecordProcessorCheckpointer, ShutdownReason shutdownReason)
     {
         streamBuffer.shutdown();
-        log.error("Shutdown %s, the reason is %s", shardId, shutdownReason.name());
+        if(shutdownReason == ShutdownReason.TERMINATE) {
+            try {
+                iRecordProcessorCheckpointer.checkpoint();
+            }
+            catch (InvalidStateException|ShutdownException e) {
+                log.error(e, "Shutdown %s, the reason is %s", shardId, shutdownReason.name());
+
+            }
+        }
+
+        log.info("Shutdown %s, the reason is %s", shardId, shutdownReason.name());
     }
 
     private Map<SchemaTableName, TableData> flushStream()
