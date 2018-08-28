@@ -270,12 +270,11 @@ public class RaptorDatabaseHandler
     public List<ColumnMetadata> getColumns(String schema, String table)
     {
         Map<SchemaTableName, List<ColumnMetadata>> map = listColumns(new SchemaTablePrefix(schema, table), 5);
-        List<ColumnMetadata> cols = map.get(new SchemaTableName(schema, table));
-        if (cols == null) {
+        if (map.isEmpty()) {
             throw new IllegalArgumentException("Table doesn't exist");
         }
 
-        return cols;
+        return map.entrySet().iterator().next().getValue();
     }
 
     private Map<SchemaTableName, List<ColumnMetadata>> listColumns(SchemaTablePrefix prefix, int tryCount)
