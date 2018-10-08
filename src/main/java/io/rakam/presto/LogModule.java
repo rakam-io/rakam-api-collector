@@ -23,6 +23,8 @@ import java.util.logging.Logger;
 public class LogModule
         extends AbstractConfigurationAwareModule
 {
+    private static final io.airlift.log.Logger log = io.airlift.log.Logger.get(LogModule.class);
+
     private static final String SENTRY_DSN = "https://96145b6c6517416e9bcd24bba96e4433:6f5ba5b727114d5e91694b1755584500@sentry.io/1290995";
     private static final String RELEASE;
 
@@ -31,14 +33,26 @@ public class LogModule
 
         if (gitProps != null) {
             Properties properties = new Properties();
+            Object describe = null;
             try {
                 properties.load(gitProps.openStream());
-            } catch (IOException e) {
+                describe = properties.get("git.commit.id.describe");
             }
-
-            RELEASE = properties.get("git.commit.id.describe").toString();
-        } else {
+            catch (IOException e) {
+                log.warn(e, "Unable to fetch release tag");
+            }
+            finally {
+                if (describe != null) {
+                    RELEASE = describe.toString();
+                }
+                else {
+                    RELEASE = null;
+                }
+            }
+        }
+        else {
             RELEASE = null;
+            log.warn("Unable to fetch release tag because git.properties doesn't exist");
         }
     }
 
@@ -47,24 +61,22 @@ public class LogModule
     {
         LogManager manager = LogManager.getLogManager();
         LogConfig logConfig = buildConfigObject(LogConfig.class);
-        if (logConfig.getLogActive()) {
-            if (!Arrays.stream(manager.getLogger("").getHandlers())
-                    .anyMatch(e -> e instanceof SentryHandler)) {
-                Logger rootLogger = manager.getLogger("");
+        if (logConfig.getLogActive() && !Arrays.stream(manager.getLogger("").getHandlers())
+                .anyMatch(e -> e instanceof SentryHandler)) {
+            Logger rootLogger = manager.getLogger("");
 
-                SentryClient client = Sentry.init(SENTRY_DSN);
-                if (logConfig.getTags() != null) {
-                    for (String item : Splitter.on(',').split(logConfig.getTags())) {
-                        String[] split = item.split("=", 2);
-                        client.addTag(split[0], split.length > 1 ? split[1] : "true");
-                    }
+            SentryClient client = Sentry.init(SENTRY_DSN);
+            if (logConfig.getTags() != null) {
+                for (String item : Splitter.on(',').split(logConfig.getTags())) {
+                    String[] split = item.split("=", 2);
+                    client.addTag(split[0], split.length > 1 ? split[1] : "true");
                 }
-                client.setRelease(RELEASE);
-
-                SentryHandler sentryHandler = new SentryHandler();
-                sentryHandler.setLevel(Level.SEVERE);
-                rootLogger.addHandler(sentryHandler);
             }
+            client.setRelease(RELEASE);
+
+            SentryHandler sentryHandler = new SentryHandler();
+            sentryHandler.setLevel(Level.SEVERE);
+            rootLogger.addHandler(sentryHandler);
         }
     }
 
