@@ -20,7 +20,7 @@ import java.util.logging.Logger;
 public class LogModule
         extends AbstractConfigurationAwareModule
 {
-    private static final String SENTRY_DSN = "https://b507ce9416da4799a8379ddf93ec4056:10c3db26414240489f124f65b360601e@app.getsentry.com/62493?raven.sample.rate=0.4";
+    private static final String SENTRY_DSN = "https://96145b6c6517416e9bcd24bba96e4433:6f5ba5b727114d5e91694b1755584500@sentry.io/1290995";
 
     @Override
     public void setup(Binder binder)
