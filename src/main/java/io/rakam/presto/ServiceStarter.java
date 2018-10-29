@@ -23,7 +23,7 @@ import io.airlift.log.Logger;
 import io.airlift.log.Logging;
 import io.airlift.log.LoggingConfiguration;
 import io.rakam.presto.connector.raptor.RaptorModule;
-import io.rakam.presto.connector.redshift.RedshiftModule;
+import io.rakam.presto.connector.s3.S3Module;
 import io.rakam.presto.kafka.KafkaStreamSourceModule;
 import io.rakam.presto.kinesis.KinesisStreamSourceModule;
 import org.weakref.jmx.guice.MBeanModule;
@@ -78,8 +78,8 @@ public final class ServiceStarter
                         if (target == null || target.equals(TargetConfig.Target.RAPTOR)) {
                             install(new RaptorModule());
                         }
-                        else if (target.equals(TargetConfig.Target.REDSHIFT)) {
-                            install(new RedshiftModule());
+                        else if (target.equals(TargetConfig.Target.S3)) {
+                            install(new S3Module());
                         } else {
                             throw new IllegalArgumentException();
                         }
@@ -193,7 +193,7 @@ public final class ServiceStarter
     public static class TargetConfig
     {
         public enum Target {
-            REDSHIFT, RAPTOR
+            S3, RAPTOR
         }
 
         private Target target;

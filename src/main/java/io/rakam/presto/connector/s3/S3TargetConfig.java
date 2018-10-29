@@ -2,7 +2,7 @@
  * Licensed under the Rakam Incorporation
  */
 
-package io.rakam.presto.connector.raptor;
+package io.rakam.presto.connector.s3;
 
 import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
@@ -16,7 +16,7 @@ import javax.validation.constraints.NotNull;
 
 import static com.amazonaws.regions.Regions.DEFAULT_REGION;
 
-public class S3BackupConfig
+public class S3TargetConfig
 {
     private String accessKey;
     private String secretAccessKey;
@@ -29,8 +29,8 @@ public class S3BackupConfig
         return region;
     }
 
-    @Config("raptor.aws.region")
-    public S3BackupConfig setRegion(String region)
+    @Config("target.aws.region")
+    public S3TargetConfig setRegion(String region)
     {
         this.region = region;
         return this;
@@ -47,8 +47,8 @@ public class S3BackupConfig
         return s3Bucket;
     }
 
-    @Config("raptor.aws.s3-bucket")
-    public S3BackupConfig setS3Bucket(String s3Bucket)
+    @Config("target.aws.s3-bucket")
+    public S3TargetConfig setS3Bucket(String s3Bucket)
     {
         this.s3Bucket = s3Bucket;
         return this;
@@ -59,8 +59,8 @@ public class S3BackupConfig
         return accessKey;
     }
 
-    @Config("aws.access-key")
-    public S3BackupConfig setAccessKey(String accessKey)
+    @Config("target.access-key")
+    public S3TargetConfig setAccessKey(String accessKey)
     {
         this.accessKey = accessKey;
         return this;
@@ -71,8 +71,8 @@ public class S3BackupConfig
         return secretAccessKey;
     }
 
-    @Config("aws.secret-access-key")
-    public S3BackupConfig setSecretAccessKey(String secretAccessKey)
+    @Config("target.secret-access-key")
+    public S3TargetConfig setSecretAccessKey(String secretAccessKey)
     {
         this.secretAccessKey = secretAccessKey;
         return this;
@@ -83,10 +83,18 @@ public class S3BackupConfig
         return endpoint;
     }
 
-    @Config("raptor.aws.s3-endpoint")
-    public S3BackupConfig setEndpoint(String endpoint)
+    @Config("target.aws.s3-endpoint")
+    public S3TargetConfig setEndpoint(String endpoint)
     {
         this.endpoint = endpoint;
         return this;
+    }
+
+    public AWSCredentialsProvider getCredentials()
+    {
+        if (accessKey == null && secretAccessKey == null) {
+            return new InstanceProfileCredentialsProvider();
+        }
+        return new AWSStaticCredentialsProvider(new BasicAWSCredentials(getAccessKey(), getSecretAccessKey()));
     }
 }
