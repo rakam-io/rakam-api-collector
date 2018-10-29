@@ -293,23 +293,23 @@ public class S3DatabaseHandler
                     objectMetadata);
 
             return CompletableFuture.runAsync(() -> {
-                for (int i = 0; i < 3; i++) {
-                    try {
-                        s3Client.putObject(putObjectRequest);
-                    }
-                    catch (SdkClientException e) {
-                        if (i == 2) {
-                            log.error(e);
-                            throw e;
-                        }
-
-                        continue;
-                    }
-
-                    output.reset();
-                    break;
-                }
+                tryPutfile(putObjectRequest, 3);
+                output.reset();
             }, s3ThreadPool);
+        }
+    }
+
+    private void tryPutfile(PutObjectRequest putObjectRequest, int numberOfTry) {
+        try {
+            s3Client.putObject(putObjectRequest);
+        }
+        catch (SdkClientException e) {
+            if(numberOfTry == 0) {
+                log.error(e);
+                throw e;
+            } else {
+                tryPutfile(putObjectRequest, numberOfTry - 1);
+            }
         }
     }
 
