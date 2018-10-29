@@ -43,13 +43,14 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
@@ -224,15 +225,17 @@ public class S3DatabaseHandler
 
                     int positionCount = block.getPositionCount();
                     for (int i = 0; i < positionCount; i++) {
-                        if(block.isNull(i)) {
+                        if (block.isNull(i)) {
                             generator.writeNull();
-                        } else {
+                        }
+                        else {
                             Block object = block.getObject(i, Block.class);
-                            if(object.getPositionCount() == 0) {
+                            if (object.getPositionCount() == 0) {
                                 // TODO: fix bug
                                 // if we pass empty string, position count will be 0
                                 generator.writeNull();
-                            } else {
+                            }
+                            else {
                                 writeValue(elementType, generator, object, 0);
                             }
                         }
@@ -246,11 +249,17 @@ public class S3DatabaseHandler
 
                     generator.writeStartObject();
 
+                    Set<String> uniqueKeys = new HashSet<>();
+
                     int positionCount = block.getPositionCount();
                     for (int i = 0; i < positionCount; i++) {
                         SingleMapBlock object = (SingleMapBlock) mapBlock.getObject(i, Block.class);
-                        generator.writeFieldName(VARCHAR.getSlice(object, 0).toStringUtf8());
-                        writeValue(elementType, generator, object, 1);
+                        String fieldName = VARCHAR.getSlice(object, 0).toStringUtf8();
+                        if (!uniqueKeys.contains(fieldName)) {
+                            generator.writeFieldName(fieldName);
+                            writeValue(elementType, generator, object, 1);
+                            uniqueKeys.add(fieldName);
+                        }
                     }
 
                     generator.writeEndObject();
@@ -299,15 +308,17 @@ public class S3DatabaseHandler
         }
     }
 
-    private void tryPutfile(PutObjectRequest putObjectRequest, int numberOfTry) {
+    private void tryPutfile(PutObjectRequest putObjectRequest, int numberOfTry)
+    {
         try {
             s3Client.putObject(putObjectRequest);
         }
         catch (SdkClientException e) {
-            if(numberOfTry == 0) {
+            if (numberOfTry == 0) {
                 log.error(e);
                 throw e;
-            } else {
+            }
+            else {
                 tryPutfile(putObjectRequest, numberOfTry - 1);
             }
         }
