@@ -313,7 +313,7 @@ public class S3DatabaseHandler
         }
     }
 
-    private class SafeSliceInputStream
+    private static class SafeSliceInputStream
             extends InputStream
     {
         private final BasicSliceInput sliceInput;
