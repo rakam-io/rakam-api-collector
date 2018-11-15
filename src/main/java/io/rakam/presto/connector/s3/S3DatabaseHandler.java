@@ -230,13 +230,8 @@ public class S3DatabaseHandler
                         }
                         else {
                             Block object = block.getObject(i, Block.class);
-                            if (object.getPositionCount() == 0) {
-                                // TODO: fix bug
-                                // if we pass empty string, position count will be 0
-                                generator.writeNull();
-                            }
-                            else {
-                                writeValue(elementType, generator, object, 0);
+                            for (int i1 = 0; i1 < object.getPositionCount(); i1++) {
+                                writeValue(elementType, generator, object, i1);
                             }
                         }
                     }
@@ -302,13 +297,13 @@ public class S3DatabaseHandler
                     objectMetadata);
 
             return CompletableFuture.runAsync(() -> {
-                tryPutfile(putObjectRequest, 3);
+                tryPutFile(putObjectRequest, 3);
                 output.reset();
             }, s3ThreadPool);
         }
     }
 
-    private void tryPutfile(PutObjectRequest putObjectRequest, int numberOfTry)
+    private void tryPutFile(PutObjectRequest putObjectRequest, int numberOfTry)
     {
         try {
             s3Client.putObject(putObjectRequest);
@@ -319,7 +314,7 @@ public class S3DatabaseHandler
                 throw e;
             }
             else {
-                tryPutfile(putObjectRequest, numberOfTry - 1);
+                tryPutFile(putObjectRequest, numberOfTry - 1);
             }
         }
     }
