@@ -223,16 +223,13 @@ public class S3DatabaseHandler
 
                     generator.writeStartArray();
 
-                    int positionCount = block.getPositionCount();
-                    for (int i = 0; i < positionCount; i++) {
-                        if (block.isNull(i)) {
-                            generator.writeNull();
-                        }
-                        else {
-                            Block object = block.getObject(i, Block.class);
-                            for (int i1 = 0; i1 < object.getPositionCount(); i1++) {
-                                writeValue(elementType, generator, object, i1);
-                            }
+                    if (block.isNull(colIdx)) {
+                        generator.writeNull();
+                    }
+                    else {
+                        Block object = block.getObject(colIdx, Block.class);
+                        for (int i1 = 0; i1 < object.getPositionCount(); i1++) {
+                            writeValue(elementType, generator, object, i1);
                         }
                     }
 
@@ -246,15 +243,12 @@ public class S3DatabaseHandler
 
                     Set<String> uniqueKeys = new HashSet<>();
 
-                    int positionCount = block.getPositionCount();
-                    for (int i = 0; i < positionCount; i++) {
-                        SingleMapBlock object = (SingleMapBlock) mapBlock.getObject(i, Block.class);
-                        String fieldName = VARCHAR.getSlice(object, 0).toStringUtf8();
-                        if (!uniqueKeys.contains(fieldName)) {
-                            generator.writeFieldName(fieldName);
-                            writeValue(elementType, generator, object, 1);
-                            uniqueKeys.add(fieldName);
-                        }
+                    SingleMapBlock object = (SingleMapBlock) mapBlock.getObject(colIdx, Block.class);
+                    String fieldName = VARCHAR.getSlice(object, 0).toStringUtf8();
+                    if (!uniqueKeys.contains(fieldName)) {
+                        generator.writeFieldName(fieldName);
+                        writeValue(elementType, generator, object, 1);
+                        uniqueKeys.add(fieldName);
                     }
 
                     generator.writeEndObject();
