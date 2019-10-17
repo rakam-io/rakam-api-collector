@@ -1,1 +1,6 @@
-Licensed under the Rakam Incorporation
+Copyright (C) 2018 Rakam Inc. All rights reserved.
+This repository is the property of Rakam Inc.
+It is considered confidential and proprietary.
+This repository may not be reproduced or transmitted in any form,
+in whole or in part, without the express written permission of
+Rakam Inc.
