@@ -14,6 +14,7 @@ import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Binder;
+import com.google.inject.Module;
 import com.google.inject.Scopes;
 import com.google.inject.multibindings.OptionalBinder;
 import io.airlift.bootstrap.Bootstrap;
@@ -35,8 +36,10 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.net.URL;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.Set;
 
 import static io.airlift.configuration.ConfigBinder.configBinder;
 import static io.rakam.presto.ConditionalModule.installIfPropertyEquals;
@@ -64,27 +67,28 @@ public final class ServiceStarter
 
         initializeLogging(System.getProperty("log.levels-file"));
 
-        Bootstrap app = new Bootstrap(
-                new StreamSourceModule(),
-                new LogModule(),
-                new MBeanModule(),
-                new AbstractConfigurationAwareModule()
-                {
-                    @Override
-                    protected void setup(Binder binder)
-                    {
-                        TargetConfig targetConfig = buildConfigObject(TargetConfig.class);
-                        TargetConfig.Target target = targetConfig.getTarget();
-                        if (target == null || target.equals(TargetConfig.Target.RAPTOR)) {
-                            install(new RaptorModule());
-                        }
-                        else if (target.equals(TargetConfig.Target.S3)) {
-                            install(new S3Module());
-                        } else {
-                            throw new IllegalArgumentException();
-                        }
-                    }
-                }, new AbstractConfigurationAwareModule()
+        Set modules = new HashSet<Module>();
+        modules.add(new StreamSourceModule());
+        modules.add(new LogModule());
+        modules.add(new MBeanModule());
+        modules.add(new AbstractConfigurationAwareModule()
+        {
+            @Override
+            protected void setup(Binder binder)
+            {
+                TargetConfig targetConfig = buildConfigObject(TargetConfig.class);
+                TargetConfig.Target target = targetConfig.getTarget();
+                if (target == null || target.equals(TargetConfig.Target.RAPTOR)) {
+                    install(new RaptorModule());
+                }
+                else if (target.equals(TargetConfig.Target.S3)) {
+                    install(new S3Module());
+                } else {
+                    throw new IllegalArgumentException();
+                }
+            }
+        });
+        modules.add(new AbstractConfigurationAwareModule()
         {
             @Override
             protected void setup(Binder binder)
@@ -107,6 +111,8 @@ public final class ServiceStarter
                 binder.bind(FunctionRegistry.class).toInstance(functionRegistry);
             }
         });
+
+        Bootstrap app = new ProxyBootstrap(modules);
 
         app.requireExplicitBindings(false);
         app.strictConfig().initialize();
