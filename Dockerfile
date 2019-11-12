@@ -1,16 +1,14 @@
-FROM maven:3.5.2-jdk-8-alpine
-MAINTAINER Burak Emre Kabakci "emre@rakam.io"
+### Step 1: Prepare Rakam Collector ###
+FROM maven:3-jdk-8 as rakam-presto-collector
+WORKDIR /build
+# Copy source and create package AND Install maven packages
+ADD . .
+RUN mvn clean install -T 1C -DskipTests=true
 
-WORKDIR /var/app
-
-COPY . /var/app/
-
-ENV MAVEN_HOME /usr/share/maven
-ENV MAVEN_CONFIG "$USER_HOME_DIR/.m2"
-
-RUN cd /var/app && mvn clean install -DskipTests && tar -xvzf target/collector-*-bundle.tar.gz && mv collector-* collector && touch collector/etc/config.properties
-
-RUN echo "http://dl-8.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
-RUN apk --no-cache --update-cache add python python-dev
-
-ENTRYPOINT [ "/var/app/entrypoint.sh" ]
+### Step 2: Bundle builds ###
+FROM maven:3-jdk-8 AS rakam-bundle
+# Copy source from target
+COPY --from=rakam-presto-collector /build/target /compiled/target
+# Set entrypoint
+# ENTRYPOINT /compiled/target/rakam-*-collector/rakam-*/bin/launcher run
+EXPOSE 9997
