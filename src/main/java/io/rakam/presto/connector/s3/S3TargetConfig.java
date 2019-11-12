@@ -36,11 +36,6 @@ public class S3TargetConfig
         return this;
     }
 
-    public Region getAWSRegion()
-    {
-        return Region.getRegion(region == null ? DEFAULT_REGION : Regions.fromName(region));
-    }
-
     @NotNull
     public String getS3Bucket()
     {

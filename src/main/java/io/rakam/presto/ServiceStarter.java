@@ -78,13 +78,13 @@ public final class ServiceStarter
             {
                 TargetConfig targetConfig = buildConfigObject(TargetConfig.class);
                 TargetConfig.Target target = targetConfig.getTarget();
-                if (target == null || target.equals(TargetConfig.Target.RAPTOR)) {
+                if (target.equals(TargetConfig.Target.RAPTOR)) {
                     install(new RaptorModule());
                 }
                 else if (target.equals(TargetConfig.Target.S3)) {
                     install(new S3Module());
                 } else {
-                    throw new IllegalArgumentException();
+                    throw new IllegalArgumentException("You must set the `target` config property");
                 }
             }
         });

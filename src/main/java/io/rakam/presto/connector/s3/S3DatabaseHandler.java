@@ -5,13 +5,15 @@
 package io.rakam.presto.connector.s3;
 
 import com.amazonaws.SdkClientException;
+import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.SchemaTableName;
-import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.MapBlock;
 import com.facebook.presto.spi.block.SingleMapBlock;
@@ -67,7 +69,7 @@ public class S3DatabaseHandler
     private final ThreadPoolExecutor s3ThreadPool;
     private final MetadataDao dao;
     Map<SchemaTableName, List<ColumnMetadata>> schemaCache;
-    private final AmazonS3Client s3Client;
+    private final AmazonS3 s3Client;
 
     @Inject
     public S3DatabaseHandler(S3TargetConfig config, @Named("metadata.store.jdbc") JDBCPoolDataSource prestoMetastoreDataSource, TypeManager typeManager, FieldNameConfig fieldNameConfig) {
@@ -77,15 +79,20 @@ public class S3DatabaseHandler
         schemaCache = new HashMap<>();
         this.config = config;
         this.fieldNameConfig = fieldNameConfig;
-        s3Client = new AmazonS3Client(config.getCredentials());
-        s3Client.setRegion(config.getAWSRegion());
+        AmazonS3ClientBuilder builder = AmazonS3Client.builder().withCredentials(config.getCredentials());
+
         if (config.getEndpoint() != null) {
-            s3Client.setEndpoint(config.getEndpoint());
+            builder.withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(config.getEndpoint(), null));
+        }
+
+        if (config.getRegion() != null) {
+            builder.withRegion(config.getRegion());
         }
 
         DBI dbi = new DBI(prestoMetastoreDataSource);
         dbi.registerMapper(new MetadataDao.TableColumn.Mapper(typeManager));
         this.dao = onDemandDao(dbi, MetadataDao.class);
+        this.s3Client = builder.build();
     }
 
     @Override
