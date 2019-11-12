@@ -157,10 +157,14 @@ public final class ServiceStarter
             configBinder(binder).bindConfig(S3MiddlewareConfig.class);
             configBinder(binder).bindConfig(CommitterConfig.class);
             configBinder(binder).bindConfig(MiddlewareConfig.class);
+            configBinder(binder).bindConfig(LicenseConfig.class);
             binder.bind(StreamWorkerContext.class).in(Scopes.SINGLETON);
+            binder.bind(LicenseService.class).in(Scopes.SINGLETON);
             binder.bind(TargetConnectorCommitter.class).in(Scopes.SINGLETON);
 
             OptionalBinder.newOptionalBinder(binder, HistoricalDataHandler.class);
+
+
 
             bindDataSource("stream.source");
         }
