@@ -21,7 +21,7 @@ public class KinesisStreamSourceConfig
     private String kinesisEndpoint;
     private String dynamodbEndpoint;
     private boolean enableCloudWatch = true;
-    private String dynamodbTable;
+    private String dynamodbTable = "rakam-kinesis-worker";
     private Integer maxKinesisRecordsPerBatch;
 
     public String getStreamName()

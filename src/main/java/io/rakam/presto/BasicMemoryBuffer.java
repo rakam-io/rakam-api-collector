@@ -17,7 +17,7 @@ public class BasicMemoryBuffer<T>
     private final long maxBytes;
     private final MemoryTracker memoryTracker;
     private long previousFlushTimeMillisecond;
-    private int totalBytes;
+    private long totalBytes;
 
     public BasicMemoryBuffer(StreamConfig config, MemoryTracker memoryTracker, SizeCalculator<T> sizeCalculator)
     {
@@ -43,7 +43,7 @@ public class BasicMemoryBuffer<T>
         return previousFlushTimeMillisecond;
     }
 
-    public int getTotalBytes()
+    public long getTotalBytes()
     {
         return totalBytes;
     }
