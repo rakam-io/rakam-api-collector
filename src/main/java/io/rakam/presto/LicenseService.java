@@ -1,24 +1,22 @@
+/*
+ * Licensed under the Rakam Incorporation
+ */
 package io.rakam.presto;
 
 import com.amazonaws.util.StringInputStream;
 import com.google.api.gax.core.FixedCredentialsProvider;
 import com.google.auth.oauth2.ServiceAccountCredentials;
-import com.google.cloud.kms.v1.*;
+import com.google.cloud.kms.v1.CryptoKeyPathName;
+import com.google.cloud.kms.v1.KeyManagementServiceClient;
+import com.google.cloud.kms.v1.KeyManagementServiceSettings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.BaseEncoding;
 import com.google.protobuf.ByteString;
 import okhttp3.*;
-import okio.Okio;
 import org.rakam.util.JsonHelper;
 
 import javax.inject.Inject;
-import javax.net.ssl.HttpsURLConnection;
-import java.io.ByteArrayInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.URL;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.concurrent.Executors;

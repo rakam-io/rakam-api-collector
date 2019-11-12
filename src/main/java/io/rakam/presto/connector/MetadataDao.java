@@ -1,3 +1,6 @@
+/*
+ * Licensed under the Rakam Incorporation
+ */
 package io.rakam.presto.connector;
 
 import com.facebook.presto.raptor.metadata.SchemaTableNameMapper;
