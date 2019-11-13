@@ -15,6 +15,8 @@ import com.google.protobuf.ByteString;
 import okhttp3.*;
 import org.rakam.util.JsonHelper;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -25,13 +27,12 @@ import java.util.concurrent.TimeUnit;
 
 public class LicenseService {
 
-    private final ScheduledExecutorService scheduler;
+    private ScheduledExecutorService scheduler;
     private final LicenseConfig config;
     private Instant licenseSuccessfullyCheckedAt;
 
     @Inject
     public LicenseService(LicenseConfig config) {
-        this.scheduler = Executors.newScheduledThreadPool(1);
         this.licenseSuccessfullyCheckedAt = Instant.now();
         this.config = config;
 
@@ -41,11 +42,21 @@ public class LicenseService {
         if (config.getKeyName() == null) {
             throw new IllegalStateException("License key-name is required for the license server.");
         }
-        scheduler.scheduleAtFixedRate(this::isLicenseValid, 45, 60, TimeUnit.SECONDS);
 
         if (!isLicenseValid()) {
             throw new IllegalStateException("initial license check failed.");
         }
+    }
+
+    @PostConstruct
+    public void start() {
+        this.scheduler = Executors.newScheduledThreadPool(1);
+        scheduler.scheduleAtFixedRate(this::isLicenseValid, 45, 60, TimeUnit.SECONDS);
+    }
+
+    @PreDestroy
+    public void destroy() {
+        this.scheduler.shutdown();
     }
 
     public boolean isLicenseValid() {

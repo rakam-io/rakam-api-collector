@@ -4,18 +4,23 @@
 
 package io.rakam.presto.kinesis;
 
+import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClient;
+import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
+import com.amazonaws.services.kinesis.AmazonKinesisAsyncClient;
 import com.amazonaws.services.kinesis.AmazonKinesisClient;
+import com.amazonaws.services.kinesis.AmazonKinesisClientBuilder;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorFactory;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.InitialPositionInStream;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.KinesisClientLibConfiguration;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.Worker;
+import com.amazonaws.services.kinesis.model.DescribeStreamResult;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
-
 import java.rmi.dgc.VMID;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,58 +29,54 @@ import java.util.concurrent.Executors;
 import static com.amazonaws.services.kinesis.metrics.interfaces.MetricsLevel.NONE;
 import static com.amazonaws.services.kinesis.metrics.interfaces.MetricsLevel.SUMMARY;
 
-public class KinesisWorkerManager
-{
+public class KinesisWorkerManager {
     private final KinesisStreamSourceConfig config;
-    private final AmazonKinesisClient kinesisClient;
     private final List<Thread> threads;
     private final IRecordProcessorFactory recordProcessorFactory;
 
     @Inject
-    public KinesisWorkerManager(KinesisStreamSourceConfig config, IRecordProcessorFactory recordProcessorFactory)
-    {
+    public KinesisWorkerManager(KinesisStreamSourceConfig config, IRecordProcessorFactory recordProcessorFactory) {
         this.config = config;
         this.threads = new ArrayList<>();
-        this.kinesisClient = new AmazonKinesisClient(config.getCredentials());
-        // SEE: https://github.com/awslabs/amazon-kinesis-client/issues/34
-        if (config.getDynamodbEndpoint() == null && config.getKinesisEndpoint() == null) {
-            kinesisClient.setRegion(config.getAWSRegion());
-        }
-        if (config.getKinesisEndpoint() != null) {
-            kinesisClient.setEndpoint(config.getKinesisEndpoint());
-        }
-        KinesisUtil.createAndWaitForStreamToBecomeAvailable(kinesisClient, config.getStreamName(), 1);
         this.recordProcessorFactory = recordProcessorFactory;
     }
 
     @PostConstruct
-    public void initializeWorker()
-    {
+    public void initializeWorker() {
+        // check if kinesis stream exists
+        AmazonKinesisClient.builder().withCredentials(config.getCredentials())
+                .build()
+                .describeStream(config.getStreamName());
+
         Thread middlewareWorker = createMiddlewareWorker();
         middlewareWorker.start();
         threads.add(middlewareWorker);
     }
 
-    private Worker getWorker(IRecordProcessorFactory factory, KinesisClientLibConfiguration config)
-    {
-        AmazonKinesisClient amazonKinesisClient = new AmazonKinesisClient(config.getKinesisCredentialsProvider(),
-                config.getKinesisClientConfiguration());
-        AmazonDynamoDBClient dynamoDBClient = new AmazonDynamoDBClient(config.getDynamoDBCredentialsProvider(),
-                config.getDynamoDBClientConfiguration());
+    private Worker getWorker(IRecordProcessorFactory factory, KinesisClientLibConfiguration config) {
+        AmazonDynamoDBClientBuilder dynamodbBuilder = AmazonDynamoDBClient.builder().withCredentials(config.getDynamoDBCredentialsProvider());
+        dynamodbBuilder.withClientConfiguration(config.getDynamoDBClientConfiguration());
         if (this.config.getDynamodbEndpoint() != null) {
-            dynamoDBClient.setEndpoint(this.config.getDynamodbEndpoint());
+            dynamodbBuilder.withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(this.config.getDynamodbEndpoint(), null));
         }
+
+        AmazonKinesisClientBuilder kinesisBuilder = AmazonKinesisClient.builder().withCredentials(config.getKinesisCredentialsProvider());
+        kinesisBuilder.withClientConfiguration(config.getKinesisClientConfiguration());
 
         config.withMetricsLevel(this.config.getEnableCloudWatch() ? SUMMARY : NONE);
 
-        AmazonCloudWatchClient client = new AmazonCloudWatchClient(config.getCloudWatchCredentialsProvider(),
-                config.getCloudWatchClientConfiguration());
+        AmazonCloudWatchClientBuilder cwBuilder = AmazonCloudWatchClient.builder().withCredentials(config.getCloudWatchCredentialsProvider())
+                .withClientConfiguration(config.getCloudWatchClientConfiguration());
 
-        return new Worker(factory, config, amazonKinesisClient, dynamoDBClient, client, Executors.newCachedThreadPool());
+        return new Worker.Builder().config(config)
+                .recordProcessorFactory(factory)
+                .kinesisClient(kinesisBuilder.build())
+                .dynamoDBClient(dynamodbBuilder.build())
+                .cloudWatchClient(cwBuilder.build())
+                .build();
     }
 
-    private Thread createMiddlewareWorker()
-    {
+    private Thread createMiddlewareWorker() {
         KinesisClientLibConfiguration configuration = new KinesisClientLibConfiguration(config.getDynamodbTable(),
                 this.config.getStreamName(),
                 this.config.getCredentials(),
@@ -85,7 +86,7 @@ public class KinesisWorkerManager
                 .withFailoverTimeMillis(30000)
                 .withCallProcessRecordsEvenForEmptyRecordList(true);
 
-        if(config.getMaxKinesisRecordsPerBatch() != null) {
+        if (config.getMaxKinesisRecordsPerBatch() != null) {
             configuration.withMaxRecords(config.getMaxKinesisRecordsPerBatch());
         }
         if (this.config.getKinesisEndpoint() == null && this.config.getDynamodbEndpoint() == null) {
@@ -100,8 +101,7 @@ public class KinesisWorkerManager
         try {
             Worker worker = getWorker(recordProcessorFactory, configuration);
             middlewareWorkerThread = new Thread(worker);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             throw new RuntimeException("Error creating Kinesis stream worker", e);
         }
 
@@ -110,8 +110,7 @@ public class KinesisWorkerManager
     }
 
     @PreDestroy
-    public void destroyWorkers()
-    {
+    public void destroyWorkers() {
         threads.forEach(Thread::interrupt);
     }
 }

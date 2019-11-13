@@ -60,12 +60,12 @@ public class KinesisUtil
             }
         }
         else {
-//            throw new IllegalStateException(String.format("Kinesis stream %s doesn't exist."));
-            CreateStreamRequest createStreamRequest = new CreateStreamRequest();
-            createStreamRequest.setStreamName(streamName);
-            createStreamRequest.setShardCount(shardCount);
-            kinesisClient.createStream(createStreamRequest);
-            LOGGER.info("Stream " + streamName + " created");
+            throw new IllegalStateException(String.format("Kinesis stream %s doesn't exist."));
+//            CreateStreamRequest createStreamRequest = new CreateStreamRequest();
+//            createStreamRequest.setStreamName(streamName);
+//            createStreamRequest.setShardCount(shardCount);
+//            kinesisClient.createStream(createStreamRequest);
+//            LOGGER.info("Stream " + streamName + " created");
         }
         long startTime = System.currentTimeMillis();
         long endTime = startTime + (10 * 60 * 1000);

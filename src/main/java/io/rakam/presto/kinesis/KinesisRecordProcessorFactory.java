@@ -13,9 +13,12 @@ import io.rakam.presto.MiddlewareConfig;
 import io.rakam.presto.StreamWorkerContext;
 import io.rakam.presto.TargetConnectorCommitter;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static io.airlift.units.DataSize.succinctBytes;
 import static java.lang.String.format;
@@ -30,6 +33,7 @@ public class KinesisRecordProcessorFactory
     private final StreamWorkerContext context;
     private final MemoryTracker memoryTracker;
     private final MiddlewareBuffer middlewareBuffer;
+    private ScheduledExecutorService scheduledExecutorService;
 
     @Inject
     public KinesisRecordProcessorFactory(StreamWorkerContext context,
@@ -40,9 +44,19 @@ public class KinesisRecordProcessorFactory
         this.memoryTracker = memoryTracker;
         this.committer = committer;
         middlewareBuffer = new MiddlewareBuffer(middlewareConfig, memoryTracker);
+    }
 
+    @Override
+    public IRecordProcessor createProcessor()
+    {
+        return new KinesisRecordProcessor(context, middlewareBuffer, memoryTracker, committer);
+    }
+
+    @PostConstruct
+    public void start() {
         if (log.isDebugEnabled()) {
-            Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
+            scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+            scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
                     long bytes = memoryTracker.availableMemory();
                     String message = format("[%s (%s%%) memory available] Active flush count is %d (%s), Middleware buffer is %s",
@@ -57,12 +71,13 @@ public class KinesisRecordProcessorFactory
                     log.debug(e, "Error while printing stats");
                 }
             }, 5, 5, SECONDS);
+        } else {
+            scheduledExecutorService = null;
         }
     }
 
-    @Override
-    public IRecordProcessor createProcessor()
-    {
-        return new KinesisRecordProcessor(context, middlewareBuffer, memoryTracker, committer);
+    @PreDestroy
+    public void destroyWorkers() {
+        scheduledExecutorService.shutdown();
     }
 }

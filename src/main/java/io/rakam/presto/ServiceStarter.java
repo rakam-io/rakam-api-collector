@@ -28,6 +28,7 @@ import io.rakam.presto.connector.s3.S3Module;
 import io.rakam.presto.kafka.KafkaStreamSourceModule;
 import io.rakam.presto.kinesis.KinesisStreamSourceModule;
 import org.weakref.jmx.guice.MBeanModule;
+import sun.rmi.runtime.Log;
 
 import javax.management.MBeanServer;
 
@@ -115,7 +116,12 @@ public final class ServiceStarter
         Bootstrap app = new ProxyBootstrap(modules);
 
         app.requireExplicitBindings(false);
-        app.strictConfig().initialize();
+        try {
+            app.strictConfig().initialize();
+        } catch (Throwable e) {
+            LOGGER.error(e);
+            System.exit(0);
+        }
 
         LOGGER.info("======== SERVER STARTED ========");
     }
