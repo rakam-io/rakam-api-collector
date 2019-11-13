@@ -60,7 +60,7 @@ public class KinesisUtil
             }
         }
         else {
-            throw new IllegalStateException(String.format("Kinesis stream %s doesn't exist."));
+            throw new IllegalStateException(String.format("Kinesis stream %s doesn't exist.", streamName));
 //            CreateStreamRequest createStreamRequest = new CreateStreamRequest();
 //            createStreamRequest.setStreamName(streamName);
 //            createStreamRequest.setShardCount(shardCount);
