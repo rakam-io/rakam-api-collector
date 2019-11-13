@@ -6,7 +6,7 @@ ADD . .
 RUN mvn clean install -T 1C -DskipTests=true
 
 ### Step 2: Bundle builds ###
-FROM maven:3-jdk-8 AS rakam-bundle
+FROM openjdk:8-jre-alpine
 # Copy source from target
 COPY --from=rakam-presto-collector /build/target /compiled/target
 # Set entrypoint
