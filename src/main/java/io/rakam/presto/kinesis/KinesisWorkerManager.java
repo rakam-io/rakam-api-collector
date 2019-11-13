@@ -43,11 +43,6 @@ public class KinesisWorkerManager {
 
     @PostConstruct
     public void initializeWorker() {
-        // check if kinesis stream exists
-        AmazonKinesisClient.builder().withCredentials(config.getCredentials())
-                .build()
-                .describeStream(config.getStreamName());
-
         Thread middlewareWorker = createMiddlewareWorker();
         middlewareWorker.start();
         threads.add(middlewareWorker);
