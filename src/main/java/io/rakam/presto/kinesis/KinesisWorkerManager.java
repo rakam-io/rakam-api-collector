@@ -5,10 +5,13 @@
 package io.rakam.presto.kinesis;
 
 import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClient;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
+import com.amazonaws.services.kinesis.AmazonKinesis;
 import com.amazonaws.services.kinesis.AmazonKinesisAsyncClient;
 import com.amazonaws.services.kinesis.AmazonKinesisClient;
 import com.amazonaws.services.kinesis.AmazonKinesisClientBuilder;
@@ -49,25 +52,36 @@ public class KinesisWorkerManager {
     }
 
     private Worker getWorker(IRecordProcessorFactory factory, KinesisClientLibConfiguration config) {
-        AmazonDynamoDBClientBuilder dynamodbBuilder = AmazonDynamoDBClient.builder().withCredentials(config.getDynamoDBCredentialsProvider());
-        dynamodbBuilder.withClientConfiguration(config.getDynamoDBClientConfiguration());
-        if (this.config.getDynamodbEndpoint() != null) {
-            dynamodbBuilder.withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(this.config.getDynamodbEndpoint(), null));
-        }
-
-        AmazonKinesisClientBuilder kinesisBuilder = AmazonKinesisClient.builder().withCredentials(config.getKinesisCredentialsProvider());
-        kinesisBuilder.withClientConfiguration(config.getKinesisClientConfiguration());
-
         config.withMetricsLevel(this.config.getEnableCloudWatch() ? SUMMARY : NONE);
 
-        AmazonCloudWatchClientBuilder cwBuilder = AmazonCloudWatchClient.builder().withCredentials(config.getCloudWatchCredentialsProvider())
-                .withClientConfiguration(config.getCloudWatchClientConfiguration());
+        AmazonCloudWatch cwClient;
+        AmazonKinesis kinesis;
+        AmazonDynamoDB dynamodb;
+        if(this.config.getAccessKey() == null) {
+            cwClient = AmazonCloudWatchClient.builder().withCredentials(config.getCloudWatchCredentialsProvider())
+                    .withClientConfiguration(config.getCloudWatchClientConfiguration()).build();
+            kinesis = AmazonKinesisClient.builder()
+                    .withCredentials(config.getKinesisCredentialsProvider())
+                    .withClientConfiguration(config.getKinesisClientConfiguration()).build();
+
+            AmazonDynamoDBClientBuilder dynamodbBuilder = AmazonDynamoDBClient
+                    .builder().withCredentials(config.getDynamoDBCredentialsProvider())
+                    .withClientConfiguration(config.getDynamoDBClientConfiguration());
+            if (this.config.getDynamodbEndpoint() != null) {
+                dynamodbBuilder.withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(this.config.getDynamodbEndpoint(), null));
+            }
+            dynamodb = dynamodbBuilder.build();
+        } else {
+            cwClient = new AmazonCloudWatchClient(config.getCloudWatchCredentialsProvider(), config.getCloudWatchClientConfiguration());
+            kinesis = new AmazonKinesisClient(config.getKinesisCredentialsProvider(), config.getKinesisClientConfiguration());
+            dynamodb = new AmazonDynamoDBClient(config.getDynamoDBCredentialsProvider(), config.getDynamoDBClientConfiguration());
+        }
 
         return new Worker.Builder().config(config)
                 .recordProcessorFactory(factory)
-                .kinesisClient(kinesisBuilder.build())
-                .dynamoDBClient(dynamodbBuilder.build())
-                .cloudWatchClient(cwBuilder.build())
+                .kinesisClient(kinesis)
+                .dynamoDBClient(dynamodb)
+                .cloudWatchClient(cwClient)
                 .build();
     }
 

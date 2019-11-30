@@ -57,6 +57,7 @@ import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
+import static com.facebook.presto.spi.type.TypeUtils.readNativeValue;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 
 public class S3DatabaseHandler
@@ -243,13 +244,17 @@ public class S3DatabaseHandler
                     Set<String> uniqueKeys = new HashSet<>();
 
                     SingleMapBlock object = (SingleMapBlock) mapBlock.getObject(colIdx, Block.class);
-                    String fieldName = VARCHAR.getSlice(object, 0).toStringUtf8();
-                    if (!uniqueKeys.contains(fieldName)) {
-                        generator.writeFieldName(fieldName);
-                        Type elementType = ((MapType) type).getValueType();
-                        writeValue(elementType, generator, object, 1);
-                        uniqueKeys.add(fieldName);
+                    Type elementType = ((MapType) type).getValueType();
+
+                    for(int i = 0; i < object.getPositionCount(); i+=2) {
+                        String fieldName = VARCHAR.getSlice(object, i).toStringUtf8();
+                        if (!uniqueKeys.contains(fieldName)) {
+                            generator.writeFieldName(fieldName);
+                            writeValue(elementType, generator, object, i+1);
+                            uniqueKeys.add(fieldName);
+                        }
                     }
+
 
                     generator.writeEndObject();
                 } else {

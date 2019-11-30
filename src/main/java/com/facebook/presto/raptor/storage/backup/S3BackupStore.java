@@ -145,37 +145,31 @@ public class S3BackupStore
         }
 
         public int read()
-                throws IOException
         {
             return this.sliceInput.read();
         }
 
         public int read(byte[] b)
-                throws IOException
         {
             return this.sliceInput.read(b);
         }
 
         public int read(byte[] b, int off, int len)
-                throws IOException
         {
             return this.sliceInput.read(b, off, len);
         }
 
         public long skip(long n)
-                throws IOException
         {
             return this.sliceInput.skip(n);
         }
 
         public int available()
-                throws IOException
         {
             return this.sliceInput.available();
         }
 
         public void close()
-                throws IOException
         {
             this.sliceInput.close();
         }
