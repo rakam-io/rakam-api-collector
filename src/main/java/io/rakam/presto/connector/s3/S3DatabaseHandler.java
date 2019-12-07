@@ -20,10 +20,12 @@ import com.facebook.presto.spi.block.SingleMapBlock;
 import com.facebook.presto.spi.type.*;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.name.Named;
 import io.airlift.log.Logger;
 import io.airlift.slice.BasicSliceInput;
 import io.airlift.slice.DynamicSliceOutput;
+import io.airlift.units.DataSize;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.connector.MetadataDao;
@@ -31,6 +33,7 @@ import org.rakam.analysis.JDBCPoolDataSource;
 import org.rakam.util.JsonHelper;
 import org.skife.jdbi.v2.DBI;
 
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import java.io.DataOutput;
 import java.io.IOException;
@@ -42,10 +45,9 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.zip.GZIPOutputStream;
@@ -57,7 +59,6 @@ import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
-import static com.facebook.presto.spi.type.TypeUtils.readNativeValue;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 
 public class S3DatabaseHandler
@@ -65,19 +66,23 @@ public class S3DatabaseHandler
     private static final Logger log = Logger.get(S3DatabaseHandler.class);
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(Locale.ENGLISH).withZone(ZoneOffset.UTC);
 
+    private final ScheduledExecutorService scheduler;
+    private final AmazonS3 s3Client;
     private final S3TargetConfig config;
     private final FieldNameConfig fieldNameConfig;
-    private final ThreadPoolExecutor s3ThreadPool;
     private final MetadataDao dao;
     Map<SchemaTableName, List<ColumnMetadata>> schemaCache;
-    private final AmazonS3 s3Client;
+
+    private Map<String, Queue<CollectionBatch>> collectionsBuffer;
+    // TODO: clean the buffer periodically
+    private final Map<String, DynamicSliceOutput> mainBuffer;
 
     @Inject
     public S3DatabaseHandler(S3TargetConfig config, @Named("metadata.store.jdbc") JDBCPoolDataSource prestoMetastoreDataSource, TypeManager typeManager, FieldNameConfig fieldNameConfig) {
-        s3ThreadPool = new ThreadPoolExecutor(0, Runtime.getRuntime().availableProcessors(),
-                60L, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>());
+        scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder().setNameFormat("s3-writer").build());
         schemaCache = new HashMap<>();
+        collectionsBuffer = new ConcurrentHashMap<>();
+        mainBuffer = new ConcurrentHashMap();
         this.config = config;
         this.fieldNameConfig = fieldNameConfig;
         AmazonS3ClientBuilder builder = AmazonS3Client.builder().withCredentials(config.getCredentials());
@@ -96,22 +101,70 @@ public class S3DatabaseHandler
         this.s3Client = builder.build();
     }
 
+    @PostConstruct
+    public void schedule() {
+        scheduler.scheduleAtFixedRate(() -> {
+            for (Map.Entry<String, Queue<CollectionBatch>> entry : collectionsBuffer.entrySet()) {
+                String project = entry.getKey();
+
+                DynamicSliceOutput buffer = mainBuffer.computeIfAbsent(project, p -> new DynamicSliceOutput(100000));
+
+                String fileName = String.format("%s/%s.json.gzip", project, UUID.randomUUID().toString());
+
+                ArrayList<CompletableFuture> futures = new ArrayList();
+                long maxDataSizeInBytes = config.getMaxDataSize().toBytes();
+
+                try {
+                    GZIPOutputStream out = new GZIPOutputStream(buffer);
+                    while (!collectionsBuffer.isEmpty() && buffer.getRetainedSize() < maxDataSizeInBytes) {
+                        CollectionBatch collectionBatch = entry.getValue().poll();
+                        out.write((byte[]) collectionBatch.buffer.slice().getBase(), 0, collectionBatch.buffer.size());
+                        futures.add(collectionBatch.future);
+                    }
+                    out.finish();
+                    out.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+
+                ObjectMetadata objectMetadata = new ObjectMetadata();
+                objectMetadata.setContentLength(mainBuffer.size());
+                PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
+                        fileName,
+                        new SafeSliceInputStream(new BasicSliceInput(buffer.slice())),
+                        objectMetadata);
+
+                tryPutFile(putObjectRequest, 5);
+
+                futures.forEach(future -> future.complete(null));
+
+                buffer.reset();
+            }
+
+        }, 1, 1, TimeUnit.MINUTES);
+    }
+
     @Override
     public List<ColumnMetadata> getColumns(String schema, String table) {
-        List<ColumnMetadata> tableColumns = dao.listTableColumns(schema, table).stream()
-                .map(e -> new ColumnMetadata(e.getColumnName(), e.getDataType())).collect(Collectors.toList());
+        SchemaTableName collection = new SchemaTableName(schema, table);
+
+        List<ColumnMetadata> tableColumns = schemaCache.get(collection);
+        if (tableColumns == null) {
+            tableColumns = dao.listTableColumns(schema, table).stream()
+                    .map(e -> new ColumnMetadata(e.getColumnName(), e.getDataType())).collect(Collectors.toList());
+            schemaCache.put(collection, tableColumns);
+        }
         if (tableColumns.isEmpty()) {
             throw new IllegalArgumentException("Table doesn't exist");
         }
 
-        schemaCache.put(new SchemaTableName(schema, table), tableColumns);
         return tableColumns;
     }
 
 
     @Override
     public List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns) {
-        throw new IllegalStateException();
+        throw new IllegalStateException("S3 adapter does not support changing the schema");
     }
 
     @Override
@@ -119,18 +172,17 @@ public class S3DatabaseHandler
         return new S3Inserter(new SchemaTableName(schema, table));
     }
 
-    public class S3Inserter
-            implements Inserter {
+    public class S3Inserter implements Inserter {
         private final SchemaTableName table;
-        private final DynamicSliceOutput output;
         private final int userColumnIndex;
         private final int timeColumnIndex;
         private final List<ColumnMetadata> columns;
         private final JsonGenerator generator;
+        private final DynamicSliceOutput output;
 
         public S3Inserter(SchemaTableName table) {
+            this.output = new DynamicSliceOutput(10000);
             this.table = table;
-            output = new DynamicSliceOutput(10000);
             this.columns = schemaCache.get(table);
             userColumnIndex = IntStream.range(0, columns.size()).filter(e -> columns.get(e).getName().equals(fieldNameConfig.getUserFieldName())).findAny().getAsInt();
             timeColumnIndex = IntStream.range(0, columns.size()).filter(e -> columns.get(e).getName().equals(fieldNameConfig.getTimeField())).findAny().getAsInt();
@@ -246,11 +298,11 @@ public class S3DatabaseHandler
                     SingleMapBlock object = (SingleMapBlock) mapBlock.getObject(colIdx, Block.class);
                     Type elementType = ((MapType) type).getValueType();
 
-                    for(int i = 0; i < object.getPositionCount(); i+=2) {
+                    for (int i = 0; i < object.getPositionCount(); i += 2) {
                         String fieldName = VARCHAR.getSlice(object, i).toStringUtf8();
                         if (!uniqueKeys.contains(fieldName)) {
                             generator.writeFieldName(fieldName);
-                            writeValue(elementType, generator, object, i+1);
+                            writeValue(elementType, generator, object, i + 1);
                             uniqueKeys.add(fieldName);
                         }
                     }
@@ -258,7 +310,7 @@ public class S3DatabaseHandler
 
                     generator.writeEndObject();
                 } else {
-                    throw new IllegalStateException();
+                    throw new IllegalStateException("Unknown type");
                 }
             }
         }
@@ -272,29 +324,11 @@ public class S3DatabaseHandler
                 throw new RuntimeException(e);
             }
 
-            String fileName = table.getSchemaName() + '/' + table.getTableName() + "|" + UUID.randomUUID().toString() + ".json.gzip";
+            CompletableFuture future = new CompletableFuture();
+            collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> new ConcurrentLinkedQueue())
+                    .add(new CollectionBatch(output, future));
 
-            DynamicSliceOutput singleOut = new DynamicSliceOutput(output.size() / 2);
-            try {
-                GZIPOutputStream out = new GZIPOutputStream(singleOut);
-                out.write((byte[]) output.slice().getBase(), 0, output.size());
-                out.finish();
-                out.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-
-            ObjectMetadata objectMetadata = new ObjectMetadata();
-            objectMetadata.setContentLength(singleOut.size());
-            PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
-                    fileName,
-                    new SafeSliceInputStream(new BasicSliceInput(singleOut.slice())),
-                    objectMetadata);
-
-            return CompletableFuture.runAsync(() -> {
-                tryPutFile(putObjectRequest, 3);
-                output.reset();
-            }, s3ThreadPool);
+            return future;
         }
     }
 
@@ -363,6 +397,17 @@ public class S3DatabaseHandler
         @Override
         public boolean markSupported() {
             return false;
+        }
+    }
+
+    public static class CollectionBatch {
+        public final DynamicSliceOutput buffer;
+        public final CompletableFuture future;
+
+
+        public CollectionBatch(DynamicSliceOutput buffer, CompletableFuture future) {
+            this.buffer = buffer;
+            this.future = future;
         }
     }
 }

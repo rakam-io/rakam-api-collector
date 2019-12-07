@@ -26,7 +26,7 @@ public class AvroPageDatumReader
     private final PageBuilder builder;
     // original data layout
     private final Schema actualSchema;
-    private ResolvingDecoder creatorResolver = null;
+    private ResolvingDecoder creatorResolver;
     private ResolvingDecoder temporaryResolver = null;
     private int temporaryResolverIndex;
 
@@ -38,7 +38,6 @@ public class AvroPageDatumReader
     }
 
     protected final ResolvingDecoder getResolver()
-            throws IOException
     {
         if (temporaryResolver != null) {
             return temporaryResolver;
@@ -82,8 +81,7 @@ public class AvroPageDatumReader
         return null;
     }
 
-    protected void readRecord(ResolvingDecoder in, BinaryDecoder binaryDecoder)
-            throws IOException
+    protected void readRecord(ResolvingDecoder in, BinaryDecoder binaryDecoder) throws IOException
     {
         for (Schema.Field field : in.readFieldOrder()) {
             BlockBuilder blockBuilder = builder.getBlockBuilder(field.pos());
@@ -109,8 +107,7 @@ public class AvroPageDatumReader
         }
     }
 
-    protected void read(Schema schema, ResolvingDecoder in, BlockBuilder blockBuilder)
-            throws IOException
+    protected void read(Schema schema, ResolvingDecoder in, BlockBuilder blockBuilder) throws IOException
     {
         switch (schema.getType()) {
             case UNION:

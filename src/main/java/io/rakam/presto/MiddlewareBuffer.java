@@ -128,8 +128,7 @@ public class MiddlewareBuffer
             this.tableName = tableName;
         }
 
-        public void checkpoint()
-                throws BatchRecords.CheckpointException
+        public void checkpoint() throws BatchRecords.CheckpointException
         {
             batchRecords.checkpoint(tableName);
         }

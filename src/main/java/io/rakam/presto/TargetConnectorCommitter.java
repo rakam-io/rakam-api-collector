@@ -47,17 +47,6 @@ public class TargetConnectorCommitter
         executor = Failsafe.<Void>with(retryPolicy).with(scheduler);
     }
 
-    private CompletableFuture<Void> commit(List<MiddlewareBuffer.TableCheckpoint> batches, SchemaTableName table)
-    {
-        DatabaseHandler.Inserter insert = databaseHandler.insert(table.getSchemaName(), table.getTableName());
-
-        for (MiddlewareBuffer.TableCheckpoint batch : batches) {
-            insert.addPage(batch.getTable().page);
-        }
-
-        return insert.commit();
-    }
-
     public boolean isFull()
     {
         return activeFlushCount.get() / executorPoolSize > IO_OPS_RATE;
@@ -73,9 +62,15 @@ public class TargetConnectorCommitter
         return activeFlushCount.get();
     }
 
-    private CompletableFuture<Void> processInternal(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> value)
+    private CompletableFuture<Void> processInternal(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> batches)
     {
-        return commit(value, table);
+        DatabaseHandler.Inserter insert = databaseHandler.insert(table.getSchemaName(), table.getTableName());
+
+        for (MiddlewareBuffer.TableCheckpoint batch : batches) {
+            insert.addPage(batch.getTable().page);
+        }
+
+        return insert.commit();
     }
 
     public CompletableFuture<Void> process(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> value)

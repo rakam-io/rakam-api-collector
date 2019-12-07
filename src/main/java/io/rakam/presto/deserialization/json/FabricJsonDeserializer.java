@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import static com.facebook.presto.spi.block.PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_BYTES;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
@@ -291,8 +292,9 @@ public class FabricJsonDeserializer
                 }
 
                 pageBuilder = new PageBuilder(pageBuilder.getPositionCount(),
+                        DEFAULT_MAX_PAGE_SIZE_IN_BYTES,
                         newColumns.stream().map(e -> e.getType()).collect(Collectors.toList()),
-                        Optional.ofNullable(blockBuilders), pageBuilder.getPositionCount());
+                        Optional.ofNullable(blockBuilders));
 
                 pageReader.setPageBuilder(pageBuilder);
             }

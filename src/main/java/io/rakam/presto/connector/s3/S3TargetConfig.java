@@ -11,6 +11,7 @@ import com.amazonaws.auth.InstanceProfileCredentialsProvider;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import io.airlift.configuration.Config;
+import io.airlift.units.DataSize;
 
 import javax.validation.constraints.NotNull;
 
@@ -23,6 +24,7 @@ public class S3TargetConfig
     private String s3Bucket;
     private String region;
     private String endpoint;
+    private DataSize maxDataSize = DataSize.succinctDataSize(256, DataSize.Unit.MEGABYTE);
 
     public String getRegion()
     {
@@ -83,6 +85,17 @@ public class S3TargetConfig
     {
         this.endpoint = endpoint;
         return this;
+    }
+
+    @Config("target.aws.s3-max-data-size")
+    public S3TargetConfig setMaxDataSize(DataSize maxDataSize)
+    {
+        this.maxDataSize = maxDataSize;
+        return this;
+    }
+
+    public DataSize getMaxDataSize() {
+        return maxDataSize;
     }
 
     public AWSCredentialsProvider getCredentials()
