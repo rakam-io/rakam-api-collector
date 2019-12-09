@@ -157,13 +157,8 @@ public class S3DatabaseHandler
 
     @Override
     public List<ColumnMetadata> getColumns(String schema, String table) {
-        SchemaTableName collection = new SchemaTableName(schema, table);
-
-        List<ColumnMetadata> tableColumns = null;
-        if (tableColumns == null) {
-            tableColumns = dao.listTableColumns(schema, table).stream()
-                    .map(e -> new ColumnMetadata(e.getColumnName(), e.getDataType())).collect(Collectors.toList());
-        }
+        List<ColumnMetadata> tableColumns = dao.listTableColumns(schema, table).stream()
+                .map(e -> new ColumnMetadata(e.getColumnName(), e.getDataType())).collect(Collectors.toList());
         if (tableColumns.isEmpty()) {
             throw new IllegalArgumentException("Table doesn't exist");
         }
