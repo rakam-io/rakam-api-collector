@@ -109,6 +109,7 @@ public class S3DatabaseHandler
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 long existingBufferSize = mainBuffer.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
+                int fileSize = collectionsBuffer.size();
                 for (Map.Entry<String, Queue<CollectionBatch>> entry : collectionsBuffer.entrySet()) {
                     String project = entry.getKey();
                     Queue<CollectionBatch> batches = entry.getValue();
@@ -149,6 +150,7 @@ public class S3DatabaseHandler
                 }
                 long finalBufferSize = mainBuffer.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
                 memoryTracker.reserveMemory(finalBufferSize - existingBufferSize);
+                log.debug(String.format("%d files are written to S3", fileSize));
             } catch (Exception e) {
                 log.error(e, "Error sending file to S3");
             }

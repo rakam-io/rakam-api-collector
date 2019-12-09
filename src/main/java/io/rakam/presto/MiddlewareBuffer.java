@@ -18,8 +18,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class MiddlewareBuffer
 {
-    private static final Logger log = Logger.get(MiddlewareBuffer.class);
-
     private final Map<SchemaTableName, List<TableCheckpoint>> batches;
     private final MiddlewareConfig config;
     private final MemoryTracker memoryTracker;
