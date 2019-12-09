@@ -93,7 +93,7 @@ public class TestDatabaseHandler
     }
 
     @Override
-    public Inserter insert(String schema, String table)
+    public Inserter insert(String schema, String table, List<ColumnMetadata> columnMetadata)
     {
         boolean[] isDone = new boolean[1];
 

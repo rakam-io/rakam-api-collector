@@ -269,7 +269,7 @@ public class RaptorDatabaseHandler
     @Override
     public List<ColumnMetadata> getColumns(String schema, String table)
     {
-        Map<SchemaTableName, List<ColumnMetadata>> map = listColumns(new SchemaTablePrefix(schema, table), 5);
+        Map<SchemaTableName, List<ColumnMetadata>> map = listColumns(new SchemaTablePrefix(schema, table), 3);
         if (map.isEmpty()) {
             throw new IllegalArgumentException("Table doesn't exist");
         }
@@ -309,7 +309,7 @@ public class RaptorDatabaseHandler
     }
 
     @Override
-    public Inserter insert(String schema, String table)
+    public Inserter insert(String schema, String table, List<ColumnMetadata> columns)
     {
         // 2 Mysql queries
         ConnectorTableHandle tableHandle = metadata.getTableHandle(session, new SchemaTableName(schema, table));

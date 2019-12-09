@@ -4,6 +4,7 @@
 
 package io.rakam.presto;
 
+import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import net.jodah.failsafe.AsyncFailsafe;
@@ -64,7 +65,8 @@ public class TargetConnectorCommitter
 
     private CompletableFuture<Void> processInternal(SchemaTableName table, List<MiddlewareBuffer.TableCheckpoint> batches)
     {
-        DatabaseHandler.Inserter insert = databaseHandler.insert(table.getSchemaName(), table.getTableName());
+        List<ColumnMetadata> lastColumns = batches.get(batches.size() - 1).getTable().metadata;
+        DatabaseHandler.Inserter insert = databaseHandler.insert(table.getSchemaName(), table.getTableName(), lastColumns);
 
         for (MiddlewareBuffer.TableCheckpoint batch : batches) {
             insert.addPage(batch.getTable().page);

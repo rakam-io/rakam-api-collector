@@ -173,17 +173,17 @@ public class S3DatabaseHandler
     }
 
     @Override
-    public Inserter insert(String schema, String table) {
-        return new S3Inserter(new SchemaTableName(schema, table), getColumns(schema, table));
+    public Inserter insert(String schema, String table, List<ColumnMetadata> columns) {
+        return new S3Inserter(new SchemaTableName(schema, table), columns);
     }
 
     public class S3Inserter implements Inserter {
         private final SchemaTableName table;
         private final int userColumnIndex;
         private final int timeColumnIndex;
-        private final List<ColumnMetadata> columns;
         private final DynamicSliceOutput output;
         private final JsonGenerator generator;
+        private final List<ColumnMetadata> columns;
 
         private int findColumnIndex(String fieldName) {
             return IntStream.range(0, columns.size()).filter(e -> columns.get(e).getName().equals(fieldName)).findAny().getAsInt();
