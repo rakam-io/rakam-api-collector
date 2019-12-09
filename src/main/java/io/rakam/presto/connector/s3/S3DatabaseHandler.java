@@ -150,7 +150,7 @@ public class S3DatabaseHandler
                 }
                 long finalBufferSize = mainBuffer.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
                 memoryTracker.reserveMemory(finalBufferSize - existingBufferSize);
-                log.debug(String.format("%d files are written to S3", fileSize));
+                log.info(String.format("%d files are written to S3", fileSize));
             } catch (Exception e) {
                 log.error(e, "Error sending file to S3");
             }
