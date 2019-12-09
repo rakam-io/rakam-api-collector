@@ -35,9 +35,8 @@ public abstract class JsonMessageEventTransformer<T>
 
     @Override
     public synchronized Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
-            throws IOException
     {
-        Map<SchemaTableName, PageReader> builderMap = new HashMap<>();
+        Map<SchemaTableName, PageReader> builder = new HashMap<>();
         for (T record : records) {
             SchemaTableName collection;
             try {
@@ -49,7 +48,7 @@ public abstract class JsonMessageEventTransformer<T>
             }
 
             try {
-                PageReader pageBuilder = getReader(builderMap, collection);
+                PageReader pageBuilder = getReader(builder, collection);
                 if (pageBuilder == null) {
                     continue;
                 }
@@ -61,11 +60,7 @@ public abstract class JsonMessageEventTransformer<T>
             }
         }
 
-        ImmutableMap.Builder<SchemaTableName, TableData> builder = ImmutableMap.builder();
-        for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
-            builder.put(entry.getKey(), new TableData(entry.getValue().buildPage(), entry.getValue().getActualSchema()));
-        }
-        return builder.build();
+        return buildTable(builder);
     }
 
     @Override

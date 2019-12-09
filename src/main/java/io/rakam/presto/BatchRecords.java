@@ -68,8 +68,7 @@ public class BatchRecords
 
     public interface Checkpointer
     {
-        void checkpoint()
-                throws CheckpointException;
+        void checkpoint() throws CheckpointException;
     }
 
     public static class CheckpointException

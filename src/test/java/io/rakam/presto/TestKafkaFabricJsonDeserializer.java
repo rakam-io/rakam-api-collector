@@ -83,9 +83,7 @@ public class TestKafkaFabricJsonDeserializer
                 BlockAssertions.createStringsBlock("1"));
     }
 
-    @SuppressWarnings("Duplicates")
     public List<ConsumerRecord<byte[], byte[]>> getRecordsForEvents(String project, String collection, Optional<int[]> columnIdx)
-            throws IOException
     {
         ImmutableList.Builder<ConsumerRecord<byte[], byte[]>> builder = ImmutableList.builder();
         for (Map<String, Object> event : EVENTS) {

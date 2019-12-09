@@ -7,19 +7,15 @@ package io.rakam.presto.kinesis;
 import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClient;
-import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.kinesis.AmazonKinesis;
-import com.amazonaws.services.kinesis.AmazonKinesisAsyncClient;
 import com.amazonaws.services.kinesis.AmazonKinesisClient;
-import com.amazonaws.services.kinesis.AmazonKinesisClientBuilder;
 import com.amazonaws.services.kinesis.clientlibrary.interfaces.IRecordProcessorFactory;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.InitialPositionInStream;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.KinesisClientLibConfiguration;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.Worker;
-import com.amazonaws.services.kinesis.model.DescribeStreamResult;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -27,7 +23,6 @@ import javax.inject.Inject;
 import java.rmi.dgc.VMID;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
 
 import static com.amazonaws.services.kinesis.metrics.interfaces.MetricsLevel.NONE;
 import static com.amazonaws.services.kinesis.metrics.interfaces.MetricsLevel.SUMMARY;
@@ -57,7 +52,7 @@ public class KinesisWorkerManager {
         AmazonCloudWatch cwClient;
         AmazonKinesis kinesis;
         AmazonDynamoDB dynamodb;
-        if(this.config.getAccessKey() == null) {
+        if (this.config.getAccessKey() == null) {
             cwClient = AmazonCloudWatchClient.builder().withCredentials(config.getCloudWatchCredentialsProvider())
                     .withClientConfiguration(config.getCloudWatchClientConfiguration()).build();
             kinesis = AmazonKinesisClient.builder()

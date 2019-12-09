@@ -58,7 +58,7 @@ public abstract class AvroMessageEventTransformer<T>
     public synchronized Map<SchemaTableName, TableData> createPageTable(Iterable<T> records, Iterable<T> bulkRecords)
             throws IOException
     {
-        Map<SchemaTableName, PageReader> builderMap = new HashMap<>();
+        Map<SchemaTableName, PageReader> builder = new HashMap<>();
 
         for (T record : records) {
             if (!duplicateHandler.isUnique(record)) {
@@ -70,7 +70,7 @@ public abstract class AvroMessageEventTransformer<T>
 
             SchemaTableName collection = extractCollection(record, decoder);
 
-            PageReader pageBuilder = getReader(builderMap, collection);
+            PageReader pageBuilder = getReader(builder, collection);
             if (pageBuilder == null) {
                 continue;
             }
@@ -103,7 +103,7 @@ public abstract class AvroMessageEventTransformer<T>
 
                     while (!decoder.isEnd()) {
                         String collection = decoder.readString();
-                        PageReader pageBuilder = getReader(builderMap, new SchemaTableName(project, collection));
+                        PageReader pageBuilder = getReader(builder, new SchemaTableName(project, collection));
                         if (pageBuilder == null) {
                             continue;
                         }
@@ -136,12 +136,7 @@ public abstract class AvroMessageEventTransformer<T>
             }
         }
 
-        ImmutableMap.Builder<SchemaTableName, TableData> builder = ImmutableMap.builder();
-        for (Map.Entry<SchemaTableName, PageReader> entry : builderMap.entrySet()) {
-            builder.put(entry.getKey(), new TableData(entry.getValue().buildPage(), entry.getValue().getActualSchema()));
-        }
-
-        return builder.build();
+        return buildTable(builder);
     }
 
     @Override
