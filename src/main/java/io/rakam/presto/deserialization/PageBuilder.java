@@ -68,6 +68,7 @@ public class PageBuilder
         blockBuilders = new BlockBuilder[types.size()];
 
         if (templateBlockBuilders.isPresent()) {
+            this.declaredPositions = initialExpectedEntries;
             BlockBuilder[] templates = templateBlockBuilders.get();
             checkArgument(templates.length == types.size(), "Size of templates and types should match");
             for (int i = 0; i < blockBuilders.length; i++) {
