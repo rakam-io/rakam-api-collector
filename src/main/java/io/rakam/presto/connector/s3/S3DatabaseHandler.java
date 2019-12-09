@@ -118,7 +118,7 @@ public class S3DatabaseHandler
 
                     DynamicSliceOutput buffer = mainBuffer.computeIfAbsent(project, p -> new DynamicSliceOutput(100000));
 
-                    String fileName = String.format("%s/%s.json.gzip", project, UUID.randomUUID().toString());
+                    String fileName = String.format("%s/%s.ndjson.gzip", project, UUID.randomUUID().toString());
 
                     ArrayList<CompletableFuture> futures = new ArrayList();
                     long maxDataSizeInBytes = config.getMaxDataSize().toBytes();
