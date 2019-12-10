@@ -128,6 +128,7 @@ public class KinesisRecordProcessor
                     log.info("Checkpoint executed for %d records", pages.values().stream().mapToLong(e -> e.page.getPositionCount()).sum());
                 }
                 catch (InvalidStateException | ShutdownException e) {
+                    log.error(e);
                     throw new RuntimeException(e);
                 }
             }));
