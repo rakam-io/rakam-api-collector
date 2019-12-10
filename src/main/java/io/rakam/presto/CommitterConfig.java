@@ -10,7 +10,7 @@ import java.io.File;
 
 public class CommitterConfig
 {
-    private int committerThreadCount = Runtime.getRuntime().availableProcessors() * 2;
+    private int committerThreadCount = Runtime.getRuntime().availableProcessors();
     private File duplicateHandlerRocksdbDirectory;
 
     public int getCommitterThreadCount()

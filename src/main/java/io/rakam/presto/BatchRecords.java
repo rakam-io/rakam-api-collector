@@ -71,8 +71,7 @@ public class BatchRecords
         void checkpoint() throws CheckpointException;
     }
 
-    public static class CheckpointException
-            extends Exception {
+    public static class CheckpointException extends Exception {
         public CheckpointException(Throwable cause) {
             super("Error while performing checkpoint operation.", cause);
         }

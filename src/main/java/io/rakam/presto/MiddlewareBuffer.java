@@ -5,7 +5,6 @@
 package io.rakam.presto;
 
 import com.facebook.presto.spi.SchemaTableName;
-import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.rakam.presto.deserialization.TableData;
 

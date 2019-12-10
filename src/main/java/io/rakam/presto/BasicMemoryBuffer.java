@@ -28,8 +28,6 @@ public class BasicMemoryBuffer<T>
         bulkBuffer = new ArrayList<>(1000);
         maxBytes = (long) (memoryTracker.getAvailableHeapSize() * config.getMaxFlushTotalMemoryRatio());
         totalBytes = 0;
-        // the basic memory buffer reserve the buffer memory for itself
-        memoryTracker.reserveMemory(maxBytes);
         this.memoryTracker = memoryTracker;
     }
 
@@ -75,7 +73,6 @@ public class BasicMemoryBuffer<T>
 
     public void shutdown() {
         clear();
-        memoryTracker.freeMemory(maxBytes);
     }
 
     public boolean shouldFlush()
