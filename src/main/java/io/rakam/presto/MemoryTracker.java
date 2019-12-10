@@ -59,7 +59,7 @@ public class MemoryTracker
 
     public static class MemoryConfig
     {
-        private double heapRatio = .7;
+        private double heapRatio = .6;
 
         @Max(1)
         public double getHeapRatio()

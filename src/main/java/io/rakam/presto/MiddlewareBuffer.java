@@ -35,6 +35,7 @@ public class MiddlewareBuffer
     {
         long now = System.currentTimeMillis();
 
+        long totalAllocate = 0;
         for (Map.Entry<SchemaTableName, TableData> entry : records.getTable().entrySet()) {
             SchemaTableName tableName = entry.getKey();
             batches.computeIfAbsent(tableName, (e) ->
@@ -45,9 +46,11 @@ public class MiddlewareBuffer
             bufferSize.computeIfAbsent(tableName, (e) -> new Counter())
                     .increment(entry.getValue().page.getRetainedSizeInBytes());
 
-            memoryTracker.reserveMemory(entry.getValue().page.getRetainedSizeInBytes());
+            totalAllocate += entry.getValue().page.getRetainedSizeInBytes();
             bufferLastFlushed.putIfAbsent(tableName, now);
         }
+
+        memoryTracker.reserveMemory(totalAllocate);
     }
 
     public DataSize calculateSize()

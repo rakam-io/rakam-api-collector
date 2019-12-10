@@ -78,7 +78,6 @@ public class S3DatabaseHandler
     private final MemoryTracker memoryTracker;
 
     private Map<String, Queue<CollectionBatch>> collectionsBuffer;
-    // TODO: clean the buffer periodically
     private final DynamicSliceOutput gzipBuffer;
 
     @Inject
@@ -103,6 +102,7 @@ public class S3DatabaseHandler
         dbi.registerMapper(new MetadataDao.TableColumn.Mapper(typeManager));
         this.dao = onDemandDao(dbi, MetadataDao.class);
         this.s3Client = builder.build();
+        memoryTracker.reserveMemory(gzipBuffer.getRetainedSize());
     }
 
     @PostConstruct
@@ -295,34 +295,6 @@ public class S3DatabaseHandler
             Queue<CollectionBatch> batches = collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> new ConcurrentLinkedQueue());
             batches.add(new CollectionBatch(this.output, future));
             return future;
-//            return CompletableFuture.supplyAsync(new Supplier() {
-//                @Override
-//                public Object get() {
-//                    try {
-//                        DynamicSliceOutput gzipOutput = new DynamicSliceOutput(output.size() / 10);
-//                        GZIPOutputStream out = new GZIPOutputStream(gzipOutput);
-//
-//                        out.write((byte[]) output.slice().getBase(), 0, output.size());
-//                        out.finish();
-//                        out.close();
-//
-//                        String fileName = String.format("%s/%s.ndjson.gzip", table.getSchemaName(), UUID.randomUUID().toString());
-//
-//                        ObjectMetadata objectMetadata = new ObjectMetadata();
-//                        objectMetadata.setContentLength(gzipOutput.size());
-//                        PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
-//                                fileName,
-//                                new SafeSliceInputStream(new BasicSliceInput(gzipOutput.slice())),
-//                                objectMetadata);
-//
-//                        tryPutFile(putObjectRequest, 5);
-//                        return null;
-//                    } catch (IOException e) {
-//                        log.error(e);
-//                        throw new RuntimeException(e);
-//                    }
-//                }
-//            });
         }
     }
 
@@ -415,6 +387,7 @@ public class S3DatabaseHandler
                     long startedAt = System.currentTimeMillis();
                     long totalDataSizeWritten = 0;
                     long totalFileWritten = 0;
+                    long gzipBufferSize = gzipBuffer.getRetainedSize();
 
                     Iterator<Map.Entry<String, Queue<CollectionBatch>>> it = collectionsBuffer.entrySet().iterator();
                     while (it.hasNext()) {
@@ -461,6 +434,10 @@ public class S3DatabaseHandler
                     }
 
                     if (totalFileWritten > 0) {
+                        long newGzipSize = gzipBuffer.getRetainedSize();
+                        if(newGzipSize != gzipBufferSize) {
+                            memoryTracker.reserveMemory(newGzipSize - gzipBufferSize);
+                        }
                         log.info(String.format("%d files (%s) written to S3 in %s",
                                 totalFileWritten,
                                 DataSize.succinctBytes(totalDataSizeWritten).toString(),
