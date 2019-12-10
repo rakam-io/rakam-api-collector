@@ -466,8 +466,7 @@ public class S3DatabaseHandler
                                 DataSize.succinctBytes(totalDataSizeWritten).toString(),
                                 Duration.succinctDuration(System.currentTimeMillis() - startedAt, TimeUnit.MILLISECONDS).toString()));
                     } else {
-                        log.info("The queue is empty, sleeping..");
-                        Thread.sleep(5000);
+                        Thread.sleep(3000);
                     }
                 } catch (Throwable e) {
                     log.error(e, "Error sending file to S3");
