@@ -285,11 +285,8 @@ public class S3DatabaseHandler
                 throw new RuntimeException(e);
             }
 
-            collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> {
-                ConcurrentLinkedQueue queue = new ConcurrentLinkedQueue();
-                queue.add(new CollectionBatch(output, future));
-                return queue;
-            });
+            Queue<CollectionBatch> batches = collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> new ConcurrentLinkedQueue());
+            batches.add(new CollectionBatch(output, future));
 
             return future;
         }
