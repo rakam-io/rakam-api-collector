@@ -65,7 +65,7 @@ public class MiddlewareBuffer
         return (timeLapseMillisecond >= config.getMaxFlushDuration().toMillis());
     }
 
-    public Map<SchemaTableName, List<TableCheckpoint>> getRecordsToBeFlushed(int maximum)
+    public Map<SchemaTableName, List<TableCheckpoint>> getRecordsToBeFlushed()
     {
         long now = System.currentTimeMillis();
         long memoryNeedsToBeAvailable = (long) (memoryTracker.getAvailableHeapSize() * .5);
@@ -96,10 +96,6 @@ public class MiddlewareBuffer
                 bufferRecordCount.remove(tableName);
                 bufferSize.remove(tableName);
                 availableMemory += next.getValue().value;
-
-                if (map.size() > maximum) {
-                    break;
-                }
             }
         }
         return map;

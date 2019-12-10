@@ -134,10 +134,9 @@ public class KinesisRecordProcessor
         }
 
         if (!committer.isFull()) {
-            Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed(committer.availableSlots());
+            Map<SchemaTableName, List<TableCheckpoint>> map = middlewareBuffer.getRecordsToBeFlushed();
             if (!map.isEmpty()) {
                 for (Map.Entry<SchemaTableName, List<TableCheckpoint>> entry : map.entrySet()) {
-
                     long now = System.currentTimeMillis();
                     SchemaTableName table = entry.getKey();
                     List<TableCheckpoint> records = entry.getValue();

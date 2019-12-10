@@ -14,10 +14,7 @@ import net.jodah.failsafe.RetryPolicy;
 import javax.inject.Inject;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class TargetConnectorCommitter
@@ -42,7 +39,7 @@ public class TargetConnectorCommitter
                 .withMaxRetries(3);
 
         executorPoolSize = committerConfig.getCommitterThreadCount();
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(executorPoolSize,
+        ScheduledExecutorService scheduler = new ScheduledThreadPoolExecutor(executorPoolSize,
                 new ThreadFactoryBuilder().setNameFormat("target-committer").build());
 
         executor = Failsafe.<Void>with(retryPolicy).with(scheduler);
@@ -51,12 +48,6 @@ public class TargetConnectorCommitter
     public boolean isFull()
     {
         return activeFlushCount.get() / executorPoolSize > IO_OPS_RATE;
-    }
-
-    public int availableSlots()
-    {
-        return 100000;
-//        return (executorPoolSize * IO_OPS_RATE) - activeFlushCount.get();
     }
 
     public int getActiveFlushCount()
