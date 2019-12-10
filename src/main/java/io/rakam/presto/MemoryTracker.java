@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class MemoryTracker
 {
-    public static final long HEAP_MAX_SIZE = (Runtime.getRuntime().maxMemory() - Runtime.getRuntime().totalMemory());
+    public static final long HEAP_MAX_SIZE = Runtime.getRuntime().freeMemory();
     private final double availableRatio;
     private final long availableHeapSize;
 

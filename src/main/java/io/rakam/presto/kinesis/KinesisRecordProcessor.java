@@ -102,7 +102,7 @@ public class KinesisRecordProcessor
             flushDataSafe(checkpointer);
         }
 
-        while (memoryTracker.availableMemoryInPercentage() < .3) {
+        while (memoryTracker.availableMemoryInPercentage() < .2) {
             try {
                 log.info("Not enough memory (%s) to process records, sleeping for 3s..",
                         memoryTracker.availableMemoryInPercentage());
