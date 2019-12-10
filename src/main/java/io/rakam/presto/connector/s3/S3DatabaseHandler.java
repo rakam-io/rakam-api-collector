@@ -105,7 +105,7 @@ public class S3DatabaseHandler
 
     @PostConstruct
     public void schedule() {
-        writerThread.run();
+        writerThread.start();
     }
 
     @Override
