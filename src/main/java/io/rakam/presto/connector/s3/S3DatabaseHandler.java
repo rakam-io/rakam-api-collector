@@ -106,7 +106,7 @@ public class S3DatabaseHandler
 
     @PostConstruct
     public void schedule() {
-        scheduler.scheduleAtFixedRate(() -> {
+        scheduler.scheduleWithFixedDelay(() -> {
             try {
                 long existingBufferSize = mainBuffer.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
                 int fileSize = collectionsBuffer.size();
@@ -150,11 +150,11 @@ public class S3DatabaseHandler
                 }
                 long finalBufferSize = mainBuffer.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
                 memoryTracker.reserveMemory(finalBufferSize - existingBufferSize);
-                log.info(String.format("%d files are written to S3", fileSize));
+                log.info(String.format("%d written to S3", fileSize));
             } catch (Exception e) {
                 log.error(e, "Error sending file to S3");
             }
-        }, 1, 1, TimeUnit.MINUTES);
+        }, 1, 1, TimeUnit.SECONDS);
     }
 
     @Override
