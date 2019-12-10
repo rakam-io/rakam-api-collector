@@ -406,7 +406,7 @@ public class S3DatabaseHandler
 
                         GZIPOutputStream out = new GZIPOutputStream(gzipBuffer);
 
-                        while (!batches.isEmpty() && gzipBuffer.getRetainedSize() < maxDataSizeInBytes) {
+                        while (!batches.isEmpty() && gzipBuffer.size() < maxDataSizeInBytes) {
                             CollectionBatch collectionBatch = batches.poll();
                             out.write((byte[]) collectionBatch.buffer.slice().getBase(), 0, collectionBatch.buffer.size());
                             futures.add(collectionBatch.future);
