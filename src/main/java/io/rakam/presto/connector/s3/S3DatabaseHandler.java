@@ -29,6 +29,7 @@ import io.airlift.units.Duration;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.MemoryTracker;
+import io.rakam.presto.MiddlewareConfig;
 import io.rakam.presto.connector.MetadataDao;
 import org.rakam.analysis.JDBCPoolDataSource;
 import org.rakam.util.JsonHelper;
@@ -76,16 +77,18 @@ public class S3DatabaseHandler
     private final FieldNameConfig fieldNameConfig;
     private final MetadataDao dao;
     private final MemoryTracker memoryTracker;
+    private final MiddlewareConfig middlewareConfig;
 
     private Map<String, Queue<CollectionBatch>> collectionsBuffer;
     private final DynamicSliceOutput gzipBuffer;
 
     @Inject
-    public S3DatabaseHandler(S3TargetConfig config, MemoryTracker memoryTracker, @Named("metadata.store.jdbc") JDBCPoolDataSource prestoMetastoreDataSource, TypeManager typeManager, FieldNameConfig fieldNameConfig) {
+    public S3DatabaseHandler(S3TargetConfig config, MiddlewareConfig middlewareConfig, MemoryTracker memoryTracker, @Named("metadata.store.jdbc") JDBCPoolDataSource prestoMetastoreDataSource, TypeManager typeManager, FieldNameConfig fieldNameConfig) {
         writerThread = new S3WriterThread();
         collectionsBuffer = new ConcurrentHashMap<>();
         gzipBuffer = new DynamicSliceOutput(10000);
         this.memoryTracker = memoryTracker;
+        this.middlewareConfig = middlewareConfig;
         this.config = config;
         this.fieldNameConfig = fieldNameConfig;
         AmazonS3ClientBuilder builder = AmazonS3Client.builder().withCredentials(config.getCredentials());
@@ -293,7 +296,7 @@ public class S3DatabaseHandler
             }
 
             Queue<CollectionBatch> batches = collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> new ConcurrentLinkedQueue());
-            batches.add(new CollectionBatch(this.output, future));
+            batches.add(new CollectionBatch(this.output, future, System.currentTimeMillis()));
             return future;
         }
     }
@@ -368,11 +371,13 @@ public class S3DatabaseHandler
     public static class CollectionBatch {
         public final DynamicSliceOutput buffer;
         public final CompletableFuture future;
+        public final long timestamp;
 
 
-        public CollectionBatch(DynamicSliceOutput buffer, CompletableFuture future) {
+        public CollectionBatch(DynamicSliceOutput buffer, CompletableFuture future, long timestamp) {
             this.buffer = buffer;
             this.future = future;
+            this.timestamp = timestamp;
         }
     }
 
@@ -392,13 +397,13 @@ public class S3DatabaseHandler
                     Iterator<Map.Entry<String, Queue<CollectionBatch>>> it = collectionsBuffer.entrySet().iterator();
                     while (it.hasNext()) {
                         Map.Entry<String, Queue<CollectionBatch>> entry = it.next();
-                        String project = entry.getKey();
-                        Queue<CollectionBatch> batches = entry.getValue();
 
-                        if (batches.isEmpty()) {
+                        if (!shouldFlush(entry)) {
                             continue;
                         }
 
+                        String project = entry.getKey();
+                        Queue<CollectionBatch> batches = entry.getValue();
                         String fileName = String.format("%s/%s.ndjson.gzip", project, UUID.randomUUID().toString());
 
                         ArrayList<CompletableFuture> futures = new ArrayList();
@@ -451,6 +456,29 @@ public class S3DatabaseHandler
                     log.error(e, "Error sending file to S3");
                 }
             }
+        }
+
+        private boolean shouldFlush(Map.Entry<String, Queue<CollectionBatch>> projectQueuePair) {
+            Queue<CollectionBatch> queue = projectQueuePair.getValue();
+
+            if(queue.isEmpty()) {
+                return false;
+            }
+
+            CollectionBatch batch = queue.peek();
+            long timestamp = batch.timestamp;
+            long lastExpireTime = System.currentTimeMillis() - (middlewareConfig.getMaxFlushDuration().toMillis() * 2);
+            if(timestamp < lastExpireTime) {
+                return true;
+            }
+
+            long sizeInBytes = 0;
+            while(batch != null) {
+                sizeInBytes += batch.buffer.size();
+                batch = queue.peek();
+            }
+
+            return sizeInBytes > config.getMaxDataSize().toBytes() / 10;
         }
     }
 

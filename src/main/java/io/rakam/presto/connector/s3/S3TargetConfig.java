@@ -12,8 +12,11 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import io.airlift.configuration.Config;
 import io.airlift.units.DataSize;
+import io.airlift.units.Duration;
 
 import javax.validation.constraints.NotNull;
+
+import java.util.concurrent.TimeUnit;
 
 import static com.amazonaws.regions.Regions.DEFAULT_REGION;
 
