@@ -51,6 +51,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.zip.GZIPOutputStream;
@@ -428,7 +429,7 @@ public class S3DatabaseHandler
                         tryPutFile(putObjectRequest, 5);
 
                         for (CompletableFuture future : futures) {
-                            future.complete(null);
+                            future.complete(NULLS.get());
                         }
                         totalDataSizeWritten += buffer.size();
                         totalFileWritten += 1;
@@ -453,4 +454,6 @@ public class S3DatabaseHandler
             }
         }
     }
+
+    private static final Supplier<Void> NULLS = () -> null;
 }
