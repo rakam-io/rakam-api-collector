@@ -34,8 +34,6 @@ import org.rakam.analysis.JDBCPoolDataSource;
 import org.rakam.util.JsonHelper;
 import org.skife.jdbi.v2.DBI;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import java.io.DataOutput;
 import java.io.IOException;
@@ -49,7 +47,6 @@ import java.time.format.FormatStyle;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -80,6 +77,7 @@ public class S3DatabaseHandler
     private Map<String, Queue<CollectionBatch>> collectionsBuffer;
     // TODO: clean the buffer periodically
     private final Map<String, DynamicSliceOutput> projectBuffers;
+    private final DynamicSliceOutput gzipBuffer;
 
     @Inject
     public S3DatabaseHandler(S3TargetConfig config, MemoryTracker memoryTracker, @Named("metadata.store.jdbc") JDBCPoolDataSource prestoMetastoreDataSource, TypeManager typeManager, FieldNameConfig fieldNameConfig) {
@@ -299,15 +297,26 @@ public class S3DatabaseHandler
             return CompletableFuture.supplyAsync(new Supplier() {
                 @Override
                 public Object get() {
-                    ObjectMetadata objectMetadata = new ObjectMetadata();
-                    objectMetadata.setContentLength(output.size());
-                    PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
-                            null,
-                            new SafeSliceInputStream(new BasicSliceInput(output.slice())),
-                            objectMetadata);
+                    try {
+                        DynamicSliceOutput gzipOutput = new DynamicSliceOutput(output.size() / 10);
+                        GZIPOutputStream out = new GZIPOutputStream(gzipOutput);
 
-                    tryPutFile(putObjectRequest, 5);
-                    return null;
+                        out.write((byte[]) output.slice().getBase(), 0, output.size());
+                        out.finish();
+                        out.close();
+
+                        ObjectMetadata objectMetadata = new ObjectMetadata();
+                        objectMetadata.setContentLength(output.size());
+                        PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
+                                null,
+                                new SafeSliceInputStream(new BasicSliceInput(output.slice())),
+                                objectMetadata);
+
+                        tryPutFile(putObjectRequest, 5);
+                        return null;
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
             });
         }
@@ -401,7 +410,6 @@ public class S3DatabaseHandler
             while (!isInterrupted()) {
                 try {
                     long startedAt = System.currentTimeMillis();
-                    long existingBufferSize = projectBuffers.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
                     long totalDataSizeWritten = 0;
                     long totalFileWritten = 0;
 
@@ -453,7 +461,7 @@ public class S3DatabaseHandler
 
                     long finalBufferSize = projectBuffers.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
                     memoryTracker.reserveMemory(finalBufferSize - existingBufferSize);
-                    if(totalFileWritten > 0) {
+                    if (totalFileWritten > 0) {
                         log.info(String.format("%d files (%s) written to S3 in %s",
                                 totalFileWritten,
                                 DataSize.succinctBytes(totalDataSizeWritten).toString(),
