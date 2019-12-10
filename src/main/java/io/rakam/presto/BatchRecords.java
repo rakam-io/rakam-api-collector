@@ -45,7 +45,7 @@ public class BatchRecords
             throws CheckpointException
     {
         committed.add(tableName);
-        if (committed.size() == table.size()) {
+        if (committed.size() >= table.size()) {
             if (historicalDataHandler.isDone()) {
                 checkpointer.checkpoint();
             }
