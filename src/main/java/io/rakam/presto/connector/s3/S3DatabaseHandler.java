@@ -20,7 +20,6 @@ import com.facebook.presto.spi.block.SingleMapBlock;
 import com.facebook.presto.spi.type.*;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.name.Named;
 import io.airlift.log.Logger;
 import io.airlift.slice.BasicSliceInput;
@@ -47,7 +46,10 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.zip.GZIPOutputStream;
@@ -66,7 +68,7 @@ public class S3DatabaseHandler
     private static final Logger log = Logger.get(S3DatabaseHandler.class);
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withLocale(Locale.ENGLISH).withZone(ZoneOffset.UTC);
 
-    private final ScheduledExecutorService scheduler;
+    private final S3WriterThread writerThread;
     private final AmazonS3 s3Client;
     private final S3TargetConfig config;
     private final FieldNameConfig fieldNameConfig;
@@ -75,18 +77,13 @@ public class S3DatabaseHandler
 
     private Map<String, Queue<CollectionBatch>> collectionsBuffer;
     // TODO: clean the buffer periodically
-    private final Map<String, DynamicSliceOutput> mainBuffer;
+    private final Map<String, DynamicSliceOutput> projectBuffers;
 
     @Inject
     public S3DatabaseHandler(S3TargetConfig config, MemoryTracker memoryTracker, @Named("metadata.store.jdbc") JDBCPoolDataSource prestoMetastoreDataSource, TypeManager typeManager, FieldNameConfig fieldNameConfig) {
-        scheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder().setNameFormat("s3-writer").setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
-            @Override
-            public void uncaughtException(Thread t, Throwable e) {
-                log.error(e, "S3 uploader thread is halted");
-            }
-        }).build());
+        writerThread = new S3WriterThread();
         collectionsBuffer = new ConcurrentHashMap<>();
-        mainBuffer = new ConcurrentHashMap();
+        projectBuffers = new ConcurrentHashMap();
         this.memoryTracker = memoryTracker;
         this.config = config;
         this.fieldNameConfig = fieldNameConfig;
@@ -108,65 +105,7 @@ public class S3DatabaseHandler
 
     @PostConstruct
     public void schedule() {
-        scheduler.scheduleWithFixedDelay(() -> {
-            try {
-                if(collectionsBuffer.isEmpty()) {
-                    return;
-                }
-
-                long startedAt = System.currentTimeMillis();
-                long existingBufferSize = mainBuffer.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
-                int projectCount = collectionsBuffer.size();
-                long totalSize = 0;
-                for (Map.Entry<String, Queue<CollectionBatch>> entry : collectionsBuffer.entrySet()) {
-                    String project = entry.getKey();
-                    Queue<CollectionBatch> batches = entry.getValue();
-                    if (batches.isEmpty()) {
-                        continue;
-                    }
-
-                    DynamicSliceOutput buffer = mainBuffer.computeIfAbsent(project, p -> new DynamicSliceOutput(100000));
-
-                    String fileName = String.format("%s/%s.ndjson.gzip", project, UUID.randomUUID().toString());
-
-                    ArrayList<CompletableFuture> futures = new ArrayList();
-                    long maxDataSizeInBytes = config.getMaxDataSize().toBytes();
-
-                    GZIPOutputStream out = new GZIPOutputStream(buffer);
-
-                    while (!batches.isEmpty() && buffer.getRetainedSize() < maxDataSizeInBytes) {
-                        CollectionBatch collectionBatch = batches.poll();
-                        out.write((byte[]) collectionBatch.buffer.slice().getBase(), 0, collectionBatch.buffer.size());
-                        futures.add(collectionBatch.future);
-                    }
-
-                    out.finish();
-                    out.close();
-
-                    ObjectMetadata objectMetadata = new ObjectMetadata();
-                    objectMetadata.setContentLength(buffer.size());
-                    PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
-                            fileName,
-                            new SafeSliceInputStream(new BasicSliceInput(buffer.slice())),
-                            objectMetadata);
-
-                    tryPutFile(putObjectRequest, 5);
-
-                    futures.forEach(future -> future.complete(null));
-                    totalSize += buffer.size();
-
-                    buffer.reset();
-                }
-                long finalBufferSize = mainBuffer.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
-                memoryTracker.reserveMemory(finalBufferSize - existingBufferSize);
-                log.info(String.format("%d files (%s) written to S3 in %s",
-                        projectCount,
-                        DataSize.succinctBytes(totalSize).toString(),
-                        Duration.succinctDuration(System.currentTimeMillis() - startedAt, TimeUnit.MILLISECONDS).toString()));
-            } catch (Exception e) {
-                log.error(e, "Error sending file to S3");
-            }
-        }, 1, 1, TimeUnit.SECONDS);
+        writerThread.run();
     }
 
     @Override
@@ -345,8 +284,12 @@ public class S3DatabaseHandler
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> new ConcurrentLinkedQueue())
-                    .add(new CollectionBatch(output, future));
+
+            collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> {
+                ConcurrentLinkedQueue queue = new ConcurrentLinkedQueue();
+                queue.add(new CollectionBatch(output, future));
+                return queue;
+            });
 
             return future;
         }
@@ -428,6 +371,79 @@ public class S3DatabaseHandler
         public CollectionBatch(DynamicSliceOutput buffer, CompletableFuture future) {
             this.buffer = buffer;
             this.future = future;
+        }
+    }
+
+    public class S3WriterThread extends Thread {
+        public S3WriterThread() {
+            super("s3-writer");
+        }
+
+        public void run() {
+            while (!isInterrupted()) {
+                try {
+                    long startedAt = System.currentTimeMillis();
+                    long existingBufferSize = projectBuffers.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
+                    long totalDataSizeWritten = 0;
+                    long totalFileWritten = 0;
+                    Iterator<Map.Entry<String, Queue<CollectionBatch>>> it = collectionsBuffer.entrySet().iterator();
+                    while (it.hasNext()) {
+                        Map.Entry<String, Queue<CollectionBatch>> entry = it.next();
+                        String project = entry.getKey();
+                        Queue<CollectionBatch> batches = entry.getValue();
+
+                        if (batches.isEmpty()) {
+                            continue;
+                        }
+
+                        DynamicSliceOutput buffer = projectBuffers.computeIfAbsent(project, p -> new DynamicSliceOutput(100000));
+
+                        String fileName = String.format("%s/%s.ndjson.gzip", project, UUID.randomUUID().toString());
+
+                        ArrayList<CompletableFuture> futures = new ArrayList();
+                        long maxDataSizeInBytes = config.getMaxDataSize().toBytes();
+
+                        GZIPOutputStream out = new GZIPOutputStream(buffer);
+
+                        while (!batches.isEmpty() && buffer.getRetainedSize() < maxDataSizeInBytes) {
+                            CollectionBatch collectionBatch = batches.poll();
+                            out.write((byte[]) collectionBatch.buffer.slice().getBase(), 0, collectionBatch.buffer.size());
+                            futures.add(collectionBatch.future);
+                        }
+
+                        out.finish();
+                        out.close();
+
+                        ObjectMetadata objectMetadata = new ObjectMetadata();
+                        objectMetadata.setContentLength(buffer.size());
+                        PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
+                                fileName,
+                                new SafeSliceInputStream(new BasicSliceInput(buffer.slice())),
+                                objectMetadata);
+
+                        tryPutFile(putObjectRequest, 5);
+
+                        futures.forEach(future -> future.complete(null));
+                        totalDataSizeWritten += buffer.size();
+                        totalFileWritten += 1;
+
+                        buffer.reset();
+                    }
+                    long finalBufferSize = projectBuffers.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
+                    memoryTracker.reserveMemory(finalBufferSize - existingBufferSize);
+                    if(totalFileWritten > 0) {
+                        log.info(String.format("%d files (%s) written to S3 in %s",
+                                totalFileWritten,
+                                DataSize.succinctBytes(totalDataSizeWritten).toString(),
+                                Duration.succinctDuration(System.currentTimeMillis() - startedAt, TimeUnit.MILLISECONDS).toString()));
+                    } else {
+                        log.info("The queue is empty, sleeping..");
+                        Thread.sleep(5000);
+                    }
+                } catch (Throwable e) {
+                    log.error(e, "Error sending file to S3");
+                }
+            }
         }
     }
 }
