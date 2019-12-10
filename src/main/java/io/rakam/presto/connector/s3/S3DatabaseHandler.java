@@ -25,6 +25,7 @@ import com.google.inject.name.Named;
 import io.airlift.log.Logger;
 import io.airlift.slice.BasicSliceInput;
 import io.airlift.slice.DynamicSliceOutput;
+import io.airlift.units.DataSize;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.MemoryTracker;
@@ -109,7 +110,8 @@ public class S3DatabaseHandler
         scheduler.scheduleWithFixedDelay(() -> {
             try {
                 long existingBufferSize = mainBuffer.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
-                int fileSize = collectionsBuffer.size();
+                int projectCount = collectionsBuffer.size();
+                long totalSize = 0;
                 for (Map.Entry<String, Queue<CollectionBatch>> entry : collectionsBuffer.entrySet()) {
                     String project = entry.getKey();
                     Queue<CollectionBatch> batches = entry.getValue();
@@ -145,12 +147,13 @@ public class S3DatabaseHandler
                     tryPutFile(putObjectRequest, 5);
 
                     futures.forEach(future -> future.complete(null));
+                    totalSize += buffer.size();
 
                     buffer.reset();
                 }
                 long finalBufferSize = mainBuffer.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
                 memoryTracker.reserveMemory(finalBufferSize - existingBufferSize);
-                log.info(String.format("%d written to S3", fileSize));
+                log.info(String.format("%d files (%s) written to S3", projectCount, DataSize.succinctBytes(totalSize).toString()));
             } catch (Exception e) {
                 log.error(e, "Error sending file to S3");
             }
