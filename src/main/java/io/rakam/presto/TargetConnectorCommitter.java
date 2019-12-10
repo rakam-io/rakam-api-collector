@@ -47,7 +47,7 @@ public class TargetConnectorCommitter
 
     public boolean isFull()
     {
-        return activeFlushCount.get() / executorPoolSize > IO_OPS_RATE;
+        return (activeFlushCount.get() / executorPoolSize) > IO_OPS_RATE;
     }
 
     public int getActiveFlushCount()

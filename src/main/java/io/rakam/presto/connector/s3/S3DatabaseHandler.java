@@ -442,6 +442,7 @@ public class S3DatabaseHandler
                                 totalFileWritten,
                                 DataSize.succinctBytes(totalDataSizeWritten).toString(),
                                 Duration.succinctDuration(System.currentTimeMillis() - startedAt, TimeUnit.MILLISECONDS).toString()));
+                        Thread.sleep(1000);
                     } else {
                         Thread.sleep(3000);
                     }
