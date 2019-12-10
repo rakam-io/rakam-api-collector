@@ -23,6 +23,6 @@ public interface DatabaseHandler
 
         void addPage(Page page);
 
-        CompletableFuture<Void> commit();
+        CompletableFuture commit();
     }
 }

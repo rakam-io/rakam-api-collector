@@ -105,15 +105,15 @@ public class S3DatabaseHandler
         this.s3Client = builder.build();
     }
 
-    @PostConstruct
-    public void schedule() {
-        writerThread.start();
-    }
-
-    @PreDestroy
-    public void destroy() {
-        writerThread.interrupt();
-    }
+//    @PostConstruct
+//    public void schedule() {
+//        writerThread.start();
+//    }
+//
+//    @PreDestroy
+//    public void destroy() {
+//        writerThread.interrupt();
+//    }
 
     @Override
     public List<ColumnMetadata> getColumns(String schema, String table) {
@@ -285,17 +285,31 @@ public class S3DatabaseHandler
 
         @Override
         public CompletableFuture<Void> commit() {
-            CompletableFuture future = new CompletableFuture();
+//            CompletableFuture future = new CompletableFuture();
             try {
                 generator.flush();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
 
-            Queue<CollectionBatch> batches = collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> new ConcurrentLinkedQueue());
-            batches.add(new CollectionBatch(output, future));
 
-            return future;
+//            Queue<CollectionBatch> batches = collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> new ConcurrentLinkedQueue());
+//            batches.add(new CollectionBatch(this.output, future));
+
+            return CompletableFuture.supplyAsync(new Supplier() {
+                @Override
+                public Object get() {
+                    ObjectMetadata objectMetadata = new ObjectMetadata();
+                    objectMetadata.setContentLength(output.size());
+                    PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
+                            null,
+                            new SafeSliceInputStream(new BasicSliceInput(output.slice())),
+                            objectMetadata);
+
+                    tryPutFile(putObjectRequest, 5);
+                    return null;
+                }
+            });
         }
     }
 
