@@ -305,10 +305,13 @@ public class S3DatabaseHandler
                         out.finish();
                         out.close();
 
+                        String fileName = String.format("%s/%s.ndjson.gzip", table.getSchemaName(), UUID.randomUUID().toString());
+
+
                         ObjectMetadata objectMetadata = new ObjectMetadata();
                         objectMetadata.setContentLength(gzipOutput.size());
                         PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
-                                null,
+                                fileName,
                                 new SafeSliceInputStream(new BasicSliceInput(gzipOutput.slice())),
                                 objectMetadata);
 
