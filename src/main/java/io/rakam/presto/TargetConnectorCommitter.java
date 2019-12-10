@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class TargetConnectorCommitter
 {
-    private static int IO_OPS_RATE = 3;
+    private static int IO_OPS_RATE = 20;
 
     private final int executorPoolSize;
     private final DatabaseHandler databaseHandler;
