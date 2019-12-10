@@ -77,7 +77,7 @@ public class S3DatabaseHandler
     private Map<String, Queue<CollectionBatch>> collectionsBuffer;
     // TODO: clean the buffer periodically
     private final Map<String, DynamicSliceOutput> projectBuffers;
-    private final DynamicSliceOutput gzipBuffer;
+//    private final DynamicSliceOutput gzipBuffer;
 
     @Inject
     public S3DatabaseHandler(S3TargetConfig config, MemoryTracker memoryTracker, @Named("metadata.store.jdbc") JDBCPoolDataSource prestoMetastoreDataSource, TypeManager typeManager, FieldNameConfig fieldNameConfig) {
@@ -306,10 +306,10 @@ public class S3DatabaseHandler
                         out.close();
 
                         ObjectMetadata objectMetadata = new ObjectMetadata();
-                        objectMetadata.setContentLength(output.size());
+                        objectMetadata.setContentLength(gzipOutput.size());
                         PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
                                 null,
-                                new SafeSliceInputStream(new BasicSliceInput(output.slice())),
+                                new SafeSliceInputStream(new BasicSliceInput(gzipOutput.slice())),
                                 objectMetadata);
 
                         tryPutFile(putObjectRequest, 5);
@@ -460,7 +460,7 @@ public class S3DatabaseHandler
                     }
 
                     long finalBufferSize = projectBuffers.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
-                    memoryTracker.reserveMemory(finalBufferSize - existingBufferSize);
+                    memoryTracker.reserveMemory(finalBufferSize - 0);
                     if (totalFileWritten > 0) {
                         log.info(String.format("%d files (%s) written to S3 in %s",
                                 totalFileWritten,
