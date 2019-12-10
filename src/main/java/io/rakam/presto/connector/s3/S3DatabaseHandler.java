@@ -26,6 +26,7 @@ import io.airlift.log.Logger;
 import io.airlift.slice.BasicSliceInput;
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.units.DataSize;
+import io.airlift.units.Duration;
 import io.rakam.presto.DatabaseHandler;
 import io.rakam.presto.FieldNameConfig;
 import io.rakam.presto.MemoryTracker;
@@ -109,6 +110,11 @@ public class S3DatabaseHandler
     public void schedule() {
         scheduler.scheduleWithFixedDelay(() -> {
             try {
+                if(collectionsBuffer.isEmpty()) {
+                    return;
+                }
+
+                long startedAt = System.currentTimeMillis();
                 long existingBufferSize = mainBuffer.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
                 int projectCount = collectionsBuffer.size();
                 long totalSize = 0;
@@ -153,7 +159,10 @@ public class S3DatabaseHandler
                 }
                 long finalBufferSize = mainBuffer.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
                 memoryTracker.reserveMemory(finalBufferSize - existingBufferSize);
-                log.info(String.format("%d files (%s) written to S3", projectCount, DataSize.succinctBytes(totalSize).toString()));
+                log.info(String.format("%d files (%s) written to S3 in %s",
+                        projectCount,
+                        DataSize.succinctBytes(totalSize).toString(),
+                        Duration.succinctDuration(System.currentTimeMillis() - startedAt, TimeUnit.MILLISECONDS).toString()));
             } catch (Exception e) {
                 log.error(e, "Error sending file to S3");
             }
