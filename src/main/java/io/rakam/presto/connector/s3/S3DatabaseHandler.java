@@ -35,6 +35,7 @@ import org.rakam.util.JsonHelper;
 import org.skife.jdbi.v2.DBI;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import java.io.DataOutput;
 import java.io.IOException;
@@ -106,6 +107,11 @@ public class S3DatabaseHandler
     @PostConstruct
     public void schedule() {
         writerThread.start();
+    }
+
+    @PreDestroy
+    public void destroy() {
+        writerThread.interrupt();
     }
 
     @Override
@@ -421,7 +427,9 @@ public class S3DatabaseHandler
 
                         tryPutFile(putObjectRequest, 5);
 
-                        futures.forEach(future -> future.complete(null));
+                        for (CompletableFuture future : futures) {
+                            future.complete(null);
+                        }
                         totalDataSizeWritten += buffer.size();
                         totalFileWritten += 1;
 

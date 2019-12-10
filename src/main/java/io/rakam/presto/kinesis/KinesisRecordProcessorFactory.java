@@ -54,7 +54,7 @@ public class KinesisRecordProcessorFactory
 
     @PostConstruct
     public void start() {
-        if (log.isDebugEnabled()) {
+//        if (log.isDebugEnabled()) {
             scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
             scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
@@ -65,19 +65,21 @@ public class KinesisRecordProcessorFactory
                             committer.getActiveFlushCount(),
                             committer.isFull() ? "full" : "not full",
                             middlewareBuffer.calculateSize().toString());
-                    log.debug(message);
+                    log.info(message);
                 }
                 catch (Exception e) {
                     log.debug(e, "Error while printing stats");
                 }
-            }, 5, 5, SECONDS);
-        } else {
-            scheduledExecutorService = null;
-        }
+            }, 30, 10, SECONDS);
+//        } else {
+//            scheduledExecutorService = null;
+//        }
     }
 
     @PreDestroy
     public void destroyWorkers() {
-        scheduledExecutorService.shutdown();
+        if(scheduledExecutorService != null) {
+            scheduledExecutorService.shutdown();
+        }
     }
 }
