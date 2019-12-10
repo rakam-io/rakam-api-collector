@@ -472,13 +472,9 @@ public class S3DatabaseHandler
                 return true;
             }
 
-            long sizeInBytes = 0;
-            while(batch != null) {
-                sizeInBytes += batch.buffer.size();
-                batch = queue.peek();
-            }
+            long sizeInBytes = queue.stream().mapToLong(e -> e.buffer.size()).sum();
 
-            return sizeInBytes > config.getMaxDataSize().toBytes() / 10;
+            return sizeInBytes > config.getMaxDataSize().toBytes() / 5;
         }
     }
 
