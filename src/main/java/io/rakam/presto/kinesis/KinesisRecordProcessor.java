@@ -125,6 +125,7 @@ public class KinesisRecordProcessor
             middlewareBuffer.add(new BatchRecords(pages, () -> {
                 try {
                     checkpointer.checkpoint();
+                    log.info("Checkpoint executed for %d records", pages.values().stream().mapToLong(e -> e.page.getPositionCount()).sum());
                 }
                 catch (InvalidStateException | ShutdownException e) {
                     throw new RuntimeException(e);

@@ -290,7 +290,6 @@ public class S3DatabaseHandler
                 throw new RuntimeException(e);
             }
 
-
 //            Queue<CollectionBatch> batches = collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> new ConcurrentLinkedQueue());
 //            batches.add(new CollectionBatch(this.output, future));
 
@@ -307,7 +306,6 @@ public class S3DatabaseHandler
 
                         String fileName = String.format("%s/%s.ndjson.gzip", table.getSchemaName(), UUID.randomUUID().toString());
 
-
                         ObjectMetadata objectMetadata = new ObjectMetadata();
                         objectMetadata.setContentLength(gzipOutput.size());
                         PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
@@ -318,6 +316,7 @@ public class S3DatabaseHandler
                         tryPutFile(putObjectRequest, 5);
                         return null;
                     } catch (IOException e) {
+                        log.error(e);
                         throw new RuntimeException(e);
                     }
                 }
