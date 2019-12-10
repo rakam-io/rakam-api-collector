@@ -34,6 +34,8 @@ import org.rakam.analysis.JDBCPoolDataSource;
 import org.rakam.util.JsonHelper;
 import org.skife.jdbi.v2.DBI;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import java.io.DataOutput;
 import java.io.IOException;
@@ -47,6 +49,7 @@ import java.time.format.FormatStyle;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -76,14 +79,13 @@ public class S3DatabaseHandler
 
     private Map<String, Queue<CollectionBatch>> collectionsBuffer;
     // TODO: clean the buffer periodically
-    private final Map<String, DynamicSliceOutput> projectBuffers;
-//    private final DynamicSliceOutput gzipBuffer;
+    private final DynamicSliceOutput gzipBuffer;
 
     @Inject
     public S3DatabaseHandler(S3TargetConfig config, MemoryTracker memoryTracker, @Named("metadata.store.jdbc") JDBCPoolDataSource prestoMetastoreDataSource, TypeManager typeManager, FieldNameConfig fieldNameConfig) {
         writerThread = new S3WriterThread();
         collectionsBuffer = new ConcurrentHashMap<>();
-        projectBuffers = new ConcurrentHashMap();
+        gzipBuffer = new DynamicSliceOutput(10000);
         this.memoryTracker = memoryTracker;
         this.config = config;
         this.fieldNameConfig = fieldNameConfig;
@@ -103,15 +105,15 @@ public class S3DatabaseHandler
         this.s3Client = builder.build();
     }
 
-//    @PostConstruct
-//    public void schedule() {
-//        writerThread.start();
-//    }
-//
-//    @PreDestroy
-//    public void destroy() {
-//        writerThread.interrupt();
-//    }
+    @PostConstruct
+    public void schedule() {
+        writerThread.start();
+    }
+
+    @PreDestroy
+    public void destroy() {
+        writerThread.interrupt();
+    }
 
     @Override
     public List<ColumnMetadata> getColumns(String schema, String table) {
@@ -283,44 +285,44 @@ public class S3DatabaseHandler
 
         @Override
         public CompletableFuture<Void> commit() {
-//            CompletableFuture future = new CompletableFuture();
+            CompletableFuture future = new CompletableFuture();
             try {
                 generator.flush();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
 
-//            Queue<CollectionBatch> batches = collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> new ConcurrentLinkedQueue());
-//            batches.add(new CollectionBatch(this.output, future));
-
-            return CompletableFuture.supplyAsync(new Supplier() {
-                @Override
-                public Object get() {
-                    try {
-                        DynamicSliceOutput gzipOutput = new DynamicSliceOutput(output.size() / 10);
-                        GZIPOutputStream out = new GZIPOutputStream(gzipOutput);
-
-                        out.write((byte[]) output.slice().getBase(), 0, output.size());
-                        out.finish();
-                        out.close();
-
-                        String fileName = String.format("%s/%s.ndjson.gzip", table.getSchemaName(), UUID.randomUUID().toString());
-
-                        ObjectMetadata objectMetadata = new ObjectMetadata();
-                        objectMetadata.setContentLength(gzipOutput.size());
-                        PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
-                                fileName,
-                                new SafeSliceInputStream(new BasicSliceInput(gzipOutput.slice())),
-                                objectMetadata);
-
-                        tryPutFile(putObjectRequest, 5);
-                        return null;
-                    } catch (IOException e) {
-                        log.error(e);
-                        throw new RuntimeException(e);
-                    }
-                }
-            });
+            Queue<CollectionBatch> batches = collectionsBuffer.computeIfAbsent(table.getSchemaName(), schema -> new ConcurrentLinkedQueue());
+            batches.add(new CollectionBatch(this.output, future));
+            return future;
+//            return CompletableFuture.supplyAsync(new Supplier() {
+//                @Override
+//                public Object get() {
+//                    try {
+//                        DynamicSliceOutput gzipOutput = new DynamicSliceOutput(output.size() / 10);
+//                        GZIPOutputStream out = new GZIPOutputStream(gzipOutput);
+//
+//                        out.write((byte[]) output.slice().getBase(), 0, output.size());
+//                        out.finish();
+//                        out.close();
+//
+//                        String fileName = String.format("%s/%s.ndjson.gzip", table.getSchemaName(), UUID.randomUUID().toString());
+//
+//                        ObjectMetadata objectMetadata = new ObjectMetadata();
+//                        objectMetadata.setContentLength(gzipOutput.size());
+//                        PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
+//                                fileName,
+//                                new SafeSliceInputStream(new BasicSliceInput(gzipOutput.slice())),
+//                                objectMetadata);
+//
+//                        tryPutFile(putObjectRequest, 5);
+//                        return null;
+//                    } catch (IOException e) {
+//                        log.error(e);
+//                        throw new RuntimeException(e);
+//                    }
+//                }
+//            });
         }
     }
 
@@ -381,8 +383,7 @@ public class S3DatabaseHandler
         }
 
         @Override
-        public synchronized void reset()
-                throws IOException {
+        public synchronized void reset() throws IOException {
             throw new IOException("mark/reset not supported");
         }
 
@@ -425,16 +426,14 @@ public class S3DatabaseHandler
                             continue;
                         }
 
-                        DynamicSliceOutput buffer = projectBuffers.computeIfAbsent(project, p -> new DynamicSliceOutput(100000));
-
                         String fileName = String.format("%s/%s.ndjson.gzip", project, UUID.randomUUID().toString());
 
                         ArrayList<CompletableFuture> futures = new ArrayList();
                         long maxDataSizeInBytes = config.getMaxDataSize().toBytes();
 
-                        GZIPOutputStream out = new GZIPOutputStream(buffer);
+                        GZIPOutputStream out = new GZIPOutputStream(gzipBuffer);
 
-                        while (!batches.isEmpty() && buffer.getRetainedSize() < maxDataSizeInBytes) {
+                        while (!batches.isEmpty() && gzipBuffer.getRetainedSize() < maxDataSizeInBytes) {
                             CollectionBatch collectionBatch = batches.poll();
                             out.write((byte[]) collectionBatch.buffer.slice().getBase(), 0, collectionBatch.buffer.size());
                             futures.add(collectionBatch.future);
@@ -444,10 +443,10 @@ public class S3DatabaseHandler
                         out.close();
 
                         ObjectMetadata objectMetadata = new ObjectMetadata();
-                        objectMetadata.setContentLength(buffer.size());
+                        objectMetadata.setContentLength(gzipBuffer.size());
                         PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
                                 fileName,
-                                new SafeSliceInputStream(new BasicSliceInput(buffer.slice())),
+                                new SafeSliceInputStream(new BasicSliceInput(gzipBuffer.slice())),
                                 objectMetadata);
 
                         tryPutFile(putObjectRequest, 5);
@@ -455,14 +454,12 @@ public class S3DatabaseHandler
                         for (CompletableFuture future : futures) {
                             future.complete(NULLS.get());
                         }
-                        totalDataSizeWritten += buffer.size();
+                        totalDataSizeWritten += gzipBuffer.size();
                         totalFileWritten += 1;
 
-                        buffer.reset();
+                        gzipBuffer.reset();
                     }
 
-                    long finalBufferSize = projectBuffers.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
-                    memoryTracker.reserveMemory(finalBufferSize - 0);
                     if (totalFileWritten > 0) {
                         log.info(String.format("%d files (%s) written to S3 in %s",
                                 totalFileWritten,

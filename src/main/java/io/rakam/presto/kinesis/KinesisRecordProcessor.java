@@ -20,7 +20,6 @@ import io.rakam.presto.BatchRecords;
 import io.rakam.presto.MemoryTracker;
 import io.rakam.presto.MiddlewareBuffer;
 import io.rakam.presto.MiddlewareBuffer.TableCheckpoint;
-import io.rakam.presto.MiddlewareConfig;
 import io.rakam.presto.StreamWorkerContext;
 import io.rakam.presto.TargetConnectorCommitter;
 import io.rakam.presto.deserialization.TableData;

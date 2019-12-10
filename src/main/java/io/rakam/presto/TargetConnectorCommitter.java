@@ -55,7 +55,8 @@ public class TargetConnectorCommitter
 
     public int availableSlots()
     {
-        return (executorPoolSize * IO_OPS_RATE) - activeFlushCount.get();
+        return 100000;
+//        return (executorPoolSize * IO_OPS_RATE) - activeFlushCount.get();
     }
 
     public int getActiveFlushCount()
