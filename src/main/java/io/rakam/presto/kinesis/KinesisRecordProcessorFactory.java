@@ -54,7 +54,7 @@ public class KinesisRecordProcessorFactory
 
     @PostConstruct
     public void start() {
-//        if (log.isDebugEnabled()) {
+        if (log.isInfoEnabled()) {
             scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
             scheduledExecutorService.scheduleAtFixedRate(() -> {
                 try {
@@ -70,10 +70,10 @@ public class KinesisRecordProcessorFactory
                 catch (Exception e) {
                     log.debug(e, "Error while printing stats");
                 }
-            }, 30, 10, SECONDS);
-//        } else {
-//            scheduledExecutorService = null;
-//        }
+            }, 30, 20, SECONDS);
+        } else {
+            scheduledExecutorService = null;
+        }
     }
 
     @PreDestroy
