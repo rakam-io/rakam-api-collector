@@ -386,7 +386,7 @@ public class S3DatabaseHandler
                     long existingBufferSize = projectBuffers.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
                     long totalDataSizeWritten = 0;
                     long totalFileWritten = 0;
-                    
+
                     Iterator<Map.Entry<String, Queue<CollectionBatch>>> it = collectionsBuffer.entrySet().iterator();
                     while (it.hasNext()) {
                         Map.Entry<String, Queue<CollectionBatch>> entry = it.next();
@@ -430,6 +430,7 @@ public class S3DatabaseHandler
 
                         buffer.reset();
                     }
+
                     long finalBufferSize = projectBuffers.values().stream().mapToLong(value -> value.getRetainedSize()).sum();
                     memoryTracker.reserveMemory(finalBufferSize - existingBufferSize);
                     if(totalFileWritten > 0) {
