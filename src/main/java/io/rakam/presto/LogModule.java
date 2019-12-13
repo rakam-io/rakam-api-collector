@@ -11,6 +11,7 @@ import io.airlift.configuration.Config;
 import io.sentry.Sentry;
 import io.sentry.SentryClient;
 import io.sentry.jul.SentryHandler;
+import org.rakam.util.RakamClient;
 
 import java.io.IOException;
 import java.net.URL;
@@ -25,7 +26,6 @@ public class LogModule
 {
     private static final io.airlift.log.Logger log = io.airlift.log.Logger.get(LogModule.class);
 
-    private static final String SENTRY_DSN = "https://96145b6c6517416e9bcd24bba96e4433:6f5ba5b727114d5e91694b1755584500@sentry.io/1290995";
     private static final String RELEASE;
 
     static {
@@ -56,27 +56,16 @@ public class LogModule
         }
     }
 
+    private static final String SENTRY_DSN = String.format("https://96145b6c6517416e9bcd24bba96e4433:6f5ba5b727114d5e91694b1755584500@sentry.io/1290995?release=%s&stacktrace.app.packages=org.rakam",
+            RakamClient.RELEASE);
+
     @Override
     public void setup(Binder binder)
     {
-        LogManager manager = LogManager.getLogManager();
         LogConfig logConfig = buildConfigObject(LogConfig.class);
-        if (logConfig.getLogActive() && !Arrays.stream(manager.getLogger("").getHandlers())
-                .anyMatch(e -> e instanceof SentryHandler)) {
-            Logger rootLogger = manager.getLogger("");
 
-            SentryClient client = Sentry.init(SENTRY_DSN);
-            if (logConfig.getTags() != null) {
-                for (String item : Splitter.on(',').split(logConfig.getTags())) {
-                    String[] split = item.split("=", 2);
-                    client.addTag(split[0], split.length > 1 ? split[1] : "true");
-                }
-            }
-            client.setRelease(RELEASE);
-
-            SentryHandler sentryHandler = new SentryHandler();
-            sentryHandler.setLevel(Level.SEVERE);
-            rootLogger.addHandler(sentryHandler);
+        if (logConfig.getLogActive()) {
+            Sentry.init(SENTRY_DSN+"&tags=company:"+logConfig.getCompanyName());
         }
     }
 
@@ -84,6 +73,7 @@ public class LogModule
     {
         private boolean logActive = true;
         private String tags;
+        private String companyName;
 
         public boolean getLogActive()
         {
@@ -106,6 +96,18 @@ public class LogModule
         public LogConfig setTags(String tags)
         {
             this.tags = tags;
+            return this;
+        }
+
+        public String getCompanyName()
+        {
+            return companyName;
+        }
+
+        @Config("company-name")
+        public LogConfig setCompanyName(String companyName)
+        {
+            this.companyName = companyName;
             return this;
         }
     }
