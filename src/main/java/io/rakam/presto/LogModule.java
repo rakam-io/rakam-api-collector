@@ -56,7 +56,7 @@ public class LogModule
         }
     }
 
-    private static final String SENTRY_DSN = String.format("https://96145b6c6517416e9bcd24bba96e4433:6f5ba5b727114d5e91694b1755584500@sentry.io/1290995?release=%s&stacktrace.app.packages=org.rakam",
+    private static final String SENTRY_DSN = String.format("https://96145b6c6517416e9bcd24bba96e4433@sentry.io/1290995?release=%s&stacktrace.app.packages=io.rakam",
             RakamClient.RELEASE);
 
     @Override

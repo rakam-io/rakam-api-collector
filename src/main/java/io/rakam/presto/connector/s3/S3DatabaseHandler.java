@@ -111,6 +111,10 @@ public class S3DatabaseHandler
     @PostConstruct
     public void schedule() {
         writerThread.start();
+        writerThread.setUncaughtExceptionHandler((t, e) -> {
+            log.error(e, "S3 writer thread halted");
+            System.exit(1);
+        });
     }
 
     @PreDestroy
@@ -398,7 +402,7 @@ public class S3DatabaseHandler
                     while (it.hasNext()) {
                         Map.Entry<String, Queue<CollectionBatch>> entry = it.next();
 
-                        if (!shouldFlush(entry)) {
+                        if (!shouldFlush(startedAt, entry)) {
                             continue;
                         }
 
@@ -447,8 +451,6 @@ public class S3DatabaseHandler
                                 totalFileWritten,
                                 DataSize.succinctBytes(totalDataSizeWritten).toString(),
                                 Duration.succinctDuration(System.currentTimeMillis() - startedAt, TimeUnit.MILLISECONDS).toString()));
-                        // relax a bit
-                        Thread.sleep(100);
                     } else {
                         Thread.sleep(3000);
                     }
@@ -458,7 +460,7 @@ public class S3DatabaseHandler
             }
         }
 
-        private boolean shouldFlush(Map.Entry<String, Queue<CollectionBatch>> projectQueuePair) {
+        private boolean shouldFlush(long startedAt, Map.Entry<String, Queue<CollectionBatch>> projectQueuePair) {
             Queue<CollectionBatch> queue = projectQueuePair.getValue();
 
             if(queue.isEmpty()) {
@@ -467,7 +469,7 @@ public class S3DatabaseHandler
 
             CollectionBatch batch = queue.peek();
             long timestamp = batch.timestamp;
-            long lastExpireTime = System.currentTimeMillis() - (middlewareConfig.getMaxFlushDuration().toMillis() * 2);
+            long lastExpireTime = startedAt - (middlewareConfig.getMaxFlushDuration().toMillis() * 2);
             if(timestamp < lastExpireTime) {
                 return true;
             }
