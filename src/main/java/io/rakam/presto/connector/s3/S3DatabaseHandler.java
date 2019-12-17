@@ -399,33 +399,31 @@ public class S3DatabaseHandler
 
         public void run() {
             while (!isInterrupted()) {
-                try {
-                    long startedAt = System.currentTimeMillis();
-                    long totalDataSizeWritten = 0;
-                    long totalFileWritten = 0;
-                    long gzipBufferSize = gzipBuffer.getRetainedSize();
+                long startedAt = System.currentTimeMillis();
+                long totalDataSizeWritten = 0;
+                long totalFileWritten = 0;
+                long gzipBufferSize = gzipBuffer.getRetainedSize();
 
-                    Iterator<Map.Entry<String, Queue<CollectionBatch>>> it = collectionsBuffer.entrySet().iterator();
-                    while (it.hasNext()) {
-                        Map.Entry<String, Queue<CollectionBatch>> entry = it.next();
+                Iterator<Map.Entry<String, Queue<CollectionBatch>>> it = collectionsBuffer.entrySet().iterator();
+                while (it.hasNext()) {
+                    List<CollectionBatch> batchesInProgress = new ArrayList();
+                    Map.Entry<String, Queue<CollectionBatch>> entry = it.next();
+                    String project = entry.getKey();
+                    Queue<CollectionBatch> batches = entry.getValue();
 
-                        if (!shouldFlush(startedAt, entry)) {
-                            continue;
-                        }
-
-                        String project = entry.getKey();
-                        Queue<CollectionBatch> batches = entry.getValue();
+                    if (!shouldFlush(startedAt, entry)) {
+                        continue;
+                    }
+                    
+                    try {
                         String fileName = String.format("%s/%s.ndjson.gzip", project, UUID.randomUUID().toString());
-
-                        ArrayList<CompletableFuture> futures = new ArrayList();
                         long maxDataSizeInBytes = config.getMaxDataSize().toBytes();
-
                         GZIPOutputStream out = new GZIPOutputStream(gzipBuffer);
 
                         while (!batches.isEmpty() && gzipBuffer.size() < maxDataSizeInBytes) {
                             CollectionBatch collectionBatch = batches.poll();
                             out.write((byte[]) collectionBatch.buffer.slice().getBase(), 0, collectionBatch.buffer.size());
-                            futures.add(collectionBatch.future);
+                            batchesInProgress.add(collectionBatch);
                         }
 
                         out.finish();
@@ -433,29 +431,34 @@ public class S3DatabaseHandler
 
                         tryPutFile(fileName, 5);
 
-                        for (CompletableFuture future : futures) {
-                            future.complete(NULLS.get());
+                        for (CollectionBatch batch : batchesInProgress) {
+                            batch.future.complete(NULLS.get());
                         }
                         totalDataSizeWritten += gzipBuffer.size();
                         totalFileWritten += 1;
 
                         gzipBuffer.reset();
+                    } catch (Throwable e) {
+                        batches.addAll(batches);
+                        log.error(e, "Error sending file to S3");
                     }
+                }
 
-                    if (totalFileWritten > 0) {
-                        long newGzipSize = gzipBuffer.getRetainedSize();
-                        if (newGzipSize != gzipBufferSize) {
-                            memoryTracker.reserveMemory(newGzipSize - gzipBufferSize);
-                        }
-                        log.info(String.format("%d files (%s) written to S3 in %s",
-                                totalFileWritten,
-                                DataSize.succinctBytes(totalDataSizeWritten).toString(),
-                                Duration.succinctDuration(System.currentTimeMillis() - startedAt, TimeUnit.MILLISECONDS).toString()));
-                    } else {
-                        Thread.sleep(3000);
+                if (totalFileWritten > 0) {
+                    long newGzipSize = gzipBuffer.getRetainedSize();
+                    if (newGzipSize != gzipBufferSize) {
+                        memoryTracker.reserveMemory(newGzipSize - gzipBufferSize);
                     }
-                } catch (Throwable e) {
-                    log.error(e, "Error sending file to S3");
+                    log.info(String.format("%d files (%s) written to S3 in %s",
+                            totalFileWritten,
+                            DataSize.succinctBytes(totalDataSizeWritten).toString(),
+                            Duration.succinctDuration(System.currentTimeMillis() - startedAt, TimeUnit.MILLISECONDS).toString()));
+                } else {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        continue;
+                    }
                 }
             }
         }
