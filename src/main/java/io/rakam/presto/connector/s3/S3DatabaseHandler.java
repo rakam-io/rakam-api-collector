@@ -305,16 +305,23 @@ public class S3DatabaseHandler
         }
     }
 
-    private void tryPutFile(PutObjectRequest putObjectRequest, int numberOfTry) {
+    private void tryPutFile(String fileName, int numberOfTryRemaining) {
+        ObjectMetadata objectMetadata = new ObjectMetadata();
+        objectMetadata.setContentLength(gzipBuffer.size());
+        PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
+                fileName,
+                new SafeSliceInputStream(new BasicSliceInput(gzipBuffer.slice())),
+                objectMetadata);
+
         try {
             s3Client.putObject(putObjectRequest);
         } catch (SdkClientException e) {
-            if (numberOfTry == 0) {
+            if (numberOfTryRemaining == 0) {
                 log.error(e);
                 throw e;
-            } else {
-                tryPutFile(putObjectRequest, numberOfTry - 1);
             }
+
+            tryPutFile(fileName, numberOfTryRemaining - 1);
         }
     }
 
@@ -424,14 +431,7 @@ public class S3DatabaseHandler
                         out.finish();
                         out.close();
 
-                        ObjectMetadata objectMetadata = new ObjectMetadata();
-                        objectMetadata.setContentLength(gzipBuffer.size());
-                        PutObjectRequest putObjectRequest = new PutObjectRequest(config.getS3Bucket(),
-                                fileName,
-                                new SafeSliceInputStream(new BasicSliceInput(gzipBuffer.slice())),
-                                objectMetadata);
-
-                        tryPutFile(putObjectRequest, 5);
+                        tryPutFile(fileName, 5);
 
                         for (CompletableFuture future : futures) {
                             future.complete(NULLS.get());
@@ -444,7 +444,7 @@ public class S3DatabaseHandler
 
                     if (totalFileWritten > 0) {
                         long newGzipSize = gzipBuffer.getRetainedSize();
-                        if(newGzipSize != gzipBufferSize) {
+                        if (newGzipSize != gzipBufferSize) {
                             memoryTracker.reserveMemory(newGzipSize - gzipBufferSize);
                         }
                         log.info(String.format("%d files (%s) written to S3 in %s",
@@ -463,14 +463,14 @@ public class S3DatabaseHandler
         private boolean shouldFlush(long startedAt, Map.Entry<String, Queue<CollectionBatch>> projectQueuePair) {
             Queue<CollectionBatch> queue = projectQueuePair.getValue();
 
-            if(queue.isEmpty()) {
+            if (queue.isEmpty()) {
                 return false;
             }
 
             CollectionBatch batch = queue.peek();
             long timestamp = batch.timestamp;
             long lastExpireTime = startedAt - (middlewareConfig.getMaxFlushDuration().toMillis() * 2);
-            if(timestamp < lastExpireTime) {
+            if (timestamp < lastExpireTime) {
                 return true;
             }
 
