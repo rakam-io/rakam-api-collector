@@ -437,11 +437,11 @@ public class S3DatabaseHandler
                         }
                         totalDataSizeWritten += gzipBuffer.size();
                         totalFileWritten += 1;
-
-                        gzipBuffer.reset();
                     } catch (Throwable e) {
                         batches.addAll(batchesInProgress);
                         log.error(e, "Error sending file to S3");
+                    } finally {
+                        gzipBuffer.reset();
                     }
                 }
 
