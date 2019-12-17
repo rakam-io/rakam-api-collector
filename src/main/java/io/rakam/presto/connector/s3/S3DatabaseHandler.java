@@ -398,6 +398,8 @@ public class S3DatabaseHandler
         }
 
         public void run() {
+            long maxDataSizeInBytes = config.getMaxDataSize().toBytes();
+
             while (!isInterrupted()) {
                 long startedAt = System.currentTimeMillis();
                 long totalDataSizeWritten = 0;
@@ -414,10 +416,9 @@ public class S3DatabaseHandler
                     if (!shouldFlush(startedAt, entry)) {
                         continue;
                     }
-                    
+
                     try {
                         String fileName = String.format("%s/%s.ndjson.gzip", project, UUID.randomUUID().toString());
-                        long maxDataSizeInBytes = config.getMaxDataSize().toBytes();
                         GZIPOutputStream out = new GZIPOutputStream(gzipBuffer);
 
                         while (!batches.isEmpty() && gzipBuffer.size() < maxDataSizeInBytes) {
@@ -439,7 +440,7 @@ public class S3DatabaseHandler
 
                         gzipBuffer.reset();
                     } catch (Throwable e) {
-                        batches.addAll(batches);
+                        batches.addAll(batchesInProgress);
                         log.error(e, "Error sending file to S3");
                     }
                 }
