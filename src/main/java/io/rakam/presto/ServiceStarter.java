@@ -28,10 +28,8 @@ import io.rakam.presto.connector.s3.S3Module;
 import io.rakam.presto.kafka.KafkaStreamSourceModule;
 import io.rakam.presto.kinesis.KinesisStreamSourceModule;
 import org.weakref.jmx.guice.MBeanModule;
-import sun.rmi.runtime.Log;
 
 import javax.management.MBeanServer;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -48,20 +46,17 @@ import static java.lang.management.ManagementFactory.getPlatformMBeanServer;
 import static org.weakref.jmx.ObjectNames.generatedNameOf;
 import static org.weakref.jmx.guice.ExportBinder.newExporter;
 
-public final class ServiceStarter
-{
+public final class ServiceStarter {
     private final static Logger LOGGER = Logger.get(ServiceStarter.class);
     public static String RAKAM_VERSION;
 
     private ServiceStarter()
-            throws InstantiationException
-    {
+            throws InstantiationException {
         throw new InstantiationException("The class is not created for instantiation");
     }
 
     public static void main(String[] args)
-            throws Throwable
-    {
+            throws Throwable {
         if (args.length > 0) {
             System.setProperty("config", args[0]);
         }
@@ -72,28 +67,21 @@ public final class ServiceStarter
         modules.add(new StreamSourceModule());
         modules.add(new LogModule());
         modules.add(new MBeanModule());
-        modules.add(new AbstractConfigurationAwareModule()
-        {
+        modules.add(new AbstractConfigurationAwareModule() {
             @Override
-            protected void setup(Binder binder)
-            {
+            protected void setup(Binder binder) {
                 TargetConfig targetConfig = buildConfigObject(TargetConfig.class);
                 TargetConfig.Target target = targetConfig.getTarget();
-                if (target.equals(TargetConfig.Target.RAPTOR)) {
-                    install(new RaptorModule());
-                }
-                else if (target.equals(TargetConfig.Target.S3)) {
-                    install(new S3Module());
-                } else {
-                    throw new IllegalArgumentException("You must set the `target` config property");
+                try {
+                    install(target.getModule().newInstance());
+                } catch (InstantiationException | IllegalAccessException e) {
+                    throw new RuntimeException(e);
                 }
             }
         });
-        modules.add(new AbstractConfigurationAwareModule()
-        {
+        modules.add(new AbstractConfigurationAwareModule() {
             @Override
-            protected void setup(Binder binder)
-            {
+            protected void setup(Binder binder) {
                 MBeanServer mbeanServer = new RebindSafeMBeanServer(getPlatformMBeanServer());
                 binder.bind(MBeanServer.class).toInstance(mbeanServer);
 
@@ -126,8 +114,7 @@ public final class ServiceStarter
         LOGGER.info("======== SERVER STARTED ========");
     }
 
-    public static void initializeLogging(String logLevelsFile)
-    {
+    public static void initializeLogging(String logLevelsFile) {
         // unhook out and err while initializing logging or logger will print to them
         PrintStream out = System.out;
         PrintStream err = System.err;
@@ -141,22 +128,18 @@ public final class ServiceStarter
 
             Logging logging = Logging.initialize();
             logging.configure(config);
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new UncheckedIOException(e);
-        }
-        finally {
+        } finally {
             System.setOut(out);
             System.setErr(err);
         }
     }
 
     public static class StreamSourceModule
-            extends AbstractConfigurationAwareModule
-    {
+            extends AbstractConfigurationAwareModule {
         @Override
-        protected void setup(Binder binder)
-        {
+        protected void setup(Binder binder) {
             configBinder(binder).bindConfig(StreamConfig.class);
             configBinder(binder).bindConfig(BackupConfig.class);
             configBinder(binder).bindConfig(FieldNameConfig.class);
@@ -171,12 +154,10 @@ public final class ServiceStarter
             OptionalBinder.newOptionalBinder(binder, HistoricalDataHandler.class);
 
 
-
             bindDataSource("stream.source");
         }
 
-        private void bindDataSource(String sourceName)
-        {
+        private void bindDataSource(String sourceName) {
             install(installIfPropertyEquals(new KafkaStreamSourceModule(), sourceName, "kafka"));
             install(installIfPropertyEquals(new KinesisStreamSourceModule(), sourceName, "kinesis"));
         }
@@ -189,39 +170,43 @@ public final class ServiceStarter
             URL resource = ServiceStarter.class.getResource("/git.properties");
             if (resource == null) {
                 LOGGER.warn("git.properties doesn't exist.");
-            }
-            else {
+            } else {
                 inputStream = resource.openStream();
                 properties.load(inputStream);
             }
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             LOGGER.warn(e, "Error while reading git.properties");
         }
         try {
             RAKAM_VERSION = properties.get("git.commit.id.describe-short").toString().split("-", 2)[0];
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             LOGGER.warn(e, "Error while parsing git.properties");
         }
     }
 
-    public static class TargetConfig
-    {
+    public static class TargetConfig {
         public enum Target {
-            S3, RAPTOR
+            S3(S3Module.class), RAPTOR(RaptorModule.class);
+
+            private final Class<? extends AbstractConfigurationAwareModule> moduleClass;
+
+            Target(Class<? extends AbstractConfigurationAwareModule> moduleClass) {
+                this.moduleClass = moduleClass;
+            }
+
+            public Class<? extends AbstractConfigurationAwareModule> getModule() {
+                return moduleClass;
+            }
         }
 
         private Target target;
 
-        public Target getTarget()
-        {
+        public Target getTarget() {
             return target;
         }
 
         @Config("target")
-        public TargetConfig setTarget(String target)
-        {
+        public TargetConfig setTarget(String target) {
             this.target = Target.valueOf(target.toUpperCase(Locale.ENGLISH));
             return this;
         }
