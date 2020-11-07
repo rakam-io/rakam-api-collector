@@ -100,6 +100,7 @@ public class CustomDatabaseHandler extends DatabaseHandler
 	public Inserter insert(String schema, String table, List<ColumnMetadata> columns) {
 		// create an `Inserter` that performs the action asyncronously in the background thread
 	}
+}
 ```
 
 Add it to `io.rakam.presto.ServiceStarter.TargetConfig.Target` enum class for the system to install your module when `target` is set to your implementation and you're done!
