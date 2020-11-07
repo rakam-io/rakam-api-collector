@@ -1,40 +1,70 @@
-[![Wercker](https://img.shields.io/wercker/ci/wercker/docs.svg)]()
+# rakam-api-collector
 
-# rakam-presto-collector
+Real-time data ingestion engine
 
-1. Poll data data from Kinesis or Kafka
-2. Store it in buffer and flush the buffer periodically
-3. Deserialized the JSON/Avro data into Presto internal in-memory columnar format `Page`
-4. Create `ORC` file from `Page` using Raptor
-5. Calculate the indexes for Raptor, and write the file to local disk and update metadata.
-6. Create backup S3 file.
+## Required Configs
+`stream.source`: `kafka` or `kinesis`
+`target`: `s3` or custom implementation
 
-## Sample Config
+1. Poll data data from the `stream.source`
+2. Store it in buffer and and deserialize the data into a internal in-memory columnar format `Page`.
+3. Flush the data into the `target` periodically using `middleware.max-flush-duration` config.
+
+
+# `stream.source`:
 ```
-#aws.access-key=
-#aws.secret-access-key=
-#aws.s3-bulk-bucket=
-#aws.region=us-east-1
+stream.max-flush-duration=15s
+middleware.max-flush-duration=60s
+```
 
-# ----- For Kafka
-#stream.source=kafka
-#kafka.nodes=127.0.0.1
-#kafka.topic=presto_test_2
-# 'earliest' or 'latest'
-#kafka.offset=earliest
+### `stream.source`: kinesis
 
-#kafka.group.id=
+Consumes data from your Kinesis streams
 
-#zookeeper.nodes=127.0.0.1
+```
+kinesis.stream=
+kinesis.max-records-per-batch=
+kinesis.consumer-dynamodb-table=
+aws.enable-cloudwatch=
+aws.kinesis-endpoint=
+aws.dynamodb-endpoint=
+aws.region=
+aws.access-key= ## instance profile is used when not provided
+aws.secret-access-key= ## instance profile is used when not provided
+```
 
-#database.checkpoint-field=_shard_time
+### `stream.source`: kafka
 
-#raptor.aws.region=us-east-1
-#raptor.aws.s3-bucket=
+Consumes data from your Kafka cluster
 
-#raptor.metadata.url=jdbc:mysql://localhost/presto?user=presto&password=presto
-#raptor.node.id=ffffffff-ffff-ffff-ffff-ffffffffffff
-#raptor.storage.data-directory=/var/presto/data
-#raptor.presto-url=http://localhost:8080/
-#log-active=false
-#database.user-excluded-columns=_shard_time,_collection,_project
+```
+max.poll.records=
+historical.worker=false
+kafka.topic=
+kafka.offset='earliest' or 'latest'
+kafka.group.id=
+kafka.session.timeout.ms=
+kafka.request.timeout.ms=
+kafka.nodes=127.0.0.1,127.0.0.2
+kafka.historical-data-topic=
+source.data-format=AVRO or JSON
+```
+
+# `target`:
+
+## `target`: S3
+
+Creates compressed GZIP files with JSON content inside your S3 bucket
+
+```
+target.aws.region=
+target.aws.s3-bucket=
+target.access-key= ## instance profile is used when not provided
+target.secret-access-key= ## instance profile is used when not provided
+target.aws.s3-endpoint=
+target.aws.s3-max-data-size=
+```
+
+## Developing Custom Targets
+
+
