@@ -82,7 +82,7 @@ public class CustomModule
 }
 ```
 
-```json
+```java
 public class CustomDatabaseHandler extends DatabaseHandler
 {
     @Override
@@ -102,10 +102,6 @@ public class CustomDatabaseHandler extends DatabaseHandler
 	}
 ```
 
-Add it to `io.rakam.presto.ServiceStarter.TargetConfig.Target` enum class for the system to install your module when `target` is set to your implementation.
+Add it to `io.rakam.presto.ServiceStarter.TargetConfig.Target` enum class for the system to install your module when `target` is set to your implementation and you're done!
 
-
-
-
-
-
+If your enum key in `io.rakam.presto.ServiceStarter.TargetConfig.Target` is `CUSTOM`, start the collector with config `target=custom` and it will be used for target connector.
