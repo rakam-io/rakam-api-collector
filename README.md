@@ -1,10 +1,10 @@
-[![Wercker](https://img.shields.io/wercker/ci/wercker/docs.svg)]()
+# rakam-api-collector
 
-# rakam-presto-collector
+Real-time data ingestion engine
 
-## Configs
-`target`: `s3` or custom implementation
+## Required Configs
 `stream.source`: `kafka` or `kinesis`
+`target`: `s3` or custom implementation
 
 1. Poll data data from the `stream.source`
 2. Store it in buffer and and deserialize the data into a internal in-memory columnar format `Page`.
@@ -18,6 +18,9 @@ middleware.max-flush-duration=60s
 ```
 
 ### `stream.source`: kinesis
+
+Consumes data from your Kinesis streams
+
 ```
 kinesis.stream=
 kinesis.max-records-per-batch=
@@ -31,6 +34,9 @@ aws.secret-access-key= ## instance profile is used when not provided
 ```
 
 ### `stream.source`: kafka
+
+Consumes data from your Kafka cluster
+
 ```
 max.poll.records=
 historical.worker=false
@@ -47,11 +53,18 @@ source.data-format=AVRO or JSON
 # `target`:
 
 ## `target`: S3
+
+Creates compressed GZIP files with JSON content inside your S3 bucket
+
 ```
 target.aws.region=
 target.aws.s3-bucket=
-target.access-key=
-target.secret-access-key=
+target.access-key= ## instance profile is used when not provided
+target.secret-access-key= ## instance profile is used when not provided
 target.aws.s3-endpoint=
 target.aws.s3-max-data-size=
 ```
+
+## Developing Custom Targets
+
+
