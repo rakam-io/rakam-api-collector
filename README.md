@@ -5,6 +5,7 @@ Real-time data ingestion engine
 
 ## Required Configs
 **`stream.source`**: `kafka` or `kinesis`
+
 **`target`**: `s3` or custom implementation
 
 1. Poll data data from the `stream.source`
@@ -71,35 +72,45 @@ target.aws.s3-max-data-size=
 Create the following Java classes:
 
 ```java
-public class CustomModule  
-        extends AbstractConfigurationAwareModule  
-{  
-  @Override  
-  protected void setup(Binder binder)  
- {  
-  binder.bind(DatabaseHandler.class).to(CustomDatabaseHandler.class).asEagerSingleton();  
-  }  
+public class CustomModule
+        extends AbstractConfigurationAwareModule {
+    @Override
+    protected void setup(Binder binder) {
+        binder.bind(DatabaseHandler.class).to(CustomDatabaseHandler.class).asEagerSingleton();
+    }
 }
 ```
 
 ```java
-public class CustomDatabaseHandler extends DatabaseHandler
-{
+public class CustomDatabaseHandler extends AbstractDatabaseHandler {
+    @Inject
+    public CustomDatabaseHandler(@Named("metadata.store.jdbc") JDBCPoolDataSource metadataStore) {
+        super(metadataStore);
+    }
+
     @Override
-	public List<ColumnMetadata> getColumns(String schema, String table) {
-	   // Returns the columns for the table. In Rakam API, `schema` corresponds to `project` and table corresponds to `event type`.
-	   // If you use Kinesis, we store the metadata in Mysql so in this case, see the S3DatabaseHandler that makes use of the Rakam API metadata database.
-	}
-	  
-	@Override
-	public List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns) {
-	   // if your source supports data transformation, update your metadata
-	} 
-	  
-	@Override
-	public Inserter insert(String schema, String table, List<ColumnMetadata> columns) {
-		// create an `Inserter` that performs the action asyncronously in the background thread
-	}
+    public Inserter insert(String projectName, String eventType, List<ColumnMetadata> eventProperties) {
+        return new Inserter() {
+	    // we make use of PrestoSQL's Page as it provides us a way to process the data in a columnar and efficient way. See: https://github.com/prestosql/presto/blob/master/presto-spi/src/main/java/io/prestosql/spi/Page.java
+            @Override
+            public void addPage(Page page) {
+                for (int i = 0; i < eventProperties.size(); i++) {
+                    ColumnMetadata property = eventProperties.get(i);
+                    Block block = page.getBlock(i);
+                    if(property.getType() == DoubleType.DOUBLE) {
+                        // the `value` is the first value of property in our micro-batch
+                        double value = DoubleType.DOUBLE.getDouble(block, 0);
+                    }
+                }
+            }
+
+            @Override
+            public CompletableFuture commit() {
+                // if the future is completed, the checkpoint will be executed
+                return CompletableFuture.completedFuture(null);
+            }
+        };
+    }
 }
 ```
 
