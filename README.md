@@ -106,7 +106,7 @@ public class CustomDatabaseHandler extends AbstractDatabaseHandler {
 
             @Override
             public CompletableFuture commit() {
-                // if the future is completed, the checkpoint will be executed
+                // If the future is completed, the checkpoint will be executed. We make use of checkpointing just to make sure that we process the data in a reliable way. If the worker dies, we will try processing the batch in a different worker.
                 return CompletableFuture.completedFuture(null);
             }
         };
