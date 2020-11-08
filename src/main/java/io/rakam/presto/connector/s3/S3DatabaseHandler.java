@@ -133,12 +133,6 @@ public class S3DatabaseHandler
         return tableColumns;
     }
 
-
-    @Override
-    public List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns) {
-        throw new IllegalStateException("S3 adapter does not support changing the schema");
-    }
-
     @Override
     public Inserter insert(String schema, String table, List<ColumnMetadata> columns) {
         return new S3Inserter(new SchemaTableName(schema, table), columns);

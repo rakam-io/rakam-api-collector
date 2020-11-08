@@ -14,7 +14,9 @@ public interface DatabaseHandler
 {
     List<ColumnMetadata> getColumns(String schema, String table);
 
-    List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns);
+    default List<ColumnMetadata> addColumns(String schema, String table, List<ColumnMetadata> columns) {
+        throw new IllegalStateException("Handler dapter does not support changing the schema");
+    }
 
     Inserter insert(String schema, String table, List<ColumnMetadata> columns);
 
